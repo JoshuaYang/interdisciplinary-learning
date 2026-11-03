@@ -1,5 +1,6 @@
 import React from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
+import { X } from 'lucide-react';
 import { useChemStore } from '../../store/useChemStore';
 
 export const HelpDialog: React.FC = () => {
@@ -10,48 +11,49 @@ export const HelpDialog: React.FC = () => {
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Portal>
         <Dialog.Overlay className="radix-dialog-overlay" />
-        <Dialog.Content className="modal radix-dialog-content" aria-labelledby="help-title">
-          <div className="modal-card">
-            <div className="modal-head">
-              <div>
-                <span className="eyebrow">操作指南</span>
-                <Dialog.Title asChild>
-                  <h2 id="help-title">课堂演示说明</h2>
-                </Dialog.Title>
-              </div>
-              <Dialog.Close asChild>
-                <button className="ghost-btn" id="help-close" type="button">
-                  关闭
-                </button>
-              </Dialog.Close>
+        <Dialog.Content className="radix-dialog-content dialog-surface" aria-labelledby="help-title">
+          <div className="dialog-header">
+            <div>
+              <span className="small-label">操作指南</span>
+              <Dialog.Title asChild>
+                <h2 id="help-title">课堂实验与交互说明</h2>
+              </Dialog.Title>
             </div>
-            <div className="help-grid">
-              <div>
-                <h3>第一步 · 分子核验</h3>
-                <p>
-                  上传或载入 6 种分子的 JSON 配置文件，系统自动核验化学式、空间构型、键长与键角。点击任意已通过的分子卡片可单独预览其 3D 结构。
-                </p>
-              </div>
-              <div>
-                <h3>第二步 · 反应链路拼装</h3>
-                <p>
-                  从微粒库拖拽或点击微粒放入对应方框，完成链引发、链传递（一）、链传递（二）以及链终止（3 条自由基偶联反应）四个阶段的装配。
-                </p>
-              </div>
-              <div>
-                <h3>第三步 · 三维机理推演</h3>
-                <p>
-                  左键拖拽旋转视角，右键或双指平移，滚轮缩放；点击原子可高亮查看其成键状态。完成右侧机理问答可逐步解锁全部 7 个反应步骤。
-                </p>
-              </div>
-              <div>
-                <h3>键盘快捷键</h3>
-                <p>
-                  空格键播放或暂停；左右方向键切换已解锁的步骤；Home 键回到第一步并重置视角。
-                </p>
-              </div>
-            </div>
+            <Dialog.Close asChild>
+              <button className="icon-button" id="help-close" type="button" aria-label="关闭说明">
+                <X size={18} />
+              </button>
+            </Dialog.Close>
           </div>
+
+          <ol className="help-list">
+            <li>
+              <strong>第一步 · 分子结构核验与 3D 预览</strong>
+              <p>
+                上传或核验 6 种参与反应微粒的 JSON 配置文件，系统自动核验化学式、杂化方式、空间构型与键长键角。点击任意已通过的分子卡片可单独弹出其三维球棍模型并交互旋转。
+              </p>
+            </li>
+            <li>
+              <strong>第二步 · 微观反应链路拼装</strong>
+              <p>
+                从微粒池拖拽（或点击选中后放入）微粒至对应反应槽，依次完成「链引发」、「链传递（一）」、「链传递（二）」及「链终止（3 条自由基偶联反应）」四个阶段。
+              </p>
+            </li>
+            <li>
+              <strong>第三步 · 三维机理推演与原子追踪</strong>
+              <p>
+                左键拖拽旋转模型，滚轮或双指缩放，点击任意原子可高亮查看其成键状态与三维坐标。完成右侧反应机理推演问答即可逐步解锁全部 7 个步骤与连续播放。
+              </p>
+            </li>
+          </ol>
+
+          <div className="keyboard-help">
+            <kbd>空格</kbd> 播放 / 暂停 <kbd>←</kbd>
+            <kbd>→</kbd> 前后步骤切换 <kbd>Home</kbd> 回到初始步骤并复位视角
+          </div>
+          <p className="dialog-footnote">
+            离线可用 · 键长单位 Å · 三维动画为微观反应机理示意
+          </p>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

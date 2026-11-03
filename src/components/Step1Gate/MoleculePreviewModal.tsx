@@ -1,45 +1,17 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import * as Dialog from '@radix-ui/react-dialog';
-import { RotateCcw, Upload, X } from 'lucide-react';
+import { RotateCcw, X } from 'lucide-react';
 import { useChemStore, REQUIRED_SLOTS } from '../../store/useChemStore';
 import * as core from '../../engine/core';
+import {
+  ELEMENT_COLORS as COLORS,
+  ELEMENT_RADII as RADII,
+  RADICAL_COLOR,
+  getElementSpriteTexture as getElementTexture,
+} from '../../engine/cpkPalette';
 
-const COLORS: Record<string, number> = {
-  C: 0x3d5047,
-  H: 0xf6f7ed,
-  Br: 0x9e382b,
-};
-
-const RADII: Record<string, number> = {
-  C: 0.36,
-  H: 0.245,
-  Br: 0.46,
-};
-
-const textureCache = new Map<string, THREE.CanvasTexture>();
-function getElementTexture(element: string): THREE.CanvasTexture {
-  if (textureCache.has(element)) return textureCache.get(element)!;
-  const c = document.createElement('canvas');
-  c.width = 128;
-  c.height = 128;
-  const ctx = c.getContext('2d')!;
-  ctx.font = '500 66px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = element === 'C' || element === 'Br' ? '#ffffff' : '#344b29';
-  ctx.fillText(element, 64, 66);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  textureCache.set(element, tex);
-  return tex;
-}
-
-interface Props {
-  onReupload: (slotId: string) => void;
-}
-
-export const MoleculePreviewModal: React.FC<Props> = ({ onReupload }) => {
+export const MoleculePreviewModal: React.FC = () => {
   const previewSlotId = useChemStore((s) => s.previewSlotId);
   const slotState = useChemStore((s) => s.slotState);
   const setPreviewSlotId = useChemStore((s) => s.setPreviewSlotId);
@@ -82,11 +54,11 @@ export const MoleculePreviewModal: React.FC<Props> = ({ onReupload }) => {
 
       const root = new THREE.Group();
       scene.add(root);
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x929e82, 0.65));
-      const dirLight = new THREE.DirectionalLight(0xfff9e8, 1.25);
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x94a3b8, 0.7));
+      const dirLight = new THREE.DirectionalLight(0xfffdf5, 1.25);
       dirLight.position.set(-4, 7, 9);
       scene.add(dirLight);
-      const fillLight = new THREE.DirectionalLight(0xe1efcf, 0.4);
+      const fillLight = new THREE.DirectionalLight(0xe0f2fe, 0.42);
       fillLight.position.set(7, -2, 5);
       scene.add(fillLight);
 
@@ -152,7 +124,7 @@ export const MoleculePreviewModal: React.FC<Props> = ({ onReupload }) => {
         const hasRadical = radicalSet.has(a.id) || a.radical === 1;
         const dot = new THREE.Mesh(
           sphereGeo,
-          new THREE.MeshBasicMaterial({ color: 0xaa642c })
+          new THREE.MeshBasicMaterial({ color: RADICAL_COLOR })
         );
         dot.scale.setScalar(0.08);
         dot.visible = hasRadical;
@@ -327,7 +299,7 @@ export const MoleculePreviewModal: React.FC<Props> = ({ onReupload }) => {
         <Dialog.Overlay className="radix-dialog-overlay" />
         <Dialog.Content
           id="molecule-preview-dialog"
-          className="radix-dialog-content molecule-preview-dialog"
+          className="radix-dialog-content dialog-surface molecule-preview-dialog"
           aria-describedby={undefined}
         >
           <div className="dialog-header">
@@ -335,24 +307,13 @@ export const MoleculePreviewModal: React.FC<Props> = ({ onReupload }) => {
               <span className="small-label" id="mol-preview-subtitle">
                 分子三维结构预览 · {mol.geometry}
               </span>
-              <Dialog.Title id="mol-preview-title">
-                {mol.name || activeSlot?.name} · {mol.formula || activeSlot?.formula}
+              <Dialog.Title asChild>
+                <h2 id="mol-preview-title">
+                  {mol.name || activeSlot?.name} · {mol.formula || activeSlot?.formula}
+                </h2>
               </Dialog.Title>
             </div>
             <div className="mol-preview-header-actions">
-              <button
-                type="button"
-                id="mol-preview-reupload"
-                className="text-button top-action-btn mol-reupload-btn"
-                onClick={() => {
-                  const id = previewSlotId;
-                  setPreviewSlotId(null);
-                  onReupload(id);
-                }}
-              >
-                <Upload size={15} />
-                <span>重新上传文件</span>
-              </button>
               <Dialog.Close asChild>
                 <button className="icon-button" aria-label="关闭预览">
                   <X size={18} />
@@ -400,13 +361,31 @@ export const MoleculePreviewModal: React.FC<Props> = ({ onReupload }) => {
           </div>
 
           <div className="mol-preview-info" id="mol-preview-info">
-            <div className="mol-preview-meta-tags">
-              {mol.geometry && (
-                <span className="mol-preview-tag primary">空间构型：{mol.geometry}</span>
-              )}
-              {doc.hybridization && (
-                <span className="mol-preview-tag">中心杂化：{doc.hybridization}</span>
-              )}
+            <div className="mol-spec-grid">
+              <div className="mol-spec-item">
+                <span className="mol-spec-label">空间构型</span>
+                <strong className="mol-spec-value">{mol.geometry || '-'}</strong>
+              </div>
+              <div className="mol-spec-item">
+                <span className="mol-spec-label">中心原子杂化</span>
+                <strong className="mol-spec-value mono">
+                  {doc.hybridization && doc.hybridization !== 'none' ? doc.hybridization : '无'}
+                </strong>
+              </div>
+              <div className="mol-spec-item">
+                <span className="mol-spec-label">原子总数 / 成键数</span>
+                <strong className="mol-spec-value mono">
+                  {mol.atoms.length} 原子 · {mol.bonds.length} 共价键
+                </strong>
+              </div>
+              <div className="mol-spec-item">
+                <span className="mol-spec-label">未成对电子</span>
+                <strong className="mol-spec-value">
+                  {mol.radicals && mol.radicals.length > 0
+                    ? `${mol.radicals.length} 个（自由基微粒）`
+                    : '0（闭壳层稳定微粒）'}
+                </strong>
+              </div>
               {Array.isArray(mol.measurements) &&
                 mol.measurements.map((q) => {
                   const val = core.measure(mol, q.atoms);
@@ -415,10 +394,13 @@ export const MoleculePreviewModal: React.FC<Props> = ({ onReupload }) => {
                     ? val.toFixed(q.atoms.length === 2 ? 3 : 2)
                     : '';
                   return (
-                    <span key={q.label} className="mol-preview-tag">
-                      {q.label}：{formatted}
-                      {unit}
-                    </span>
+                    <div key={q.label} className="mol-spec-item">
+                      <span className="mol-spec-label">{q.label}</span>
+                      <strong className="mol-spec-value mono">
+                        {formatted}
+                        {unit}
+                      </strong>
+                    </div>
                   );
                 })}
             </div>

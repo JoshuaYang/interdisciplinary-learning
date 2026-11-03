@@ -1,39 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { CheckCircle2, ChevronDown, Lock, RotateCcw, Sparkles } from 'lucide-react';
 import { useChemStore } from '../../store/useChemStore';
 import * as core from '../../engine/core';
 import * as deduction from '../../engine/deduction';
 import type { ChemConfig, CompiledState, StepInstance } from '../../types/chem';
-
-const COLORS: Record<string, number> = {
-  C: 0x3d5047,
-  H: 0xf6f7ed,
-  Br: 0x9e382b,
-};
-
-const RADII: Record<string, number> = {
-  C: 0.36,
-  H: 0.245,
-  Br: 0.46,
-};
-
-const textures = new Map<string, THREE.CanvasTexture>();
-function elementTexture(element: string): THREE.CanvasTexture {
-  if (textures.has(element)) return textures.get(element)!;
-  const c = document.createElement('canvas');
-  c.width = 128;
-  c.height = 128;
-  const ctx = c.getContext('2d')!;
-  ctx.font = '500 66px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = element === 'C' || element === 'Br' ? '#ffffff' : '#344b29';
-  ctx.fillText(element, 64, 66);
-  const texture = new THREE.CanvasTexture(c);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  textures.set(element, texture);
-  return texture;
-}
+import {
+  ELEMENT_COLORS as COLORS,
+  ELEMENT_RADII as RADII,
+  RADICAL_COLOR,
+  SELECTION_EMISSIVE,
+  getElementSpriteTexture as elementTexture,
+} from '../../engine/cpkPalette';
 
 export function getStepInstances(
   config: ChemConfig | null,
@@ -181,8 +159,8 @@ export const StageScreen: React.FC = () => {
 
     const root = new THREE.Group();
     scene.add(root);
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x929e82, 0.55));
-    const light = new THREE.DirectionalLight(0xfff9e8, 1.3);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x94a3b8, 0.62));
+    const light = new THREE.DirectionalLight(0xfffdf5, 1.3);
     light.position.set(-4, 7, 9);
     light.castShadow = true;
     light.shadow.mapSize.set(1024, 1024);
@@ -192,7 +170,7 @@ export const StageScreen: React.FC = () => {
     light.shadow.camera.bottom = -8;
     light.shadow.bias = -0.002;
     scene.add(light);
-    const fill = new THREE.DirectionalLight(0xe1efcf, 0.35);
+    const fill = new THREE.DirectionalLight(0xe0f2fe, 0.38);
     fill.position.set(7, -2, 5);
     scene.add(fill);
 
@@ -231,7 +209,7 @@ export const StageScreen: React.FC = () => {
 
       const dot = new THREE.Mesh(
         sphereGeo,
-        new THREE.MeshBasicMaterial({ color: 0xaa642c, transparent: true })
+        new THREE.MeshBasicMaterial({ color: RADICAL_COLOR, transparent: true })
       );
       dot.scale.setScalar(0.075);
 
@@ -330,7 +308,7 @@ export const StageScreen: React.FC = () => {
         meshMat.opacity = a.opacity;
         meshMat.depthWrite = a.opacity > 0.7;
         obj.mesh.castShadow = a.opacity > 0.7;
-        meshMat.emissive.setHex(st.selection === id ? 0x52663a : 0x000000);
+        meshMat.emissive.setHex(st.selection === id ? SELECTION_EMISSIVE : 0x000000);
         meshMat.emissiveIntensity = 0.35;
 
         obj.label.position
@@ -850,19 +828,23 @@ export const StageScreen: React.FC = () => {
           </div>
 
           <div className="play-options">
-            <label>
-              速度{' '}
-              <select
-                id="speed"
-                aria-label="动画速度"
-                value={String(speed)}
-                onChange={(e) => setSpeed(Number(e.target.value))}
-              >
-                <option value="0.5">0.5×</option>
-                <option value="1">1×</option>
-                <option value="1.5">1.5×</option>
-                <option value="2">2×</option>
-              </select>
+            <label className="speed-label">
+              <span>速度</span>
+              <div className="select-wrapper speed-select-wrapper">
+                <select
+                  id="speed"
+                  className="speed-select"
+                  aria-label="动画速度"
+                  value={String(speed)}
+                  onChange={(e) => setSpeed(Number(e.target.value))}
+                >
+                  <option value="0.5">0.5×</option>
+                  <option value="1">1×</option>
+                  <option value="1.5">1.5×</option>
+                  <option value="2">2×</option>
+                </select>
+                <ChevronDown size={14} className="select-chevron" />
+              </div>
             </label>
             <button
               id="restart"
@@ -963,115 +945,123 @@ export const StageScreen: React.FC = () => {
               <div className="deduction-body" id="deduction-body">
                 {index === 0 ? (
                   <div className="deduction-summary-box">
-                    <strong>初始观察：</strong>
-                    {stepData.summary}
-                    <br />
-                    <span
-                      style={{
-                        color: 'var(--muted)',
-                        fontSize: 14,
-                        marginTop: 8,
-                        display: 'inline-block',
-                      }}
-                    >
-                      👉 观察完毕后，请点击左侧导航栏
-                      <strong>「02 光照激发」</strong>开始本步微观反应机理推演。
-                    </span>
+                    <div className="summary-box-title">初始观察</div>
+                    <p className="summary-box-text">{stepData.summary}</p>
+                    <div className="summary-box-hint">
+                      观察完毕后，请点击左侧导航栏 <strong>02 光照激发</strong> 开始本步微观反应机理推演。
+                    </div>
                   </div>
                 ) : isCurrentSolved ? (
-                  <div className="deduction-summary-box">
-                    <strong>本步推演结论：</strong>
-                    {stepData.summary}
+                  <div className="deduction-summary-box solved-box">
+                    <div className="summary-box-title">
+                      <CheckCircle2 size={15} />
+                      <span>本步推演结论</span>
+                    </div>
+                    <p className="summary-box-text">{stepData.summary}</p>
                   </div>
                 ) : index <= unlockedMaxStep + 1 ? (
-                  <>
+                  <div className="deduction-form-list">
                     <div className="deduction-field">
                       <label className="deduction-label" htmlFor="deduce-phase">
-                        1. 本步属于自由基取代的哪个阶段？
+                        <span className="deduction-q-num">01</span>
+                        <span>本步属于自由基取代的哪个阶段？</span>
                       </label>
-                      <select
-                        id="deduce-phase"
-                        className="deduction-select"
-                        value={selPhase}
-                        onChange={(e) => setSelPhase(e.target.value)}
-                      >
-                        <option value="">-- 请选择阶段 --</option>
-                        {stepData.phaseOptions?.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="select-wrapper">
+                        <select
+                          id="deduce-phase"
+                          className="deduction-select"
+                          value={selPhase}
+                          onChange={(e) => setSelPhase(e.target.value)}
+                        >
+                          <option value="">请选择反应阶段…</option>
+                          {stepData.phaseOptions?.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown size={16} className="select-chevron" />
+                      </div>
                     </div>
 
                     <div className="deduction-field">
                       <label className="deduction-label" htmlFor="deduce-equation">
-                        2. {stepData.fieldLabel || '微粒变化与反应式'}？
+                        <span className="deduction-q-num">02</span>
+                        <span>{stepData.fieldLabel || '微粒变化与反应式'}？</span>
                       </label>
-                      <select
-                        id="deduce-equation"
-                        className="deduction-select"
-                        value={selEq}
-                        onChange={(e) => setSelEq(e.target.value)}
-                      >
-                        <option value="">-- 请选择 --</option>
-                        {stepData.equationOptions?.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="select-wrapper">
+                        <select
+                          id="deduce-equation"
+                          className="deduction-select"
+                          value={selEq}
+                          onChange={(e) => setSelEq(e.target.value)}
+                        >
+                          <option value="">请选择微粒变化…</option>
+                          {stepData.equationOptions?.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown size={16} className="select-chevron" />
+                      </div>
                     </div>
 
                     <div className="deduction-field">
                       <label className="deduction-label" htmlFor="deduce-break">
-                        3. 本步发生断裂的共价键？
+                        <span className="deduction-q-num">03</span>
+                        <span>本步发生断裂的共价键？</span>
                       </label>
-                      <select
-                        id="deduce-break"
-                        className="deduction-select"
-                        value={selBreak}
-                        onChange={(e) => setSelBreak(e.target.value)}
-                      >
-                        <option value="">-- 请选择断键 --</option>
-                        {stepData.breakBondOptions?.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="select-wrapper">
+                        <select
+                          id="deduce-break"
+                          className="deduction-select"
+                          value={selBreak}
+                          onChange={(e) => setSelBreak(e.target.value)}
+                        >
+                          <option value="">请选择断裂的化学键…</option>
+                          {stepData.breakBondOptions?.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown size={16} className="select-chevron" />
+                      </div>
                     </div>
 
                     <div className="deduction-field">
                       <label className="deduction-label" htmlFor="deduce-form">
-                        4. 本步新生成的共价键？
+                        <span className="deduction-q-num">04</span>
+                        <span>本步新生成的共价键？</span>
                       </label>
-                      <select
-                        id="deduce-form"
-                        className="deduction-select"
-                        value={selForm}
-                        onChange={(e) => setSelForm(e.target.value)}
-                      >
-                        <option value="">-- 请选择成键 --</option>
-                        {stepData.formBondOptions?.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="select-wrapper">
+                        <select
+                          id="deduce-form"
+                          className="deduction-select"
+                          value={selForm}
+                          onChange={(e) => setSelForm(e.target.value)}
+                        >
+                          <option value="">请选择生成的化学键…</option>
+                          {stepData.formBondOptions?.map((opt) => (
+                            <option key={opt} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown size={16} className="select-chevron" />
+                      </div>
                     </div>
-                  </>
+                  </div>
                 ) : (
-                  <div
-                    className="deduction-summary-box"
-                    style={{
-                      background: '#f4f6f1',
-                      borderLeftColor: '#a7b4a2',
-                      color: '#6d7b69',
-                    }}
-                  >
-                    🔒 <strong>尚未解锁：</strong>请先完成第 {unlockedMaxStep + 2}{' '}
-                    步的反应推演，遵循化学反应发生的时序逐步探究。
+                  <div className="deduction-summary-box locked-box">
+                    <div className="summary-box-title">
+                      <Lock size={14} />
+                      <span>尚未解锁</span>
+                    </div>
+                    <p className="summary-box-text">
+                      请先完成第 {unlockedMaxStep + 2} 步的反应推演，遵循化学反应发生的时序逐步探究。
+                    </p>
                   </div>
                 )}
               </div>
@@ -1091,7 +1081,17 @@ export const StageScreen: React.FC = () => {
                       }
                     }}
                   >
-                    {isCurrentSolved ? '↻ 再次播放本步 3D 动画' : '检验反应推演'}
+                    {isCurrentSolved ? (
+                      <>
+                        <RotateCcw size={15} />
+                        <span>再次播放本步 3D 动画</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={15} />
+                        <span>检验反应推演</span>
+                      </>
+                    )}
                   </button>
                 </div>
               ) : null}

@@ -3,8 +3,6 @@ import { Header } from './components/Header';
 import { GateScreen } from './components/Step1Gate/GateScreen';
 import { PipelineScreen } from './components/Step2Pipeline/PipelineScreen';
 import { StageScreen } from './components/Step3Stage/StageScreen';
-import { ConfigDialog } from './components/Dialogs/ConfigDialog';
-import { HelpDialog } from './components/Dialogs/HelpDialog';
 import { useChemStore } from './store/useChemStore';
 import * as core from './engine/core';
 import * as files from './engine/configFiles';
@@ -77,13 +75,11 @@ export const App: React.FC = () => {
   }, []);
 
   return (
-    <>
+    <div className="app-shell">
       <Header />
-      <GateScreen />
-      <PipelineScreen />
-      <StageScreen />
-      <ConfigDialog />
-      <HelpDialog />
+      {screen === 'gate' && <GateScreen />}
+      {screen === 'pipeline' && <PipelineScreen />}
+      {screen === 'stage' && <StageScreen />}
       <div
         className="toast"
         id="toast"
@@ -93,6 +89,6 @@ export const App: React.FC = () => {
       >
         {toastMessage}
       </div>
-    </>
+    </div>
   );
 };

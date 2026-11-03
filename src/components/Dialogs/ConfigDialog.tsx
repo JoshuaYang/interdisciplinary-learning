@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
+import { Download, RotateCcw, Upload, X } from 'lucide-react';
 import { useChemStore } from '../../store/useChemStore';
 import * as files from '../../engine/configFiles';
 
@@ -44,101 +45,125 @@ export const ConfigDialog: React.FC = () => {
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Portal>
         <Dialog.Overlay className="radix-dialog-overlay" />
-        <Dialog.Content className="modal radix-dialog-content" aria-labelledby="config-title">
-          <div className="modal-card">
-            <div className="modal-head">
-              <div>
-                <span className="eyebrow">JSON 配置与校验</span>
-                <Dialog.Title asChild>
-                  <h2 id="config-title">课堂配置管理</h2>
-                </Dialog.Title>
-              </div>
-              <Dialog.Close asChild>
-                <button className="ghost-btn" id="config-close" type="button">
-                  关闭
-                </button>
-              </Dialog.Close>
+        <Dialog.Content className="radix-dialog-content dialog-surface" aria-labelledby="config-title">
+          <div className="dialog-header">
+            <div>
+              <span className="small-label">JSON 配置与校验</span>
+              <Dialog.Title asChild>
+                <h2 id="config-title">课堂配置管理</h2>
+              </Dialog.Title>
             </div>
-            <p className="modal-copy">
-              学生只需编辑各自负责的分子 JSON（如 <code>01-甲烷-CH4.json</code>
-              ），导入后程序会自动识别分子并更新相关反应步骤。
-            </p>
-            <div className="config-actions">
-              <label className="primary-btn file-btn" htmlFor="config-file">
-                导入学生分子 JSON
-              </label>
-              <input
-                ref={fileInputRef}
-                id="config-file"
-                type="file"
-                accept=".json,application/json"
-                multiple
-                hidden
-                onChange={(e) => {
-                  const list = Array.from(e.target.files || []);
-                  importStageFiles(list);
-                  e.target.value = '';
-                }}
-              />
+            <Dialog.Close asChild>
+              <button className="icon-button" id="config-close" type="button" aria-label="关闭配置">
+                <X size={18} />
+              </button>
+            </Dialog.Close>
+          </div>
+
+          <p className="dialog-intro">
+            学生只需编辑各自负责的分子 JSON（如 <code>CH4.json</code>、<code>Br2.json</code>），导入后程序会自动识别分子并更新全部七步反应动画。
+          </p>
+
+          <div
+            className="file-drop"
+            onClick={() => fileInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+          >
+            <span className="file-symbol" aria-hidden="true">
+              {'{ }'}
+            </span>
+            <strong>选择 CH4.json、CH3.json、Br2.json 等分子配置文件</strong>
+            <span>支持一次选多个文件 · 浏览器本地解析，不会上传服务器</span>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={(e) => {
+                e.stopPropagation();
+                fileInputRef.current?.click();
+              }}
+            >
+              <Upload size={16} />
+              <span>导入学生分子 JSON</span>
+            </button>
+            <input
+              ref={fileInputRef}
+              id="config-file"
+              type="file"
+              accept=".json,application/json"
+              multiple
+              hidden
+              onChange={(e) => {
+                const list = Array.from(e.target.files || []);
+                importStageFiles(list);
+                e.target.value = '';
+              }}
+            />
+          </div>
+
+          <div className="config-source">
+            <span>当前配置来源</span>
+            <strong id="config-source">{sourceName}</strong>
+          </div>
+
+          {validationReport && (
+            <div
+              id="validation-result"
+              className={validationReport.accepted ? '' : 'error'}
+              role="status"
+            >
+              <strong>
+                {validationReport.accepted
+                  ? '✓ 配置校验通过，已应用至当前场景。'
+                  : '✗ 配置未通过校验，已保留原场景：'}
+              </strong>
+              {validationReport.errors.length > 0 && (
+                <ul>
+                  {validationReport.errors.map((err, idx) => (
+                    <li key={idx}>{err}</li>
+                  ))}
+                </ul>
+              )}
+              {validationReport.warnings.length > 0 && (
+                <ul>
+                  {validationReport.warnings.map((w, idx) => (
+                    <li key={idx}>{w}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          <div className="dialog-actions">
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button
-                className="ghost-btn"
+                className="text-button top-action-btn"
                 id="export-students"
                 type="button"
                 onClick={handleExportStudents}
               >
-                下载 6 个分子 JSON
+                <Download size={15} />
+                <span>下载 6 个分子 JSON</span>
               </button>
               <button
-                className="ghost-btn"
+                className="text-button top-action-btn"
                 id="export-config"
                 type="button"
                 onClick={handleExportCurrent}
               >
-                导出完整配置
-              </button>
-              <button
-                className="ghost-btn"
-                id="reset-config"
-                type="button"
-                onClick={() => reloadDefaultConfig()}
-              >
-                恢复默认配置
+                <Download size={15} />
+                <span>导出完整配置</span>
               </button>
             </div>
-            <div className="status-row">
-              <span>当前配置来源：</span>
-              <strong id="config-source">{sourceName}</strong>
-            </div>
-            <div className="validation-report" id="validation-report" aria-live="polite">
-              {validationReport && (
-                <>
-                  <div className={`report-block ${validationReport.accepted ? 'ok' : 'err'}`}>
-                    <strong>
-                      {validationReport.accepted
-                        ? '配置校验通过，已载入当前场景。'
-                        : '配置未通过校验，已保留原场景。'}
-                    </strong>
-                    {validationReport.errors.length > 0 && (
-                      <ul className="report-list">
-                        {validationReport.errors.map((err, idx) => (
-                          <li key={idx}>{err}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  {validationReport.warnings.length > 0 && (
-                    <div className="report-block warn">
-                      <strong>化学参数提示（不影响载入）：</strong>
-                      <ul className="report-list">
-                        {validationReport.warnings.map((w, idx) => (
-                          <li key={idx}>{w}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+            <button
+              className="text-button top-action-btn"
+              id="reset-config"
+              type="button"
+              onClick={() => reloadDefaultConfig()}
+            >
+              <RotateCcw size={15} />
+              <span>恢复默认配置</span>
+            </button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
