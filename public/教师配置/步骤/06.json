@@ -1,0 +1,50 @@
+{
+  "title": "再次碰撞反应",
+  "shortTitle": "碰撞反应 ②",
+  "phase": "链增长 ②",
+  "formula": "CH₃· + Br₂  →  CH₃Br + Br·",
+  "description": "观察含碳中间体与溴单质发生碰撞转化，注意成键变化与体系中新微粒的产生。",
+  "note": "注意观察新微粒的产生以及是否具备继续引发反应的活性。",
+  "instances": [
+    {
+      "molecule": "CH3Br",
+      "position": [2.15, 0.45, 0],
+      "rotation": [0, -53.130102, 0],
+      "atomMap": {"c": "C", "h1": "H1", "h2": "H2", "h3": "H3", "br": "BrC"},
+      "role": "focus"
+    },
+    {
+      "molecule": "Br",
+      "position": [-2.8, 0.45, 0],
+      "rotation": [0, 0, 0],
+      "atomMap": {"br": "BrD"},
+      "role": "focus"
+    },
+    {
+      "molecule": "Br",
+      "position": [-3.8, -2.4, -0.5],
+      "rotation": [0, 0, 0],
+      "atomMap": {"br": "BrA"},
+      "role": "context",
+      "caption": "另一 Br· · 仍在体系中"
+    },
+    {
+      "molecule": "HBr",
+      "position": [3.1, -2.4, -0.5],
+      "rotation": [0, 0, 0],
+      "atomMap": {"h": "H4", "br": "BrB"},
+      "role": "context",
+      "caption": "HBr · 已生成"
+    }
+  ],
+  "transition": {
+    "kind": "reaction",
+    "duration": 5,
+    "breakBonds": [
+      ["BrC", "BrD"]
+    ],
+    "formBonds": [
+      ["C", "BrC"]
+    ]
+  }
+}

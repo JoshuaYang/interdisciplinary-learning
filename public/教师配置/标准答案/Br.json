@@ -1,0 +1,10 @@
+{
+  "name": "溴自由基",
+  "formula": "Br·",
+  "atoms": [
+    "Br"
+  ],
+  "geometry": "atomic",
+  "unpairedElectrons": 1,
+  "description": "溴自由基含一个未成对电子，可参与夺氢。"
+}

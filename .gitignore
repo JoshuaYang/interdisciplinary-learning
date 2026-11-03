@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-offline
+.DS_Store
+*.local
+/private/tmp/chem-qa
+
+*.tsbuildinfo

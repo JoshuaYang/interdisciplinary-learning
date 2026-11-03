@@ -1,0 +1,13 @@
+{
+  "name": "溴化氢",
+  "formula": "HBr",
+  "atoms": [
+    "H",
+    "Br"
+  ],
+  "geometry": "diatomic",
+  "bondLengths": {
+    "H-Br": 1.414
+  },
+  "description": "溴化氢在溴自由基夺取甲烷中的氢时形成。"
+}

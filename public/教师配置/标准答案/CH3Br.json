@@ -1,0 +1,22 @@
+{
+  "name": "一溴甲烷",
+  "formula": "CH3Br",
+  "center": "C",
+  "neighbors": [
+    "H",
+    "H",
+    "H",
+    "Br"
+  ],
+  "geometry": "tetrahedral",
+  "bondLengths": {
+    "C-H": 1.09,
+    "C-Br": 1.939
+  },
+  "bondAngles": {
+    "H-C-H": 111.37,
+    "H-C-Br": 107.5
+  },
+  "hybridization": "sp3",
+  "description": "一溴甲烷是本次取代反应的有机产物。"
+}
