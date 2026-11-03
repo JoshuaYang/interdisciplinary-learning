@@ -345,7 +345,7 @@ export const PipelineScreen: React.FC = () => {
                     };
                     return (
                       <div key={rIdx} className="track-multi-row">
-                        <div className="track-multi-row-badge">偶联反应 {rIdx + 1}</div>
+                        <div className="track-multi-row-badge">反应 {rIdx + 1}</div>
                         <div className="track-flow track-flow-compact">
                           <DropZone
                             stageId={currentStep.id}
@@ -355,7 +355,7 @@ export const PipelineScreen: React.FC = () => {
                             particles={row.reactants || []}
                           />
                           <div className="track-arrow-zone">
-                            <span className="track-condition-tag">偶联成键</span>
+                            <span className="track-condition-tag">成键</span>
                             <span className="track-arrow" aria-hidden="true">
                               ➔
                             </span>
@@ -363,7 +363,7 @@ export const PipelineScreen: React.FC = () => {
                           <DropZone
                             stageId={currentStep.id}
                             role="products"
-                            titleText={`反应 ${rIdx + 1} · 偶联生成物`}
+                            titleText={`反应 ${rIdx + 1} · 生成物`}
                             reactionIndex={rIdx}
                             particles={row.products || []}
                           />

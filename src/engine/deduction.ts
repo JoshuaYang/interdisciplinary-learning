@@ -273,9 +273,9 @@ export const PIPELINE_STEPS: PipelineStepDef[] = [
   {
     id: 'termination',
     phaseName: '阶段四：链终止',
-    condition: '自由基偶联',
+    condition: '自由基成键',
     summary:
-      '体系中的活性自由基两两结合形成稳定共价键，自由基消失，链反应终止（请拼出全部 3 种偶联方式）',
+      '体系中的活性自由基两两结合形成稳定共价键，自由基消失，链反应终止（请拼出全部 3 种结合方式）',
     isMultiReaction: true,
     expectedReactions: [
       { reactants: ['Br', 'Br'], products: ['Br2'] },
@@ -324,7 +324,7 @@ function verifyTerminationStage(step: PipelineStepDef, stageData: any) {
       return {
         ok: false,
         empty: false,
-        hint: `「${step.phaseName}」第 ${rowNum} 条反应尚未放置生成物，请拖入偶联后的稳定分子。`,
+        hint: `「${step.phaseName}」第 ${rowNum} 条反应尚未放置生成物，请拖入成键后的稳定分子。`,
       };
     }
 
@@ -364,7 +364,7 @@ function verifyTerminationStage(step: PipelineStepDef, stageData: any) {
     matchedIndices.add(expIdx);
   }
 
-  return { ok: true, message: `「${step.phaseName}」全部 3 条偶联反应装配正确！` };
+  return { ok: true, message: `「${step.phaseName}」全部 3 条反应装配正确！` };
 }
 
 export function verifyStage(
