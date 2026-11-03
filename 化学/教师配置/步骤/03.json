@@ -1,0 +1,41 @@
+{
+  "title": "活性微粒接近底物",
+  "shortTitle": "接近甲烷",
+  "phase": "链增长 ①",
+  "formula": "Br· + CH₄",
+  "description": "聚焦引发产生的活性微粒，让它向甲烷分子的一个 C—H 键方向靠近。",
+  "note": "另一个溴微粒仍在背景；当前处于接近取向阶段，尚未发生化学键变化。",
+  "instances": [
+    {
+      "molecule": "Br",
+      "position": [-0.3, 0.45, 1.85],
+      "rotation": [0, 0, 0],
+      "atomMap": {"br": "BrB"},
+      "role": "focus"
+    },
+    {
+      "molecule": "CH4",
+      "position": [2.15, 0.45, 0],
+      "rotation": [0, -53.130102, 0],
+      "atomMap": {"c": "C", "h1": "H1", "h2": "H2", "h3": "H3", "h4": "H4"},
+      "role": "focus"
+    },
+    {
+      "molecule": "Br",
+      "position": [-3.8, -2.4, -0.5],
+      "rotation": [0, 0, 0],
+      "atomMap": {"br": "BrA"},
+      "role": "context",
+      "caption": "另一 Br· · 仍在体系中"
+    },
+    {
+      "molecule": "Br2",
+      "position": [3.1, -2.4, -0.5],
+      "rotation": [0, 0, 0],
+      "atomMap": {"br1": "BrD", "br2": "BrC"},
+      "role": "context",
+      "caption": "另一分子 Br₂ · 随后参与"
+    }
+  ],
+  "transition": {"kind": "reframe", "duration": 3, "breakBonds": [], "formBonds": []}
+}

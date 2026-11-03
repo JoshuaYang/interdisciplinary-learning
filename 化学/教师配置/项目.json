@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "title": "甲烷的自由基取代",
+  "units": "angstrom",
+  "dataStatus": "参考键长，待化学老师确认",
+  "teachingNote": "分子结构按参考数据建立；粒子大小、间距、时间和过渡路径为教学示意，不是分子动力学模拟。",
+  "sources": [
+    {
+      "title": "OpenStax · 自由基卤代反应",
+      "url": "https://openstax.org/books/organic-chemistry/pages/10-2-preparing-alkyl-halides-from-alkanes-radical-halogenation"
+    }
+  ],
+  "moleculeFiles": ["CH4.json", "CH3.json", "CH3Br.json", "Br2.json", "Br.json", "HBr.json"],
+  "stepFiles": ["01.json", "02.json", "03.json", "04.json", "05.json", "06.json", "07.json"]
+}

@@ -1,0 +1,33 @@
+{
+  "title": "从甲烷与溴单质开始",
+  "shortTitle": "初始分子",
+  "phase": "准备",
+  "formula": "CH₄ + Br₂",
+  "description": "观察甲烷的四面体结构，以及溴分子中的 Br—Br 键。",
+  "note": "先观察，再点击播放。背景粒子保留在体系中，灰淡显示。",
+  "instances": [
+    {
+      "molecule": "Br2",
+      "position": [-2.6, 0.45, 0],
+      "rotation": [0, 0, 0],
+      "atomMap": {"br1": "BrA", "br2": "BrB"},
+      "role": "focus"
+    },
+    {
+      "molecule": "CH4",
+      "position": [2.15, 0.45, 0],
+      "rotation": [0, -53.130102, 0],
+      "atomMap": {"c": "C", "h1": "H1", "h2": "H2", "h3": "H3", "h4": "H4"},
+      "role": "focus"
+    },
+    {
+      "molecule": "Br2",
+      "position": [3.1, -2.4, -0.5],
+      "rotation": [0, 0, 0],
+      "atomMap": {"br1": "BrD", "br2": "BrC"},
+      "role": "context",
+      "caption": "另一分子 Br₂ · 随后参与"
+    }
+  ],
+  "transition": {"kind": "initial", "duration": 0, "breakBonds": [], "formBonds": []}
+}

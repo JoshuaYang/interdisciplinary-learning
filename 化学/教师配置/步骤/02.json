@@ -1,0 +1,48 @@
+{
+  "title": "吸收光能",
+  "shortTitle": "光照激发",
+  "phase": "引发",
+  "formula": "Br₂  →  2 Br·",
+  "description": "体系受到光照（hν）作用，观察溴单质分子在吸收能量后发生的结构与化学键变化。",
+  "note": "小圆点 · 表示未成对电子，不表示电荷。",
+  "instances": [
+    {
+      "molecule": "Br",
+      "position": [-2.8, 0.45, 0],
+      "rotation": [0, 0, 0],
+      "atomMap": {"br": "BrA"},
+      "role": "focus"
+    },
+    {
+      "molecule": "Br",
+      "position": [0.6, 0.45, 0],
+      "rotation": [0, 0, 0],
+      "atomMap": {"br": "BrB"},
+      "role": "focus"
+    },
+    {
+      "molecule": "CH4",
+      "position": [3, -2.4, -0.5],
+      "rotation": [0, -53.130102, 0],
+      "atomMap": {"c": "C", "h1": "H1", "h2": "H2", "h3": "H3", "h4": "H4"},
+      "role": "context",
+      "caption": "CH₄ · 尚未反应"
+    },
+    {
+      "molecule": "Br2",
+      "position": [-2.7, -2.4, -0.5],
+      "rotation": [0, 0, 0],
+      "atomMap": {"br1": "BrD", "br2": "BrC"},
+      "role": "context",
+      "caption": "另一分子 Br₂"
+    }
+  ],
+  "transition": {
+    "kind": "initiation",
+    "duration": 4,
+    "breakBonds": [
+      ["BrA", "BrB"]
+    ],
+    "formBonds": []
+  }
+}

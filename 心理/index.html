@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>情绪重塑 · 隔空抓碎与抚平 - 心理体感游戏</title>
+  <!-- MediaPipe Hands & Camera Utils -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at center, #0f111a 0%, #050608 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: #fff;
+    }
+
+    #canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    #webcam {
+      display: none;
+    }
+
+    /* UI 悬浮层 */
+    #ui-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 30px;
+    }
+
+    .header {
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 26px;
+      font-weight: 500;
+      letter-spacing: 4px;
+      color: rgba(255, 255, 255, 0.9);
+      text-shadow: 0 0 20px rgba(120, 180, 255, 0.4);
+    }
+    .header p {
+      font-size: 14px;
+      margin-top: 6px;
+      color: rgba(255, 255, 255, 0.5);
+      letter-spacing: 2px;
+    }
+
+    .instruction-box {
+      text-align: center;
+      margin-bottom: 20px;
+      transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .instruction-main {
+      font-size: 32px;
+      font-weight: 600;
+      letter-spacing: 3px;
+      margin-bottom: 10px;
+      text-shadow: 0 0 25px rgba(255, 255, 255, 0.6);
+    }
+    .instruction-sub {
+      font-size: 15px;
+      color: rgba(255, 255, 255, 0.65);
+      letter-spacing: 1.5px;
+    }
+
+    /* 能量蓄力条 */
+    .charge-bar-wrap {
+      width: 280px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      margin: 16px auto 0 auto;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .charge-bar-wrap.active {
+      opacity: 1;
+    }
+    .charge-bar {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #ff3366, #ff9900, #ffdd55);
+      box-shadow: 0 0 15px #ff5533;
+      transition: width 0.1s linear;
+    }
+
+    /* 摄像头小窗预览 */
+    .cam-preview-box {
+      position: absolute;
+      right: 25px;
+      bottom: 25px;
+      width: 160px;
+      height: 120px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+      transform: scaleX(-1); /* 镜像翻转 */
+    }
+    #cam-preview-canvas {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .cam-status {
+      position: absolute;
+      right: 25px;
+      bottom: 155px;
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ff4757;
+    }
+    .status-dot.active {
+      background: #2ed573;
+      box-shadow: 0 0 8px #2ed573;
+    }
+
+    /* 底部功能栏 */
+    .controls {
+      pointer-events: auto;
+      display: flex;
+      gap: 15px;
+      align-self: center;
+      margin-bottom: 10px;
+    }
+    .btn {
+      padding: 10px 22px;
+      border-radius: 25px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      font-size: 14px;
+      cursor: pointer;
+      backdrop-filter: blur(10px);
+      transition: all 0.25s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.5);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    }
+
+    /* 初始启动遮罩 */
+    #start-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(8, 10, 16, 0.95);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 20px;
+      backdrop-filter: blur(20px);
+    }
+    #start-overlay h2 {
+      font-size: 34px;
+      font-weight: 400;
+      margin-bottom: 14px;
+      letter-spacing: 4px;
+    }
+    #start-overlay p {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.65);
+      max-width: 520px;
+      line-height: 1.8;
+      margin-bottom: 35px;
+      letter-spacing: 1px;
+    }
+    .start-btn {
+      padding: 14px 44px;
+      font-size: 17px;
+      letter-spacing: 2px;
+      border: none;
+      border-radius: 30px;
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      color: #000;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 8px 30px rgba(79, 172, 254, 0.4);
+      transition: all 0.3s ease;
+    }
+    .start-btn:hover {
+      transform: scale(1.05);
+      box-shadow: 0 12px 40px rgba(79, 172, 254, 0.6);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <video id="webcam" autoplay playsinline></video>
+
+  <div id="ui-container">
+    <div class="header">
+      <h1>EMOTIONAL RESHAPE · 情绪重塑</h1>
+      <p>心理减压体感交互空间</p>
+    </div>
+
+    <div class="instruction-box" id="instruction-box">
+      <div class="instruction-main" id="inst-main">面向摄像头，举起双手</div>
+      <div class="instruction-sub" id="inst-sub">双手握拳：压缩压力核心 ｜ 猛然张开双掌：引爆情绪</div>
+      <div class="charge-bar-wrap" id="charge-wrap">
+        <div class="charge-bar" id="charge-bar"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="btn-reset">🔄 重新凝聚压力</button>
+      <button class="btn" id="btn-mouse-toggle">🖱️ 开启/关闭鼠标测试</button>
+    </div>
+
+    <div class="cam-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">摄像头未就绪</span>
+    </div>
+
+    <div class="cam-preview-box">
+      <canvas id="cam-preview-canvas"></canvas>
+    </div>
+  </div>
+
+  <!-- 首次进入点击（解锁 Web Audio 声音播放） -->
+  <div id="start-overlay">
+    <h2>情绪重塑 · 隔空抓碎与抚平</h2>
+    <p>
+      我们总会积累各种难以言说的烦躁与压力。<br/>
+      在这里，将那团无形的郁结化为实体。<br/>
+      <strong>用拳头将它狠狠压缩，张开双手将它彻底击碎</strong>，<br/>
+      化作满天星光，再由你的掌心抚归平静。
+    </p>
+    <button class="start-btn" id="btn-start">开始体验 (开启声效与体感)</button>
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. Web Audio 合成音效引擎 (无需任何外部音频文件)
+    // ==========================================
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.initialized = false;
+        this.tensionOsc = null;
+        this.tensionGain = null;
+      }
+
+      init() {
+        if (this.initialized) return;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioContext();
+        this.initialized = true;
+
+        // 持续的低频紧张蓄力音
+        this.tensionOsc = this.ctx.createOscillator();
+        this.tensionGain = this.ctx.createGain();
+        this.tensionOsc.type = 'sawtooth';
+        this.tensionOsc.frequency.setValueAtTime(55, this.ctx.currentTime); // A1 低音
+        this.tensionGain.gain.setValueAtTime(0.0001, this.ctx.currentTime);
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(140, this.ctx.currentTime);
+
+        this.tensionOsc.connect(filter);
+        filter.connect(this.tensionGain);
+        this.tensionGain.connect(this.ctx.destination);
+        this.tensionOsc.start();
+      }
+
+      // 更新握紧拳头时的紧张嗡鸣与心跳感
+      updateTension(chargeRatio) {
+        if (!this.initialized) return;
+        const now = this.ctx.currentTime;
+        if (chargeRatio > 0.05) {
+          this.tensionGain.gain.setTargetAtTime(0.05 + chargeRatio * 0.22, now, 0.05);
+          this.tensionOsc.frequency.setTargetAtTime(50 + chargeRatio * 150, now, 0.05);
+        } else {
+          this.tensionGain.gain.setTargetAtTime(0.0001, now, 0.1);
+        }
+      }
+
+      // 爆炸炸碎音效 (白噪音冲击 + 低频轰鸣)
+      playShatter() {
+        if (!this.initialized) return;
+        const now = this.ctx.currentTime;
+
+        // 瞬间静音蓄力音
+        this.tensionGain.gain.setValueAtTime(0.0001, now);
+
+        // 1. 冲击白噪音 (玻璃粉碎/空气爆裂)
+        const bufferSize = this.ctx.sampleRate * 1.5;
+        const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+
+        const whiteNoise = this.ctx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+
+        const noiseFilter = this.ctx.createBiquadFilter();
+        noiseFilter.type = 'highpass';
+        noiseFilter.frequency.setValueAtTime(1200, now);
+        noiseFilter.frequency.exponentialRampToValueAtTime(100, now + 1.2);
+
+        const noiseGain = this.ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.6, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+
+        whiteNoise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(this.ctx.destination);
+        whiteNoise.start(now);
+
+        // 2. 震撼低音 Sub-drop
+        const subOsc = this.ctx.createOscillator();
+        const subGain = this.ctx.createGain();
+        subOsc.type = 'sine';
+        subOsc.frequency.setValueAtTime(160, now);
+        subOsc.frequency.exponentialRampToValueAtTime(25, now + 1.2);
+
+        subGain.gain.setValueAtTime(0.7, now);
+        subGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+
+        subOsc.connect(subGain);
+        subGain.connect(this.ctx.destination);
+        subOsc.start(now);
+        subOsc.stop(now + 1.3);
+      }
+
+      // 粒子抚平时随挥手播放空灵五声音阶 (Pentatonic Chimes)
+      playChime(pitchIndex) {
+        if (!this.initialized) return;
+        const now = this.ctx.currentTime;
+        const scale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00];
+        const freq = scale[pitchIndex % scale.length];
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.12, now + 0.04);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 1.7);
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    // ==========================================
+    // 2. 状态机与核心逻辑
+    // ==========================================
+    const STATE = {
+      CHAOS: 0,      // 混沌核心生成与蓄力
+      SHATTERED: 1   // 炸裂与粒子抚平
+    };
+    let currentState = STATE.CHAOS;
+
+    let chargeProgress = 0; // 0 ~ 1 蓄力进度
+    let isFistDetected = false;
+    let handPositions = []; // 左右手坐标归一化 [ {x, y, isFist, spread} ]
+    let enableMouseTest = false;
+    let mouseState = { x: window.innerWidth / 2, y: window.innerHeight / 2, isDown: false };
+
+    // ==========================================
+    // 3. 视觉画布与粒子物理引擎
+    // ==========================================
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+
+    window.addEventListener('resize', () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    });
+
+    // 混沌多边形（代表负面压力/焦虑核心）
+    class ChaosCore {
+      constructor() {
+        this.reset();
+      }
+
+      reset() {
+        this.x = width / 2;
+        this.y = height / 2;
+        this.baseRadius = Math.min(width, height) * 0.14;
+        this.radius = this.baseRadius;
+        this.verticesCount = 28;
+        this.offsets = new Array(this.verticesCount).fill(0);
+        this.noiseTime = 0;
+        this.shake = 0;
+      }
+
+      update(charge) {
+        this.x = width / 2;
+        this.y = height / 2;
+        this.noiseTime += 0.04 + charge * 0.12;
+        this.shake = charge * 16;
+
+        // 蓄力越深，体积被强行压缩压瘪，但内部能量更暴躁
+        const targetRadius = this.baseRadius * (1 - charge * 0.45);
+        this.radius += (targetRadius - this.radius) * 0.2;
+
+        for (let i = 0; i < this.verticesCount; i++) {
+          const angle = (i / this.verticesCount) * Math.PI * 2;
+          // 尖刺起伏混沌噪波
+          const spike = Math.sin(angle * 6 + this.noiseTime) * Math.cos(angle * 3 - this.noiseTime * 1.5);
+          this.offsets[i] = spike * (25 + charge * 60);
+        }
+      }
+
+      draw(ctx, charge) {
+        ctx.save();
+        const shakeX = (Math.random() - 0.5) * this.shake;
+        const shakeY = (Math.random() - 0.5) * this.shake;
+        ctx.translate(this.x + shakeX, this.y + shakeY);
+
+        // 外层能量暗涌晕染
+        const glowRad = this.radius * (1.6 + charge * 0.8);
+        const glowGrad = ctx.createRadialGradient(0, 0, this.radius * 0.3, 0, 0, glowRad);
+        const rColor = Math.floor(60 + charge * 195);
+        const gColor = Math.floor(20 + charge * 60);
+        const bColor = Math.floor(80 - charge * 50);
+        glowGrad.addColorStop(0, `rgba(${rColor}, ${gColor}, ${bColor}, ${0.8 + charge * 0.2})`);
+        glowGrad.addColorStop(0.6, `rgba(${rColor}, 20, 40, ${0.3 + charge * 0.4})`);
+        glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+
+        ctx.fillStyle = glowGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, glowRad, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 核心不规则荆棘多边形
+        ctx.beginPath();
+        for (let i = 0; i <= this.verticesCount; i++) {
+          const idx = i % this.verticesCount;
+          const angle = (idx / this.verticesCount) * Math.PI * 2;
+          const r = Math.max(10, this.radius + this.offsets[idx]);
+          const px = Math.cos(angle) * r;
+          const py = Math.sin(angle) * r;
+
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+
+        // 核心渐变填充
+        const coreGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, this.radius);
+        if (charge > 0.7) {
+          // 极度充能：赤红与炽白
+          coreGrad.addColorStop(0, '#ffffff');
+          coreGrad.addColorStop(0.3, '#ff3344');
+          coreGrad.addColorStop(1, '#2b0308');
+        } else {
+          // 常态：压抑紫黑、墨蓝、荆棘黑
+          coreGrad.addColorStop(0, '#3a1c4a');
+          coreGrad.addColorStop(0.7, '#1b1226');
+          coreGrad.addColorStop(1, '#050308');
+        }
+
+        ctx.fillStyle = coreGrad;
+        ctx.shadowColor = charge > 0.5 ? '#ff2244' : '#aa44ff';
+        ctx.shadowBlur = 20 + charge * 40;
+        ctx.fill();
+        ctx.lineWidth = 2 + charge * 3;
+        ctx.strokeStyle = charge > 0.6 ? `rgba(255, 180, 200, ${0.5 + charge * 0.5})` : 'rgba(160, 100, 240, 0.4)';
+        ctx.stroke();
+
+        ctx.restore();
+      }
+    }
+
+    // 治愈光尘粒子
+    class SparkleParticle {
+      constructor(x, y, hue) {
+        this.x = x;
+        this.y = y;
+        this.originHue = hue;
+        this.hue = hue;
+        const angle = Math.random() * Math.PI * 2;
+        const speed = Math.random() * 18 + 4;
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
+        this.size = Math.random() * 3.5 + 1.5;
+        this.friction = 0.94; // 减速阻尼
+        this.alpha = 1;
+        this.life = 1;
+        this.decay = Math.random() * 0.001 + 0.0003;
+        this.chimeCooldown = 0;
+      }
+
+      update(hands) {
+        this.vx *= this.friction;
+        this.vy *= this.friction;
+
+        // 与双手的引力交互 (手掌作为温和的气流引力源)
+        for (let i = 0; i < hands.length; i++) {
+          const h = hands[i];
+          const hx = h.x * width;
+          const hy = h.y * height;
+          const dx = hx - this.x;
+          const dy = hy - this.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < 320 && dist > 10) {
+            const force = (1 - dist / 320) * 0.8;
+            this.vx += (dx / dist) * force;
+            this.vy += (dy / dist) * force;
+
+            // 粒子掠过手掌时激发音效与颜色升华
+            this.hue = (this.originHue + dist * 0.3) % 360;
+            if (dist < 80 && Math.random() < 0.02) {
+              const pitch = Math.floor((1 - this.y / height) * 10);
+              sound.playChime(pitch);
+            }
+          }
+        }
+
+        // 微小的自然布朗漂移
+        this.vx += (Math.random() - 0.5) * 0.3;
+        this.vy += (Math.random() - 0.5) * 0.3 - 0.08; // 微微上浮
+
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // 边界循环
+        if (this.x < 0) this.x = width;
+        if (this.x > width) this.x = 0;
+        if (this.y < 0) this.y = height;
+        if (this.y > height) this.y = 0;
+      }
+
+      draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${this.hue}, 95%, 70%, 0.85)`;
+        ctx.shadowColor = `hsla(${this.hue}, 100%, 65%, 0.9)`;
+        ctx.shadowBlur = 10;
+        ctx.fill();
+      }
+    }
+
+    const chaosCore = new ChaosCore();
+    let particles = [];
+
+    function triggerShatter() {
+      currentState = STATE.SHATTERED;
+      sound.playShatter();
+
+      // UI 更新
+      document.getElementById('inst-main').innerText = "✨ 压力已破碎！在空中漫舞双手";
+      document.getElementById('inst-sub').innerText = "张开五指，感受掌心拂过光尘与清脆和弦";
+      document.getElementById('charge-wrap').classList.remove('active');
+
+      // 爆散产生 650 个多彩粒子
+      particles = [];
+      const particleCount = 650;
+      const baseHue = Math.random() * 360;
+      for (let i = 0; i < particleCount; i++) {
+        const p = new SparkleParticle(chaosCore.x, chaosCore.y, (baseHue + Math.random() * 80) % 360);
+        particles.push(p);
+      }
+    }
+
+    function resetToChaos() {
+      currentState = STATE.CHAOS;
+      chargeProgress = 0;
+      chaosCore.reset();
+      particles = [];
+      sound.updateTension(0);
+
+      document.getElementById('inst-main').innerText = "面向摄像头，举起双手";
+      document.getElementById('inst-sub').innerText = "双手握拳：压缩压力核心 ｜ 猛然张开双掌：引爆情绪";
+      document.getElementById('charge-bar').style.width = '0%';
+      document.getElementById('charge-wrap').classList.add('active');
+    }
+
+    // ==========================================
+    // 4. 手势判断逻辑 (握拳 vs 张开手掌)
+    // ==========================================
+    function checkIsFist(landmarks) {
+      // 提取关键骨骼点: 0=手腕, 9=中指根部(掌心参考), 指尖: 4=大拇指, 8=食指, 12=中指, 16=无名指, 20=小指
+      const wrist = landmarks[0];
+      const fingerTips = [8, 12, 16, 20];
+      const fingerMcp = [5, 9, 13, 17]; // 指根
+
+      let foldedCount = 0;
+      for (let i = 0; i < fingerTips.length; i++) {
+        const tip = landmarks[fingerTips[i]];
+        const mcp = landmarks[fingerMcp[i]];
+
+        const distTipToWrist = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
+        const distMcpToWrist = Math.hypot(mcp.x - wrist.x, mcp.y - wrist.y);
+
+        if (distTipToWrist < distMcpToWrist * 1.1) {
+          foldedCount++;
+        }
+      }
+
+      // 4根手指中有3根及以上向内卷，即判定为握拳
+      return foldedCount >= 3;
+    }
+
+    // ==========================================
+    // 5. MediaPipe Hands 驱动与摄像头配置
+    // ==========================================
+    const videoElement = document.getElementById('webcam');
+    const camPreviewCanvas = document.getElementById('cam-preview-canvas');
+    const camPreviewCtx = camPreviewCanvas.getContext('2d');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.6
+    });
+
+    hands.onResults((results) => {
+      // 绘制右下角小预览窗
+      camPreviewCanvas.width = videoElement.videoWidth || 320;
+      camPreviewCanvas.height = videoElement.videoHeight || 240;
+      camPreviewCtx.save();
+      camPreviewCtx.clearRect(0, 0, camPreviewCanvas.width, camPreviewCanvas.height);
+      camPreviewCtx.drawImage(results.image, 0, 0, camPreviewCanvas.width, camPreviewCanvas.height);
+
+      handPositions = [];
+      let anyFist = false;
+      let allFists = false;
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        statusDot.classList.add('active');
+        statusText.innerText = `已捕捉 ${results.multiHandLandmarks.length} 只手`;
+
+        let fistsCount = 0;
+        for (const landmarks of results.multiHandLandmarks) {
+          const isFist = checkIsFist(landmarks);
+          if (isFist) fistsCount++;
+
+          // 绘制手部关键点小点
+          camPreviewCtx.fillStyle = isFist ? '#ff3838' : '#2ed573';
+          for (const lm of landmarks) {
+            camPreviewCtx.beginPath();
+            camPreviewCtx.arc(lm.x * camPreviewCanvas.width, lm.y * camPreviewCanvas.height, 3, 0, 2 * Math.PI);
+            camPreviewCtx.fill();
+          }
+
+          // 归一化手掌中心坐标 (摄像头通常镜面对调，1 - x)
+          const palm = landmarks[9];
+          handPositions.push({
+            x: 1 - palm.x,
+            y: palm.y,
+            isFist: isFist
+          });
+        }
+
+        anyFist = fistsCount > 0;
+        allFists = fistsCount === results.multiHandLandmarks.length;
+      } else {
+        statusText.innerText = "请将双手放入镜头视野";
+      }
+      camPreviewCtx.restore();
+
+      // 如果未开启鼠标测试，则完全由摄像头手势接管
+      if (!enableMouseTest) {
+        processHandGestures(anyFist, allFists);
+      }
+    });
+
+    function processHandGestures(anyFist, allFists) {
+      if (currentState === STATE.CHAOS) {
+        if (anyFist) {
+          // 握拳蓄力增加
+          chargeProgress += 0.015;
+          if (chargeProgress > 1) chargeProgress = 1;
+        } else {
+          // 蓄力若达到 75% 以上，突然张开手掌 -> 触发瞬间引爆！
+          if (chargeProgress > 0.75) {
+            triggerShatter();
+            return;
+          }
+          // 未蓄满且张开手则缓慢泄气
+          chargeProgress = Math.max(0, chargeProgress - 0.02);
+        }
+
+        // 声音与 UI 进度同步
+        sound.updateTension(chargeProgress);
+        document.getElementById('charge-bar').style.width = `${chargeProgress * 100}%`;
+        if (chargeProgress > 0.75) {
+          document.getElementById('inst-main').innerText = "🔥 能量濒临极限！立刻张开双手释放！";
+        } else if (chargeProgress > 0.2) {
+          document.getElementById('inst-main').innerText = "✊ 紧握双拳，将负面思绪锁紧挤压...";
+        } else {
+          document.getElementById('inst-main').innerText = "举起双手握拳，凝聚心中的困扰";
+        }
+      }
+    }
+
+    // ==========================================
+    // 6. 渲染主循环 (Render Loop)
+    // ==========================================
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // 渐进透明度背景，制造优雅拖尾光芒
+      ctx.fillStyle = 'rgba(8, 10, 16, 0.25)';
+      ctx.fillRect(0, 0, width, height);
+
+      // 处理鼠标测试模式
+      if (enableMouseTest) {
+        handPositions = [{
+          x: mouseState.x / width,
+          y: mouseState.y / height,
+          isFist: mouseState.isDown
+        }];
+        processHandGestures(mouseState.isDown, mouseState.isDown);
+      }
+
+      // 绘制当前状态
+      if (currentState === STATE.CHAOS) {
+        chaosCore.update(chargeProgress);
+        chaosCore.draw(ctx, chargeProgress);
+      } else if (currentState === STATE.SHATTERED) {
+        // 绘制光芒粒子系统
+        for (let i = 0; i < particles.length; i++) {
+          particles[i].update(handPositions);
+          particles[i].draw(ctx);
+        }
+      }
+
+      // 绘制双手光晕光标
+      for (const h of handPositions) {
+        ctx.save();
+        const px = h.x * width;
+        const py = h.y * height;
+        const grad = ctx.createRadialGradient(px, py, 5, px, py, 45);
+        if (h.isFist) {
+          grad.addColorStop(0, 'rgba(255, 60, 60, 0.9)');
+          grad.addColorStop(1, 'rgba(255, 60, 60, 0)');
+        } else {
+          grad.addColorStop(0, 'rgba(100, 220, 255, 0.8)');
+          grad.addColorStop(1, 'rgba(100, 220, 255, 0)');
+        }
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(px, py, 45, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+
+    // ==========================================
+    // 7. 用户交互、降级兼容与初始化
+    // ==========================================
+    document.getElementById('btn-start').addEventListener('click', async () => {
+      document.getElementById('start-overlay').style.display = 'none';
+      sound.init();
+      resetToChaos();
+
+      // 启动摄像头与 MediaPipe
+      try {
+        const camera = new Camera(videoElement, {
+          onFrame: async () => {
+            await hands.send({ image: videoElement });
+          },
+          width: 640,
+          height: 480
+        });
+        await camera.start();
+        statusText.innerText = "摄像头已连接，就绪";
+      } catch (err) {
+        console.warn("无法启动摄像头，自动开启鼠标互动模式:", err);
+        statusText.innerText = "未获得摄像头权限 (已启用鼠标模式)";
+        enableMouseTest = true;
+      }
+    });
+
+    // 重置按钮
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      resetToChaos();
+    });
+
+    // 鼠标测试开关 (按住鼠标左键 = 握拳，移动鼠标 = 手掌位置)
+    const btnMouse = document.getElementById('btn-mouse-toggle');
+    btnMouse.addEventListener('click', () => {
+      enableMouseTest = !enableMouseTest;
+      btnMouse.innerText = enableMouseTest ? "🖱️ 鼠标测试中 (按住左键蓄力)" : "🖱️ 开启/关闭鼠标测试";
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      mouseState.x = e.clientX;
+      mouseState.y = e.clientY;
+    });
+    window.addEventListener('mousedown', () => { mouseState.isDown = true; });
+    window.addEventListener('mouseup', () => { mouseState.isDown = false; });
+
+    // 启动动画循环
+    animate();
+  </script>
+</body>
+</html>

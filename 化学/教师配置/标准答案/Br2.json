@@ -1,0 +1,13 @@
+{
+  "name": "溴单质",
+  "formula": "Br2",
+  "atoms": [
+    "Br",
+    "Br"
+  ],
+  "geometry": "diatomic",
+  "bondLengths": {
+    "Br-Br": 2.281
+  },
+  "description": "溴单质受光照发生均裂，也参与链增长。"
+}

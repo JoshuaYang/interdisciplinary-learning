@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f6f0">
+  <title>甲烷的自由基取代 · 反应可视化</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="程序/styles.css">
+  <script defer src="程序/vendor/three.min.js"></script>
+  <script defer src="程序/离线配置.js"></script>
+  <script defer src="程序/core.js"></script>
+  <script defer src="程序/config-files.js"></script>
+  <script defer src="程序/deduction.js"></script>
+  <script defer src="程序/app.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="identity"><span class="mark" aria-hidden="true">C<span>·</span></span><div><h1>甲烷的自由基取代</h1><p>化学 × 信息技术 <span>/</span> 反应可视化</p></div></div>
+    <div class="header-actions">
+      <span class="local-state" id="workflow-badge"><i></i>第 1 步：配置核验</span>
+      <button id="help-open" class="icon-button" aria-label="使用说明">?</button>
+    </div>
+  </header>
+
+  <!-- 阶段一：前置上传与校验门禁工作台（无任何冗余提示，整块直接点击） -->
+  <section id="gate-screen" class="gate-screen" aria-label="分子配置文件核验">
+    <div class="gate-container">
+      <div class="gate-header">
+        <h2>上传分子配置</h2>
+        <div class="gate-actions">
+          <button id="gate-choose-files" class="text-button batch-upload-btn top-action-btn">批量上传文件</button>
+          <input type="file" id="gate-file-input" accept=".json,application/json" multiple hidden>
+        </div>
+      </div>
+
+      <!-- 6 分子点击上传卡片网格 -->
+      <div class="gate-grid" id="gate-card-grid"></div>
+
+      <!-- 底部控制栏 -->
+      <div class="gate-footer">
+        <div class="gate-progress-info">
+          <div class="gate-progress-track"><div id="gate-progress-bar" class="gate-progress-bar" style="width: 0%"></div></div>
+          <span id="gate-progress-text">已通过 <strong class="mono">0</strong> / 6</span>
+        </div>
+        <button id="enter-stage-btn" class="primary-button enter-stage-btn">
+          <span id="enter-btn-text">下一步：组装反应链路</span>
+          <span class="enter-arrow" aria-hidden="true">→</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 阶段二：反应链路拼装工作台（拖拽磁吸拼装微观化学反应序列） -->
+  <section id="pipeline-screen" class="pipeline-screen" aria-label="微观反应链路装配" hidden>
+    <div class="pipeline-container">
+      <div class="pipeline-header">
+        <div>
+          <span class="small-label">STEP 2 / 3 · REACTION ASSEMBLY</span>
+          <h2>拼装微观反应链路</h2>
+          <p class="pipeline-subtitle">从上方微粒池中拖拽分子（或点击放入），拼装链引发、链增长与链终止阶段的初始物料与生成物。</p>
+        </div>
+        <div class="pipeline-header-actions">
+          <button id="pipeline-reset-btn" class="text-button top-action-btn">清空微粒</button>
+        </div>
+      </div>
+
+      <!-- 顶部可用微粒积木池 -->
+      <div class="molecule-pool-card">
+        <div class="pool-title">
+          <span>📦 可用微粒积木池</span>
+          <small>可拖拽或点击微粒放入高亮插槽，自由基带有 · 标记</small>
+        </div>
+        <div class="molecule-chips" id="molecule-chips"></div>
+      </div>
+
+      <!-- 反应阶段 Tab 切换导航 -->
+      <div class="pipeline-tabs-nav" id="pipeline-tabs-nav" role="tablist"></div>
+
+      <!-- 当前选中阶段的装配工作区 -->
+      <div class="pipeline-active-stage" id="pipeline-active-stage"></div>
+
+      <div id="pipeline-feedback" class="pipeline-feedback" hidden></div>
+
+      <!-- 底部操作与流转栏：统一放置上一步/下一步操作 -->
+      <div class="pipeline-footer">
+        <div class="pipeline-footer-left">
+          <button id="pipeline-return-gate-btn" class="text-button footer-back-btn">‹ 上一步：配置核验</button>
+        </div>
+        <div class="pipeline-footer-right">
+          <button id="pipeline-submit-btn" class="primary-button enter-stage-btn">
+            <span>下一步：验证并进入三维演示</span>
+            <span class="enter-arrow" aria-hidden="true">→</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 阶段三：三维反应机理与交互动画工作台 -->
+  <div class="app-layout" id="main-stage" hidden>
+    <aside class="sidebar" aria-label="反应步骤">
+      <div class="sidebar-heading">
+        <span>反应过程</span>
+        <button id="stage-return-pipeline-btn" class="text-button sidebar-return-btn" title="返回反应链路组装">‹ 返回组装</button>
+      </div>
+      <nav id="steps" aria-label="选择展示步骤"></nav>
+    </aside>
+    <main class="workspace">
+      <section class="step-heading" aria-live="polite" aria-atomic="true">
+        <h2 id="step-title">从甲烷与溴单质开始</h2>
+        <p id="step-description">观察甲烷的四面体结构，以及溴单质分子中的 Br—Br 键。</p>
+      </section>
+      <section class="stage" id="stage" aria-label="可旋转的三维反应模型">
+        <div id="viewport" tabindex="0" role="img" aria-label="三维球棍模型；拖动旋转，滚轮缩放"></div>
+        <div id="labels" aria-hidden="true"></div>
+        <div class="stage-tools"><button id="context-toggle" class="quiet-button" aria-pressed="false" title="切换背景旁观微粒显示">旁观粒子: 关</button><button id="reset-view" class="quiet-button" title="恢复模型的默认观察方向">复位视角 <span aria-hidden="true">⤾</span></button></div>
+        <div class="stage-legend"><span><i class="element-dot carbon"></i>C</span><span><i class="element-dot hydrogen"></i>H</span><span><i class="element-dot bromine"></i>Br</span><span class="radical-legend"><b>·</b> 未成对电子</span></div>
+        <div id="light-cue" hidden><span>hν</span><small>光照</small></div>
+        <div class="stage-hint" id="stage-hint">拖动旋转 · 滚轮缩放</div>
+        <div id="atom-detail" hidden></div>
+        <div id="load-error" class="load-error" hidden role="alert"></div>
+      </section>
+      <footer class="playback">
+        <div class="transport">
+          <button id="stage-footer-back-btn" class="text-button footer-back-btn stage-back-btn" title="返回第二步组装反应链路">‹ 组装链路</button>
+          <button id="prev" class="icon-button transport-side" aria-label="上一步" title="上一步（←）">‹</button>
+          <button id="play" class="primary-button"><span id="play-icon" aria-hidden="true">▶</span><span id="play-text">连续播放</span></button>
+          <button id="next" class="icon-button transport-side" aria-label="下一步" title="下一步（→）">›</button>
+          <button id="replay" class="text-button replay-button" title="从当前步骤的起点重播">↻ <span>重播本步</span></button>
+        </div>
+        <div class="scrub-row">
+          <span id="animation-status">准备就绪</span>
+          <input id="progress" type="range" min="0" max="1000" value="1000" aria-label="当前步骤动画进度">
+          <span id="progress-label" class="mono">100%</span>
+        </div>
+        <div class="play-options">
+          <label>速度 <select id="speed" aria-label="动画速度"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label>
+          <button id="restart" class="text-button">重新开始</button>
+        </div>
+      </footer>
+    </main>
+    <aside class="panel-sidebar" id="panel-sidebar" aria-label="反应机理推演">
+      <div class="panel-header">
+        <div class="panel-title-wrap">
+          <span class="small-label">STEP ANALYSIS</span>
+          <h3>反应推演与机理</h3>
+        </div>
+        <span id="deduction-status" class="deduction-status-badge">待推演</span>
+      </div>
+
+      <section class="explanation">
+        <div id="measurement-strip" hidden></div>
+        
+        <!-- 步骤反应推演交互卡片 -->
+        <div id="deduction-card" class="deduction-card" hidden>
+          <div id="deduction-feedback" class="deduction-feedback" hidden></div>
+          <div class="deduction-body" id="deduction-body"></div>
+          <div class="deduction-action">
+            <button id="deduction-submit-btn" class="primary-button deduction-btn">检验反应推演</button>
+          </div>
+        </div>
+
+        <div class="step-note-card" id="step-note-card">
+          <div class="note-icon">💡</div>
+          <p id="step-note">先观察，再点击播放。背景粒子保留在体系中，灰淡显示。</p>
+        </div>
+      </section>
+    </aside>
+  </div>
+  <dialog id="molecule-preview-dialog" class="molecule-preview-dialog" aria-labelledby="mol-preview-title">
+    <div class="dialog-header">
+      <div>
+        <span class="small-label" id="mol-preview-subtitle">分子三维构型预览</span>
+        <h2 id="mol-preview-title">甲烷 · CH₄</h2>
+      </div>
+      <div class="mol-preview-header-actions">
+        <button id="mol-preview-reupload" class="text-button top-action-btn mol-reupload-btn">重新上传文件</button>
+        <button class="icon-button" data-close="molecule-preview-dialog" aria-label="关闭预览">×</button>
+      </div>
+    </div>
+    <div class="mol-preview-stage-wrap" id="mol-preview-stage-wrap">
+      <div id="mol-preview-viewport" class="mol-preview-viewport" tabindex="0" role="img" aria-label="分子三维球棍模型；拖动旋转，滚轮缩放"></div>
+      <div class="mol-preview-tools">
+        <button id="mol-preview-reset" class="quiet-button" title="恢复模型的默认观察方向">复位视角 <span aria-hidden="true">⤾</span></button>
+      </div>
+      <div class="stage-legend mol-preview-legend">
+        <span><i class="element-dot carbon"></i>C</span>
+        <span><i class="element-dot hydrogen"></i>H</span>
+        <span><i class="element-dot bromine"></i>Br</span>
+        <span class="radical-legend"><b>·</b> 未成对电子</span>
+      </div>
+      <div class="stage-hint">拖动旋转 · 滚轮缩放</div>
+    </div>
+    <div class="mol-preview-info" id="mol-preview-info"></div>
+  </dialog>
+  <dialog id="config-dialog" aria-labelledby="config-title">
+    <div class="dialog-header"><div><span class="small-label">课堂配置</span><h2 id="config-title">加载你的分子结构</h2></div><button class="icon-button" data-close="config-dialog" aria-label="关闭配置">×</button></div>
+    <p class="dialog-intro">每种分子一个小文件，填写原子组成、空间构型、键长、键角和分子说明，坐标由程序生成。导入后自动应用到七步动画，其余分子保持当前配置。</p>
+    <div class="file-drop"><span class="file-symbol" aria-hidden="true">{ }</span><strong>选择 CH4.json、CH3.json 等小组文件</strong><span>可一次选多个 · 本机读取，不会上传</span><button id="choose-file" class="primary-button">选择分子文件</button><input type="file" id="file-input" accept=".json,application/json" multiple hidden></div>
+    <div class="config-source"><span>当前配置</span><strong id="config-source">正在加载…</strong></div>
+    <div id="validation-result" role="status"></div>
+    <div class="molecule-export"><label for="export-molecule">保存一个分子</label><select id="export-molecule" aria-label="要下载的分子"></select><button id="download-config" class="text-button">↓ 导出配置文件</button></div>
+    <div class="dialog-actions"><span class="export-hint">每组一份分子档案，适合分组完成</span><button id="reload-config" class="text-button">恢复默认结构</button></div>
+    <details class="data-references"><summary>结构数据与参考来源</summary><p id="reference-note">当前为参考数据，键长待化学老师确认。键长与键角由自动生成的结构坐标计算；球体大小和反应路径仅作教学示意。</p><div id="reference-list"></div></details>
+    <p class="dialog-footnote">先看「学生任务 / 开始这里.md」。反应步骤由老师统一维护，学生不需要填写。</p>
+  </dialog>
+  <dialog id="help-dialog" aria-labelledby="help-title">
+    <div class="dialog-header"><div><span class="small-label">使用说明</span><h2 id="help-title">观察每一次断键与成键</h2></div><button class="icon-button" data-close="help-dialog" aria-label="关闭说明">×</button></div>
+    <ol class="help-list"><li><strong>沿七个画面观察</strong><p>点击步骤直接查看该画面的最终结构；点击「重播本步」观察它如何形成。「连续播放」会自动接续后面的步骤。</p></li><li><strong>暂停，换一个观察角度</strong><p>拖动模型区域旋转，滚轮或双指缩放；点击原子查看编号与当前坐标。</p></li><li><strong>追踪同一个原子</strong><p>H4 是被取走的氢。淡色粒子仍在体系中；每个画面只突出当前反应的粒子。第七步是产物总结，不是链终止。</p></li><li><strong>只修改自己负责的分子</strong><p>打开「学生任务」中对应的小配置文件，修改键长、键角或未成对电子，再导入。可以一次导入多个小组的文件，无需复制动画配置。</p></li></ol>
+    <div class="keyboard-help"><kbd>空格</kbd> 播放 / 暂停 <kbd>←</kbd><kbd>→</kbd> 前后步骤 <kbd>Home</kbd> 重新开始</div>
+    <p class="dialog-footnote">离线可用 · 分子内部坐标单位 Å · 动画是机理示意，不代表真实时间或轨迹</p>
+  </dialog>
+  <div id="toast" role="status" hidden></div>
+  <noscript>此演示需要浏览器启用 JavaScript。</noscript>
+</body>
+</html>
