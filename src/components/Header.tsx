@@ -1,6 +1,7 @@
 import React from 'react';
-import { Atom, Check, ChevronRight, Lock } from 'lucide-react';
+import { ArrowLeft, Atom, Check, ChevronRight, Lock } from 'lucide-react';
 import { useChemStore, REQUIRED_SLOTS } from '../store/useChemStore';
+import { useFreeChemStore } from '../store/useFreeChemStore';
 import * as deduction from '../engine/deduction';
 
 export const Header: React.FC = () => {
@@ -13,6 +14,7 @@ export const Header: React.FC = () => {
   const enterPipelineFromGate = useChemStore((s) => s.enterPipelineFromGate);
   const submitPipelineAndEnterStage = useChemStore((s) => s.submitPipelineAndEnterStage);
   const showToast = useChemStore((s) => s.showToast);
+  const setAppMode = useFreeChemStore((s) => s.setAppMode);
 
   const validMolCount = REQUIRED_SLOTS.filter((s) => slotState[s.id]?.status === 'valid').length;
   const step1Done = validMolCount === 6;
@@ -62,6 +64,15 @@ export const Header: React.FC = () => {
   return (
     <header className="app-header">
       <div className="identity">
+        <button
+          type="button"
+          className="mode-back-btn"
+          title="返回实验台模式选择首页"
+          onClick={() => setAppMode('home')}
+        >
+          <ArrowLeft size={16} />
+          <span>切换模式</span>
+        </button>
         <span className="mark" aria-hidden="true">
           <Atom size={22} strokeWidth={2} />
         </span>

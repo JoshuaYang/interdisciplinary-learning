@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import * as core from '../core';
 import * as files from '../configFiles';
 import * as deduction from '../deduction';
+import * as freeEngine from '../freeReactionEngine';
+import { PERIODIC_TABLE } from '../cpkPalette';
 import { CHEM_DEFAULT_FILES } from '../defaultBundle';
 
 const fullBundle = () => structuredClone(CHEM_DEFAULT_FILES);
@@ -125,5 +127,88 @@ describe('Chem Engine & Deduction Suite', () => {
         formBond: '无',
       }).ok
     ).toBe(false);
+  });
+
+  it('provides all 118 elements in PERIODIC_TABLE and builds universal 3D molecules & animations', () => {
+    expect(PERIODIC_TABLE.length).toBe(118);
+
+    // Build multi-center ethane (CH3CH3) from topology nodes + bonds
+    const ethaneDoc = {
+      name: '乙烷',
+      formula: 'CH3CH3',
+      geometry: 'tetrahedral',
+      hybridization: 'sp3',
+      bondLengths: { 'C-C': 1.54, 'C-H': 1.09 },
+      bondAngles: { 'H-C-H': 109.5, 'H-C-C': 109.5 },
+      nodes: [
+        { id: 'c1', element: 'C', radical: 0 },
+        { id: 'c2', element: 'C', radical: 0 },
+        { id: 'h1', element: 'H', radical: 0 },
+        { id: 'h2', element: 'H', radical: 0 },
+        { id: 'h3', element: 'H', radical: 0 },
+        { id: 'h4', element: 'H', radical: 0 },
+        { id: 'h5', element: 'H', radical: 0 },
+        { id: 'h6', element: 'H', radical: 0 },
+      ],
+      bonds: [
+        { id: 'b1', from: 'c1', to: 'c2', order: 1, length: 1.54 },
+        { id: 'b2', from: 'c1', to: 'h1', order: 1, length: 1.09 },
+        { id: 'b3', from: 'c1', to: 'h2', order: 1, length: 1.09 },
+        { id: 'b4', from: 'c1', to: 'h3', order: 1, length: 1.09 },
+        { id: 'b5', from: 'c2', to: 'h4', order: 1, length: 1.09 },
+        { id: 'b6', from: 'c2', to: 'h5', order: 1, length: 1.09 },
+        { id: 'b7', from: 'c2', to: 'h6', order: 1, length: 1.09 },
+      ],
+    };
+    const ethaneMol = freeEngine.buildUniversalMolecule(ethaneDoc);
+    expect(ethaneMol.atoms.length).toBe(8);
+    expect(ethaneMol.bonds.length).toBe(7);
+    const ccLen = core.measure(ethaneMol, ['c1', 'c2']);
+    expect(Math.abs(ccLen - 1.54)).toBeLessThan(0.01);
+
+    // Build CH3· radical and compile a stage: 2 CH3· -> CH3CH3
+    const ch3Doc = {
+      name: '甲基自由基',
+      formula: 'CH3·',
+      geometry: 'trigonalPlanar',
+      hybridization: 'sp2',
+      bondLengths: { 'C-H': 1.08 },
+      bondAngles: { 'H-C-H': 120 },
+      nodes: [
+        { id: 'c1', element: 'C', radical: 1 },
+        { id: 'h1', element: 'H', radical: 0 },
+        { id: 'h2', element: 'H', radical: 0 },
+        { id: 'h3', element: 'H', radical: 0 },
+      ],
+      bonds: [
+        { id: 'b1', from: 'c1', to: 'h1', order: 1, length: 1.08 },
+        { id: 'b2', from: 'c1', to: 'h2', order: 1, length: 1.08 },
+        { id: 'b3', from: 'c1', to: 'h3', order: 1, length: 1.08 },
+      ],
+    };
+    const ch3Mol = freeEngine.buildUniversalMolecule(ch3Doc);
+    const compiled = freeEngine.compileFreeStages(
+      [
+        { id: 'm_ch3', doc: ch3Doc, mol: ch3Mol, formulaHtml: 'CH<sub>3</sub>·' },
+        { id: 'm_c2h6', doc: ethaneDoc, mol: ethaneMol, formulaHtml: 'CH<sub>3</sub>CH<sub>3</sub>' },
+      ],
+      [
+        {
+          id: 'st_1',
+          name: '甲基结合生成乙烷',
+          reactants: ['m_ch3', 'm_ch3'],
+          products: ['m_c2h6'],
+        },
+      ]
+    );
+    expect(compiled.length).toBe(1);
+    expect(compiled[0].formedBondLabels).toContain('C—C');
+
+    const f0 = freeEngine.sampleFreeStage(compiled[0], 0);
+    const fMid = freeEngine.sampleFreeStage(compiled[0], 0.5);
+    const fEnd = freeEngine.sampleFreeStage(compiled[0], 1);
+    expect(Object.keys(f0.atoms).length).toBe(8);
+    expect(Object.keys(fMid.atoms).length).toBe(8);
+    expect(Object.keys(fEnd.atoms).length).toBe(8);
   });
 });

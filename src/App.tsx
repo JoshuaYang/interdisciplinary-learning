@@ -3,15 +3,25 @@ import { Header } from './components/Header';
 import { GateScreen } from './components/Step1Gate/GateScreen';
 import { PipelineScreen } from './components/Step2Pipeline/PipelineScreen';
 import { StageScreen } from './components/Step3Stage/StageScreen';
+import { HomeEntry } from './components/HomeEntry';
+import { FreeHeader } from './components/FreeMode/FreeHeader';
+import { FreeGateScreen } from './components/FreeMode/FreeGateScreen';
+import { FreePipelineScreen } from './components/FreeMode/FreePipelineScreen';
+import { FreeStageScreen } from './components/FreeMode/FreeStageScreen';
 import { useChemStore } from './store/useChemStore';
+import { useFreeChemStore } from './store/useFreeChemStore';
 import * as core from './engine/core';
 import * as files from './engine/configFiles';
 import * as deduction from './engine/deduction';
+import * as freeEngine from './engine/freeReactionEngine';
 
 export const App: React.FC = () => {
   const screen = useChemStore((s) => s.screen);
   const toastMessage = useChemStore((s) => s.toastMessage);
   const loadDefault = useChemStore((s) => s.loadDefault);
+
+  const appMode = useFreeChemStore((s) => s.appMode);
+  const freeScreen = useFreeChemStore((s) => s.screen);
 
   useEffect(() => {
     loadDefault();
@@ -21,10 +31,16 @@ export const App: React.FC = () => {
       core,
       files,
       deduction,
+      freeEngine,
+      setAppMode: (mode: 'home' | 'guided' | 'free') =>
+        useFreeChemStore.getState().setAppMode(mode),
       getState: () => {
         const s = useChemStore.getState();
+        const fs = useFreeChemStore.getState();
         return {
+          appMode: fs.appMode,
           screen: s.screen,
+          freeScreen: fs.screen,
           stepIndex: s.index,
           progress: s.progress,
           playing: s.playing,
@@ -47,10 +63,34 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const s = useChemStore.getState();
-      if (s.screen !== 'stage' || s.configDialogOpen || s.helpDialogOpen) return;
       const target = e.target as HTMLElement | null;
       if (target && target.matches('input, button, select, textarea, label')) return;
+
+      const fs = useFreeChemStore.getState();
+      if (fs.appMode === 'free' && fs.screen === 'stage') {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          fs.play();
+        } else if (e.code === 'ArrowRight') {
+          e.preventDefault();
+          if (fs.stageIndex < fs.compiledStages.length - 1) {
+            fs.goStage(fs.stageIndex + 1, true);
+          }
+        } else if (e.code === 'ArrowLeft') {
+          e.preventDefault();
+          if (fs.stageIndex > 0) {
+            fs.goStage(fs.stageIndex - 1, true);
+          }
+        } else if (e.code === 'Home') {
+          e.preventDefault();
+          fs.restart();
+        }
+        return;
+      }
+
+      const s = useChemStore.getState();
+      if (fs.appMode !== 'guided' || s.screen !== 'stage' || s.configDialogOpen || s.helpDialogOpen)
+        return;
 
       if (e.code === 'Space') {
         e.preventDefault();
@@ -76,10 +116,26 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-shell">
-      <Header />
-      {screen === 'gate' && <GateScreen />}
-      {screen === 'pipeline' && <PipelineScreen />}
-      {screen === 'stage' && <StageScreen />}
+      {appMode === 'home' && <HomeEntry />}
+
+      {appMode === 'guided' && (
+        <>
+          <Header />
+          {screen === 'gate' && <GateScreen />}
+          {screen === 'pipeline' && <PipelineScreen />}
+          {screen === 'stage' && <StageScreen />}
+        </>
+      )}
+
+      {appMode === 'free' && (
+        <>
+          <FreeHeader />
+          {freeScreen === 'gate' && <FreeGateScreen />}
+          {freeScreen === 'pipeline' && <FreePipelineScreen />}
+          {freeScreen === 'stage' && <FreeStageScreen />}
+        </>
+      )}
+
       <div
         className="toast"
         id="toast"

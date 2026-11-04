@@ -1,4 +1,4 @@
-export type ElementSymbol = 'C' | 'H' | 'Br';
+export type ElementSymbol = string;
 
 export interface AtomDef {
   id: string;
