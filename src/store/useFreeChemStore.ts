@@ -7,12 +7,12 @@ import {
   type FreeMoleculeItem,
   type FreeStageDef,
 } from '../engine/freeReactionEngine';
-import { useChemStore } from './useChemStore';
+import { useChemStore, REQUIRED_SLOTS, POOL_MOLECULES } from './useChemStore';
 
 /**
  * Clean, unified topology JSON schema for all molecules in the Free Reaction Workbench
  */
-const SAMPLE_MOLECULE_DOCS: Record<string, any>[] = [
+export const SAMPLE_MOLECULE_DOCS: Record<string, any>[] = [
   {
     name: 'Methane',
     formula: 'CH4',
@@ -23,10 +23,10 @@ const SAMPLE_MOLECULE_DOCS: Record<string, any>[] = [
     description: 'Regular tetrahedral saturated alkane with sp3 hybridized carbon.',
     nodes: [
       { id: 'c1', element: 'C', radical: 0, x: 250, y: 160 },
-      { id: 'h1', element: 'H', radical: 0, x: 250, y: 30 },
-      { id: 'h2', element: 'H', radical: 0, x: 380, y: 160 },
-      { id: 'h3', element: 'H', radical: 0, x: 250, y: 290 },
-      { id: 'h4', element: 'H', radical: 0, x: 120, y: 160 },
+      { id: 'h1', element: 'H', radical: 0, x: 250, y: 52 },
+      { id: 'h2', element: 'H', radical: 0, x: 370, y: 160 },
+      { id: 'h3', element: 'H', radical: 0, x: 250, y: 268 },
+      { id: 'h4', element: 'H', radical: 0, x: 130, y: 160 },
     ],
     bonds: [
       { id: 'b1', from: 'c1', to: 'h1', order: 1, length: 1.087 },
@@ -70,9 +70,9 @@ const SAMPLE_MOLECULE_DOCS: Record<string, any>[] = [
     description: 'Trigonal planar carbon radical with 1 unpaired electron on the central C.',
     nodes: [
       { id: 'c1', element: 'C', radical: 1, x: 250, y: 160 },
-      { id: 'h1', element: 'H', radical: 0, x: 250, y: 35 },
-      { id: 'h2', element: 'H', radical: 0, x: 358, y: 222 },
-      { id: 'h3', element: 'H', radical: 0, x: 142, y: 222 },
+      { id: 'h1', element: 'H', radical: 0, x: 250, y: 52 },
+      { id: 'h2', element: 'H', radical: 0, x: 344, y: 214 },
+      { id: 'h3', element: 'H', radical: 0, x: 156, y: 214 },
     ],
     bonds: [
       { id: 'b1', from: 'c1', to: 'h1', order: 1, length: 1.076 },
@@ -89,8 +89,8 @@ const SAMPLE_MOLECULE_DOCS: Record<string, any>[] = [
     bondAngles: {},
     description: 'Polar covalent diatomic molecule formed by hydrogen and bromine.',
     nodes: [
-      { id: 'h1', element: 'H', radical: 0, x: 160, y: 160 },
-      { id: 'br1', element: 'Br', radical: 0, x: 340, y: 160 },
+      { id: 'h1', element: 'H', radical: 0, x: 165, y: 160 },
+      { id: 'br1', element: 'Br', radical: 0, x: 335, y: 160 },
     ],
     bonds: [{ id: 'b1', from: 'h1', to: 'br1', order: 1, length: 1.414 }],
   },
@@ -103,11 +103,11 @@ const SAMPLE_MOLECULE_DOCS: Record<string, any>[] = [
     bondAngles: { 'H-C-H': 111.37, 'H-C-Br': 107.5 },
     description: 'Tetrahedral haloalkane molecule.',
     nodes: [
-      { id: 'c1', element: 'C', radical: 0, x: 210, y: 160 },
-      { id: 'br1', element: 'Br', radical: 0, x: 370, y: 160 },
-      { id: 'h1', element: 'H', radical: 0, x: 210, y: 35 },
-      { id: 'h2', element: 'H', radical: 0, x: 210, y: 285 },
-      { id: 'h3', element: 'H', radical: 0, x: 85, y: 160 },
+      { id: 'c1', element: 'C', radical: 0, x: 230, y: 160 },
+      { id: 'br1', element: 'Br', radical: 0, x: 375, y: 160 },
+      { id: 'h1', element: 'H', radical: 0, x: 230, y: 52 },
+      { id: 'h2', element: 'H', radical: 0, x: 230, y: 268 },
+      { id: 'h3', element: 'H', radical: 0, x: 110, y: 160 },
     ],
     bonds: [
       { id: 'b1', from: 'c1', to: 'br1', order: 1, length: 1.939 },
@@ -125,14 +125,14 @@ const SAMPLE_MOLECULE_DOCS: Record<string, any>[] = [
     bondAngles: { 'H-C-H': 109.5, 'H-C-C': 109.5 },
     description: 'Two-center alkane formed by the combination of two methyl radicals.',
     nodes: [
-      { id: 'c1', element: 'C', radical: 0, x: 170, y: 160 },
-      { id: 'c2', element: 'C', radical: 0, x: 330, y: 160 },
-      { id: 'h1', element: 'H', radical: 0, x: 170, y: 45 },
-      { id: 'h2', element: 'H', radical: 0, x: 60, y: 160 },
-      { id: 'h3', element: 'H', radical: 0, x: 170, y: 275 },
-      { id: 'h4', element: 'H', radical: 0, x: 330, y: 45 },
-      { id: 'h5', element: 'H', radical: 0, x: 440, y: 160 },
-      { id: 'h6', element: 'H', radical: 0, x: 330, y: 275 },
+      { id: 'c1', element: 'C', radical: 0, x: 185, y: 160 },
+      { id: 'c2', element: 'C', radical: 0, x: 315, y: 160 },
+      { id: 'h1', element: 'H', radical: 0, x: 185, y: 52 },
+      { id: 'h2', element: 'H', radical: 0, x: 80, y: 160 },
+      { id: 'h3', element: 'H', radical: 0, x: 185, y: 268 },
+      { id: 'h4', element: 'H', radical: 0, x: 315, y: 52 },
+      { id: 'h5', element: 'H', radical: 0, x: 420, y: 160 },
+      { id: 'h6', element: 'H', radical: 0, x: 315, y: 268 },
     ],
     bonds: [
       { id: 'b1', from: 'c1', to: 'c2', order: 1, length: 1.54 },
@@ -145,6 +145,20 @@ const SAMPLE_MOLECULE_DOCS: Record<string, any>[] = [
     ],
   },
 ];
+
+export function getSampleDocForSlot(slotId: string): Record<string, any> | null {
+  const meta =
+    REQUIRED_SLOTS.find((s) => s.id === slotId) ||
+    POOL_MOLECULES.find((s) => s.id === slotId);
+  if (!meta) return null;
+  const match = SAMPLE_MOLECULE_DOCS.find(
+    (d) =>
+      d.formula === meta.formula ||
+      d.name.toLowerCase() === meta.name.toLowerCase() ||
+      d.formula.replace(/·/g, '') === meta.id.replace(/·/g, '')
+  );
+  return match ? JSON.parse(JSON.stringify(match)) : null;
+}
 
 let nextMolSeq = 1;
 let nextStageSeq = 1;

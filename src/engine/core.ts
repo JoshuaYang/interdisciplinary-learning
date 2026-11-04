@@ -115,10 +115,10 @@ export function validate(config: any): {
   const errors: string[] = [];
   const warnings: string[] = [];
   const err = (m: string) => errors.push(m);
-  if (!isObj(config)) return { errors: ['配置最外层必须是一个 JSON 对象。'], warnings };
-  if (config.version !== 1) err('version 必须为 1。');
-  if (config.units !== 'angstrom') err('units 必须为 "angstrom"（Å）。');
-  if (typeof config.title !== 'string' || !config.title.trim()) err('请填写 title。');
+  if (!isObj(config)) return { errors: ['Configuration root must be a JSON object.'], warnings };
+  if (config.version !== 1) err('version must be 1.');
+  if (config.units !== 'angstrom') err('units must be "angstrom" (Å).');
+  if (typeof config.title !== 'string' || !config.title.trim()) err('title is required.');
   if (
     config.sources !== undefined &&
     (!Array.isArray(config.sources) ||
@@ -126,11 +126,11 @@ export function validate(config: any): {
         (s: any) => !isObj(s) || typeof s.title !== 'string' || typeof s.url !== 'string'
       ))
   )
-    err('sources 应是包含 title 和 url 的对象数组。');
+    err('sources must be an array of objects containing title and url.');
   if (!isObj(config.molecules))
-    return { errors: [...errors, '缺少 molecules 分子结构对象。'], warnings };
+    return { errors: [...errors, 'Missing "molecules" structure dictionary.'], warnings };
   if (!Array.isArray(config.steps) || config.steps.length !== 7)
-    err('本项目需要恰好 7 个 steps。');
+    err('Exactly 7 steps are required.');
   const counts: Record<string, Record<string, number>> = {
     CH4: { C: 1, H: 4 },
     CH3: { C: 1, H: 3 },
@@ -140,7 +140,7 @@ export function validate(config: any): {
     HBr: { H: 1, Br: 1 },
   };
   for (const id of Object.keys(counts))
-    if (!own(config.molecules, id)) err(`缺少分子 ${id}。`);
+    if (!own(config.molecules, id)) err(`Missing molecule ${id}.`);
   for (const [id, m] of Object.entries<any>(config.molecules)) {
     const prefix = `molecules.${id}`;
     if (
@@ -150,11 +150,11 @@ export function validate(config: any): {
       m.atoms.length > 20 ||
       !Array.isArray(m.bonds)
     ) {
-      err(`${prefix} 必须包含 atoms 和 bonds 数组。`);
+      err(`${prefix} must contain atoms and bonds arrays.`);
       continue;
     }
     for (const field of ['name', 'formula', 'geometry'])
-      if (typeof m[field] !== 'string') err(`${prefix}.${field} 必须为文字。`);
+      if (typeof m[field] !== 'string') err(`${prefix}.${field} must be a string.`);
     if (
       m.reference !== undefined &&
       (!isObj(m.reference) ||
@@ -162,34 +162,34 @@ export function validate(config: any): {
           (f) => m.reference[f] !== undefined && typeof m.reference[f] !== 'string'
         ))
     )
-      err(`${prefix}.reference 应包含文字形式的 status、source、url。`);
+      err(`${prefix}.reference must contain status, source, and url as strings.`);
     const ids = new Set<string>();
     const total: Record<string, number> = {};
     const degree: Record<string, number> = Object.create(null);
     let valid = true;
     for (const a of m.atoms) {
       if (!isObj(a) || typeof a.id !== 'string' || !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(a.id)) {
-        err(`${prefix} 中原子 id 应为字母开头的英文编号。`);
+        err(`${prefix}: atom id must start with a letter and contain only alphanumeric characters.`);
         valid = false;
         continue;
       }
       if (ids.has(a.id)) {
-        err(`${prefix} 的原子编号 ${a.id} 重复。`);
+        err(`${prefix}: duplicate atom id ${a.id}.`);
         valid = false;
       }
       ids.add(a.id);
       degree[a.id] = 0;
       if (!['C', 'H', 'Br'].includes(a.element)) {
-        err(`${prefix}.${a.id} 的元素只能是 C、H 或 Br。`);
+        err(`${prefix}.${a.id}: element must be C, H, or Br.`);
         valid = false;
       }
       total[a.element] = (total[a.element] || 0) + 1;
       if (!vec(a.position)) {
-        err(`${prefix}.${a.id}.position 必须是三个有限数字（绝对值不超过 100）。`);
+        err(`${prefix}.${a.id}.position must be 3 finite numbers within [-100, 100].`);
         valid = false;
       }
       if (a.radical !== 0 && a.radical !== 1) {
-        err(`${prefix}.${a.id}.radical 必须是 0 或 1。`);
+        err(`${prefix}.${a.id}.radical must be 0 or 1.`);
         valid = false;
       }
     }
@@ -199,9 +199,9 @@ export function validate(config: any): {
         JSON.stringify(Object.entries(counts[id]).sort())
     )
       err(
-        `${prefix} 原子组成不符：应为 ${Object.entries(counts[id])
+        `${prefix} atomic composition mismatch: expected ${Object.entries(counts[id])
           .map(([e, n]) => e + '×' + n)
-          .join('、')}。`
+          .join(', ')}.`
       );
     const seen = new Set<string>();
     for (const b of m.bonds) {
@@ -212,32 +212,32 @@ export function validate(config: any): {
         b.atoms.some((a: string) => !ids.has(a)) ||
         b.atoms[0] === b.atoms[1]
       ) {
-        err(`${prefix} 存在无效键引用，请检查两个原子编号。`);
+        err(`${prefix} contains invalid bond references; check atom ids.`);
         valid = false;
         continue;
       }
-      if (b.order !== 1) err(`${prefix} 本反应只使用单键，order 应为 1。`);
-      if (seen.has(key(b.atoms))) err(`${prefix} 中 ${b.atoms.join('—')} 重复成键。`);
+      if (b.order !== 1) err(`${prefix}: only single bonds (order: 1) are used in this reaction.`);
+      if (seen.has(key(b.atoms))) err(`${prefix}: duplicate bond between ${b.atoms.join('—')}.`);
       seen.add(key(b.atoms));
       b.atoms.forEach((a: string) => degree[a]++);
       if (valid && measure(m as MoleculeModel, b.atoms) < 0.1)
-        err(`${prefix} 中 ${b.atoms.join('—')} 键长过小，请检查坐标。`);
+        err(`${prefix}: bond length between ${b.atoms.join('—')} is too small; check coordinates.`);
     }
     if (valid) {
       for (const a of m.atoms) {
         const expected = (a.element === 'C' ? 4 : 1) - a.radical;
         if (degree[a.id] !== expected)
           err(
-            `${prefix}.${a.id} 的键数为 ${degree[a.id]}；按本反应的中性粒子与自由基标记，应为 ${expected}。`
+            `${prefix}.${a.id} has ${degree[a.id]} bonds; expected ${expected} for this species.`
           );
       }
       for (let i = 0; i < m.atoms.length; i++)
         for (let j = i + 1; j < m.atoms.length; j++)
           if (length(sub(m.atoms[i].position, m.atoms[j].position)) < 0.1)
-            err(`${prefix} 中 ${m.atoms[i].id} 与 ${m.atoms[j].id} 的坐标重叠。`);
+            err(`${prefix}: overlapping coordinates between atoms ${m.atoms[i].id} and ${m.atoms[j].id}.`);
     }
     if (!Array.isArray(m.measurements)) {
-      err(`${prefix}.measurements 应为数组（可为空）。`);
+      err(`${prefix}.measurements must be an array.`);
       continue;
     }
     for (const q of m.measurements) {
@@ -253,55 +253,55 @@ export function validate(config: any): {
         !Number.isFinite(q.tolerance) ||
         q.tolerance < 0
       ) {
-        err(`${prefix} 的 measurements 测量定义无效。`);
+        err(`${prefix}: invalid measurement definition.`);
         continue;
       }
       if (valid) {
         const n = measure(m as MoleculeModel, q.atoms);
         if (!Number.isFinite(n))
-          err(`${prefix} 的 ${q.label} 无法计算，请检查重叠坐标。`);
+          err(`${prefix}: cannot calculate ${q.label}; check coordinates.`);
         else if (Math.abs(n - q.value) > q.tolerance)
           warnings.push(
-            `${m.formula} ${q.label}：坐标计算为 ${n.toFixed(
+            `${m.formula} ${q.label}: calculated ${n.toFixed(
               q.atoms.length === 2 ? 3 : 2
-            )}${q.atoms.length === 2 ? ' Å' : '°'}，参考值为 ${q.value}，请检查。`
+            )}${q.atoms.length === 2 ? ' Å' : '°'}, reference is ${q.value}.`
           );
       }
     }
   }
   if (errors.length) return { errors, warnings };
   config.steps.forEach((s: any, i: number) => {
-    const prefix = `第 ${i + 1} 步`;
+    const prefix = `Step ${i + 1}`;
     if (!isObj(s)) {
-      err(`${prefix} 必须为对象。`);
+      err(`${prefix} must be an object.`);
       return;
     }
     for (const f of ['title', 'shortTitle', 'phase', 'formula', 'description', 'note'])
-      if (typeof s[f] !== 'string') err(`${prefix} 缺少文字字段 ${f}。`);
+      if (typeof s[f] !== 'string') err(`${prefix} missing string field "${f}".`);
     if (!Array.isArray(s.instances) || s.instances.length < 1 || s.instances.length > 12) {
-      err(`${prefix} 的 instances 应包含 1—12 个分子实例。`);
+      err(`${prefix} instances must contain 1 to 12 molecule instances.`);
       return;
     }
     const global = new Set<string>();
     for (const inst of s.instances) {
       if (!isObj(inst) || !own(config.molecules, inst.molecule)) {
-        err(`${prefix} 引用了不存在的分子。`);
+        err(`${prefix} references a non-existent molecule.`);
         continue;
       }
       if (!vec(inst.position))
-        err(`${prefix} 的 position 必须为三个数字（绝对值不超过 100）。`);
+        err(`${prefix} position must be 3 numbers within [-100, 100].`);
       if (
         !Array.isArray(inst.rotation) ||
         inst.rotation.length !== 3 ||
         inst.rotation.some((n: number) => !Number.isFinite(n) || Math.abs(n) > 360)
       )
-        err(`${prefix} 的 rotation 必须为三个角度（绝对值不超过 360）。`);
+        err(`${prefix} rotation must be 3 angles within [-360, 360].`);
       if (!['focus', 'context'].includes(inst.role))
-        err(`${prefix} 的 role 必须是 focus 或 context。`);
+        err(`${prefix} role must be "focus" or "context".`);
       if (inst.caption !== undefined && typeof inst.caption !== 'string')
-        err(`${prefix} 的 caption 必须为文字。`);
+        err(`${prefix} caption must be a string.`);
       if (!isObj(inst.atomMap)) {
-        err(`${prefix} 缺少 atomMap。`);
+        err(`${prefix} missing atomMap.`);
         continue;
       }
       const local = config.molecules[inst.molecule].atoms.map((a: any) => a.id);
@@ -309,11 +309,11 @@ export function validate(config: any): {
         Object.keys(inst.atomMap).length !== local.length ||
         local.some((id: string) => !own(inst.atomMap, id))
       )
-        err(`${prefix} 的 ${inst.molecule} atomMap 必须恰好映射每个原子。`);
+        err(`${prefix}: ${inst.molecule} atomMap must map every local atom.`);
       for (const id of Object.values<any>(inst.atomMap)) {
         if (typeof id !== 'string' || !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(id))
-          err(`${prefix} 的全局原子编号无效。`);
-        if (global.has(id)) err(`${prefix} 的全局原子 ${id} 被重复使用。`);
+          err(`${prefix}: invalid global atom id.`);
+        if (global.has(id)) err(`${prefix}: duplicate global atom id ${id}.`);
         global.add(id);
       }
     }
@@ -324,10 +324,10 @@ export function validate(config: any): {
       !Number.isFinite(t.duration) ||
       (i > 0 ? t.duration < 0.2 || t.duration > 30 : t.duration !== 0)
     ) {
-      err(`${prefix} 的 transition 类型或 duration 无效。`);
+      err(`${prefix}: invalid transition type or duration.`);
       return;
     }
-    if ((i === 0) !== (t.kind === 'initial')) err('只有第 1 步可以使用 initial 过渡。');
+    if ((i === 0) !== (t.kind === 'initial')) err('Only Step 1 can use "initial" transition.');
     for (const field of ['breakBonds', 'formBonds'])
       if (
         !Array.isArray(t[field]) ||
@@ -339,7 +339,7 @@ export function validate(config: any): {
             p.some((a: string) => !global.has(a))
         )
       )
-        err(`${prefix} 的 ${field} 包含无效全局原子编号。`);
+        err(`${prefix}: ${field} contains invalid global atom id.`);
   });
   if (errors.length) return { errors, warnings };
   const states = compile(config as ChemConfig);
@@ -350,7 +350,7 @@ export function validate(config: any): {
       Object.keys(all).some((id) => !s.atoms[id] || s.atoms[id].element !== all[id].element)
     )
       err(
-        `第 ${i + 1} 步的原子编号或元素与初始状态不一致，原子不能丢失或变成其他元素。`
+        `Step ${i + 1}: atom ids or elements do not match initial state.`
       );
     if (!i) return;
     const prev = states[i - 1];
@@ -368,7 +368,7 @@ export function validate(config: any): {
           JSON.stringify(Object.entries(inst.atomMap).sort())
       )
         err(
-          `第 ${i + 1} 步的 ${inst.molecule} 交换了未反应原子的映射；请保留 atomMap，用 rotation 改变分子朝向。`
+          `Step ${i + 1}: ${inst.molecule} swapped atom mappings of unreacted atoms; please preserve atomMap and use rotation to orient.`
         );
     }
     const removed = Object.keys(prev.bonds)
@@ -378,11 +378,11 @@ export function validate(config: any): {
       .filter((k) => !prev.bonds[k])
       .sort();
     if (JSON.stringify(removed) !== JSON.stringify(t.breakBonds.map(key).sort()))
-      err(`第 ${i + 1} 步 breakBonds 与前后结构实际断开的键不一致。`);
+      err(`Step ${i + 1}: breakBonds does not match broken bonds.`);
     if (JSON.stringify(added) !== JSON.stringify(t.formBonds.map(key).sort()))
-      err(`第 ${i + 1} 步 formBonds 与前后结构实际形成的键不一致。`);
+      err(`Step ${i + 1}: formBonds does not match formed bonds.`);
     if (['reframe', 'summary'].includes(t.kind) && (removed.length || added.length))
-      err(`第 ${i + 1} 步是视图切换或总结，不能改变化学键。`);
+      err(`Step ${i + 1} is a view transition; chemical bonds cannot change.`);
   });
   return { errors, warnings, states };
 }

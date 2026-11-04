@@ -601,7 +601,7 @@ export function normalizeDocToTopology(doc: any): {
   bonds: TopologyBond[];
 } {
   if (!doc || typeof doc !== 'object') {
-    throw new Error('JSON 内容必须是一个对象。');
+    throw new Error('JSON content must be an object.');
   }
 
   // Case 1: Already v2 topology format (`nodes` + `bonds`)
@@ -661,7 +661,7 @@ export function normalizeDocToTopology(doc: any): {
         id: centerId,
         element: centerEl,
         radical: unpaired as 0 | 1,
-        x: 220,
+        x: 250,
         y: 160,
         geometry: doc.geometry,
         hybridization: doc.hybridization,
@@ -681,8 +681,8 @@ export function normalizeDocToTopology(doc: any): {
         id: nid,
         element: el,
         radical: 0,
-        x: Math.round(220 + 92 * Math.cos(angle)),
-        y: Math.round(160 + 92 * Math.sin(angle)),
+        x: Math.round(250 + 120 * Math.cos(angle)),
+        y: Math.round(160 + 105 * Math.sin(angle)),
       });
       const k1 = `${centerEl}-${el}`;
       const k2 = `${el}-${centerEl}`;
@@ -723,7 +723,7 @@ export function normalizeDocToTopology(doc: any): {
           id,
           element: el,
           radical: idx === 0 && unpaired ? 1 : 0,
-          x: atomEls.length === 1 ? 220 : 165 + idx * 110,
+          x: atomEls.length === 1 ? 250 : 160 + idx * 180,
           y: 160,
           geometry: doc.geometry,
         });
@@ -770,7 +770,7 @@ export function normalizeDocToTopology(doc: any): {
     }
   }
 
-  throw new Error('无法识别的分子 JSON 格式：请提供 nodes/bonds、center/neighbors 或 atoms。');
+  throw new Error('Unrecognized molecule JSON format: please provide nodes/bonds, center/neighbors, or atoms.');
 }
 
 /**
@@ -803,9 +803,9 @@ export function buildUniversalMolecule(doc: any): MoleculeModel {
         }))
       : [];
     return {
-      name: doc.name || doc.formula || '自定义分子',
+      name: doc.name || doc.formula || 'Custom Molecule',
       formula: doc.formula || 'Custom',
-      geometry: GEOMETRY_LABEL_MAP[doc.geometry] || doc.geometry || '自定义构型',
+      geometry: GEOMETRY_LABEL_MAP[doc.geometry] || doc.geometry || 'Custom Geometry',
       description: doc.description || '',
       hybridization: doc.hybridization || 'none',
       atoms,

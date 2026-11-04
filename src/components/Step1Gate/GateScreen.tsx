@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { motion } from 'motion/react';
 import {
@@ -7,84 +7,55 @@ import {
   Box,
   CheckCircle2,
   CircleDashed,
+  Edit3,
   Info,
-  RefreshCw,
-  Upload,
+  RotateCcw,
 } from 'lucide-react';
 import { useChemStore, REQUIRED_SLOTS } from '../../store/useChemStore';
 import { MoleculePreviewModal } from './MoleculePreviewModal';
+import { MoleculeBuilderModal } from '../FreeMode/MoleculeBuilderModal';
+import { ConfirmModal } from '../Common/ConfirmModal';
 
 export const GateScreen: React.FC = () => {
   const slotState = useChemStore((s) => s.slotState);
-  const processFiles = useChemStore((s) => s.processFiles);
   const setPreviewSlotId = useChemStore((s) => s.setPreviewSlotId);
+  const openBuilderForSlot = useChemStore((s) => s.openBuilderForSlot);
   const enterPipelineFromGate = useChemStore((s) => s.enterPipelineFromGate);
 
-  const batchInputRef = useRef<HTMLInputElement>(null);
-  const singleInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const [dragoverSlot, setDragoverSlot] = useState<string | null>(null);
-  const [screenDragover, setScreenDragover] = useState(false);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
 
   const validCount = REQUIRED_SLOTS.filter((s) => slotState[s.id]?.status === 'valid').length;
-
-  const triggerSingleUpload = (slotId: string) => {
-    singleInputRefs.current[slotId]?.click();
-  };
 
   return (
     <Tooltip.Provider delayDuration={140}>
       <section
         id="gate-screen"
-        className={`gate-screen has-fixed-bottom-bar ${screenDragover ? 'dragover' : ''}`}
-        aria-label="Molecule Configuration Verification"
-        onDragOver={(e) => {
-          e.preventDefault();
-          setScreenDragover(true);
-        }}
-        onDragLeave={() => setScreenDragover(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setScreenDragover(false);
-          if (e.dataTransfer?.files?.length) {
-            processFiles([...e.dataTransfer.files]);
-          }
-        }}
+        className="gate-screen has-fixed-bottom-bar"
+        aria-label="Molecule Structure Configuration & Verification"
       >
         <div className="gate-container">
           <div className="gate-header">
             <div>
-              <span className="small-label">STEP 1 / 3 · MOLECULE VERIFICATION</span>
-              <h2>Upload & Verify Molecular Configurations</h2>
+              <span className="small-label">STEP 1 / 3 · MOLECULE CONFIGURATION</span>
+              <h2>Configure & Verify Molecular Structures</h2>
+              <p className="pipeline-subtitle" style={{ marginTop: 4, marginBottom: 0 }}>
+                Build each chemical structure visually on the interactive canvas. Parameters will be automatically verified against reaction requirements.
+              </p>
             </div>
             <div className="gate-actions-toolbar">
               <button
-                id="gate-choose-files"
                 type="button"
-                className="toolbar-icon-btn"
-                title="Upload JSON configuration files"
-                aria-label="Upload JSON configuration files"
-                onClick={() => batchInputRef.current?.click()}
+                className="toolbar-icon-btn danger-icon-btn"
+                title="Reset molecular configurations"
+                aria-label="Reset configurations"
+                onClick={() => setConfirmResetOpen(true)}
               >
-                <Upload size={18} />
+                <RotateCcw size={17} />
               </button>
-              <input
-                ref={batchInputRef}
-                type="file"
-                id="gate-file-input"
-                accept=".json,application/json"
-                multiple
-                hidden
-                onChange={(e) => {
-                  if (e.target.files?.length) {
-                    processFiles([...e.target.files]);
-                  }
-                  e.target.value = '';
-                }}
-              />
             </div>
           </div>
 
-          {/* 6 Molecule Verification Cards */}
+          {/* 6 Molecule Visual Configuration Cards */}
           <div className="gate-grid" id="gate-card-grid">
             {REQUIRED_SLOTS.map((slot, idx) => {
               const state = slotState[slot.id] || {
@@ -108,40 +79,9 @@ export const GateScreen: React.FC = () => {
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.22, delay: idx * 0.04 }}
-                  className={`gate-card status-${state.status} ${
-                    dragoverSlot === slot.id ? 'dragover' : ''
-                  }`}
+                  className={`gate-card status-${state.status}`}
                   data-id={slot.id}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setDragoverSlot(slot.id);
-                  }}
-                  onDragLeave={() => setDragoverSlot(null)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setDragoverSlot(null);
-                    if (e.dataTransfer?.files?.length) {
-                      processFiles([...e.dataTransfer.files], slot.id);
-                    }
-                  }}
                 >
-                  <input
-                    ref={(el) => {
-                      singleInputRefs.current[slot.id] = el;
-                    }}
-                    type="file"
-                    accept=".json,application/json"
-                    hidden
-                    onChange={(e) => {
-                      if (e.target.files?.length) {
-                        processFiles([...e.target.files], slot.id);
-                      }
-                      e.target.value = '';
-                    }}
-                  />
-
                   {/* Row 1: Number + Status & Hover Specs Trigger */}
                   <div className="gate-card-top">
                     <span className="gate-card-num mono">NO.{slot.num}</span>
@@ -260,21 +200,23 @@ export const GateScreen: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Row 3: Action Buttons */}
+                  {/* Row 3: Visual Action Buttons (No JSON Upload) */}
                   <div className="gate-card-actions">
                     {isValid ? (
                       <>
                         <button
                           type="button"
                           className="gate-action-btn secondary"
-                          onClick={() => triggerSingleUpload(slot.id)}
+                          title="Edit molecular structure visually"
+                          onClick={() => openBuilderForSlot(slot.id)}
                         >
-                          <RefreshCw size={15} />
-                          <span>Re-upload</span>
+                          <Edit3 size={15} />
+                          <span>Edit</span>
                         </button>
                         <button
                           type="button"
                           className="gate-action-btn primary"
+                          title="Inspect 3D ball-and-stick model"
                           onClick={() => setPreviewSlotId(slot.id)}
                         >
                           <Box size={16} />
@@ -284,11 +226,12 @@ export const GateScreen: React.FC = () => {
                     ) : (
                       <button
                         type="button"
-                        className="gate-action-btn upload-full"
-                        onClick={() => triggerSingleUpload(slot.id)}
+                        className="gate-action-btn primary upload-full"
+                        title="Open visual canvas to build this molecular structure"
+                        onClick={() => openBuilderForSlot(slot.id)}
                       >
-                        <Upload size={16} />
-                        <span>{isError ? 'Re-select' : 'Upload JSON'}</span>
+                        <Edit3 size={16} />
+                        <span>{isError ? 'Modify Structure' : 'Configure Structure'}</span>
                       </button>
                     )}
                   </div>
@@ -328,8 +271,28 @@ export const GateScreen: React.FC = () => {
           </div>
         </div>
 
+        {/* Universal 2D/3D Molecule Builder Modal */}
+        <MoleculeBuilderModal />
+
         {/* 3D Structure Preview Modal */}
         <MoleculePreviewModal />
+
+        {/* Reset Confirmation Modal */}
+        <ConfirmModal
+          open={confirmResetOpen}
+          onOpenChange={setConfirmResetOpen}
+          title="Reset All Configurations?"
+          description="Are you sure you want to reset all molecular configurations back to initial status?"
+          confirmLabel="Reset All"
+          onConfirm={() => {
+            const emptySlots: Record<string, any> = {};
+            REQUIRED_SLOTS.forEach((s) => {
+              emptySlots[s.id] = { status: 'empty', doc: null, mol: null, error: null, warnings: [] };
+            });
+            useChemStore.setState({ slotState: emptySlots });
+            setConfirmResetOpen(false);
+          }}
+        />
       </section>
     </Tooltip.Provider>
   );

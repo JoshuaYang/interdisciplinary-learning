@@ -22,7 +22,7 @@ describe('Chem Engine & Deduction Suite', () => {
     const bundle = fullBundle();
     const br2 = structuredClone(bundle.students.find((s) => s.formula === 'Br2')!);
     br2.geometry = 'tetrahedral';
-    expect(() => files.structure(br2, bundle.catalog.Br2)).toThrow(/空间构型填写有误/);
+    expect(() => files.structure(br2, bundle.catalog.Br2)).toThrow(/geometry/i);
   });
 
   it('accepts diatomic (and legacy linear) for Br2 and HBr, and trigonalPlanar for CH3·', () => {
@@ -135,7 +135,7 @@ describe('Chem Engine & Deduction Suite', () => {
 
     // Build multi-center ethane (CH3CH3) from topology nodes + bonds
     const ethaneDoc = {
-      name: '乙烷',
+      name: 'Ethane',
       formula: 'CH3CH3',
       geometry: 'tetrahedral',
       hybridization: 'sp3',
@@ -169,7 +169,7 @@ describe('Chem Engine & Deduction Suite', () => {
 
     // Build CH3· radical and compile a stage: 2 CH3· -> CH3CH3
     const ch3Doc = {
-      name: '甲基自由基',
+      name: 'Methyl Radical',
       formula: 'CH3·',
       geometry: 'trigonalPlanar',
       hybridization: 'sp2',
@@ -196,7 +196,7 @@ describe('Chem Engine & Deduction Suite', () => {
       [
         {
           id: 'st_1',
-          name: '甲基结合生成乙烷',
+          name: 'Methyl Radical Coupling to Ethane',
           reactants: ['m_ch3', 'm_ch3'],
           products: ['m_c2h6'],
         },

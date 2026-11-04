@@ -67,7 +67,7 @@ const sameElements = (a: unknown, b: string[]): boolean =>
 
 export function identify(doc: any): string {
   if (!object(doc) || typeof doc.formula !== 'string')
-    throw new Error('请填写 formula，例如 "formula": "CH4"。');
+    throw new Error('Please provide "formula", e.g. "formula": "CH4".');
   const formula = doc.formula
     .replace(/[₀-₉]/g, (c: string) => String('₀₁₂₃₄₅₆₇₈₉'.indexOf(c)))
     .replace(/\.$/, '·');
@@ -80,14 +80,14 @@ export function identify(doc: any): string {
     'Br·': 'Br',
   };
   if (!own(ids, formula))
-    throw new Error('formula 不受支持：请填写 CH4、CH3·、CH3Br、Br2、HBr 或 Br·，自由基须带点。');
+    throw new Error('Unsupported formula: please enter CH4, CH3·, CH3Br, Br2, HBr, or Br· (radicals must include ·).');
   return ids[formula];
 }
 
 export function structure(doc: any, template: any): MoleculeModel {
   const id = identify(doc);
   const spec = specs[id];
-  if (!template) throw new Error(`缺少 ${id} 的教师参考配置。`);
+  if (!template) throw new Error(`Missing teacher reference configuration for ${id}.`);
   const fields =
     spec.kind === 'center'
       ? ['center', 'neighbors', 'geometry', 'bondLengths', 'unpairedElectrons']
@@ -96,11 +96,12 @@ export function structure(doc: any, template: any): MoleculeModel {
       : ['atoms', 'geometry', 'unpairedElectrons'];
   fields.push('name', 'formula', 'description');
   if (spec.kind === 'center') fields.push('bondAngles', 'hybridization');
+  fields.push('nodes', 'bonds');
   for (const k of Object.keys(doc))
     if (!fields.includes(k))
-      throw new Error(`不认识字段「${k}」。此类结构只使用：${fields.join('、')}。`);
+      throw new Error(`Unrecognized field "${k}". Allowed fields for this structure: ${fields.join(', ')}.`);
   if (!spec.shapes.includes(doc['geometry']))
-    throw new Error(`${id} 的空间构型填写有误，请结合中心原子杂化与成键形式填写标准构型标识。`);
+    throw new Error(`Invalid geometry for ${id}. Please specify the correct geometry according to central atom hybridization and bonding.`);
   const elements: Record<string, string> =
     template.elements ||
     Object.fromEntries(template.atoms.map((a: any) => [a.id, a.element]));
@@ -109,14 +110,14 @@ export function structure(doc: any, template: any): MoleculeModel {
     ['description', 1000],
   ] as const)
     if (typeof doc[key] !== 'string' || !doc[key].trim() || doc[key].length > max)
-      throw new Error(`${key} 请填写非空文字，不超过 ${max} 个字符。`);
+      throw new Error(`${key} must be a non-empty string of up to ${max} characters.`);
   const formula =
     typeof doc.formula === 'string'
       ? doc.formula.replace(/[₀-₉]/g, (c: string) => String('₀₁₂₃₄₅₆₇₈₉'.indexOf(c)))
       : '';
   const radicalFormula = spec.radicals === 1;
   if (radicalFormula !== /[·.]$/.test(formula))
-    throw new Error('formula：自由基请在化学式末尾加 ·，普通分子不要加点。');
+    throw new Error('formula: radicals must end with ·, neutral closed-shell molecules must not.');
   const body = formula.replace(/[·.]$/, '');
   const parts = [...body.matchAll(/([A-Z][a-z]?)([1-9][0-9]*)?/g)];
   const counts: Record<string, number> = {};
@@ -128,28 +129,28 @@ export function structure(doc: any, template: any): MoleculeModel {
     Object.keys(counts).length !== Object.keys(expectedCounts).length ||
     Object.entries(expectedCounts).some(([e, n]) => counts[e] !== n)
   )
-    throw new Error('formula 与原子组成不一致，请检查元素和数量。');
+    throw new Error('formula does not match atomic composition; please check elements and counts.');
   if (spec.kind === 'center' && doc.hybridization !== (id === 'CH3' ? 'sp2' : 'sp3'))
-    throw new Error(`hybridization：杂化类型不正确，请结合中心原子的价层电子对数与几何构型分析。`);
+    throw new Error(`hybridization: incorrect hybridization type based on VSEPR theory and geometry.`);
   const positions: Record<string, [number, number, number]> = {};
   let bonds: [string, string][] = [];
   let radicals: string[] = [];
   if (spec.kind === 'center') {
     if (doc['center'] !== elements[spec.center])
-      throw new Error(`${id} 的中心原子填写有误，请核对分子式与成键中心。`);
+      throw new Error(`${id}: incorrect central atom. Please verify the molecular center.`);
     const expected = spec.neighbors.map((n: string) => elements[n]);
     if (!sameElements(doc['neighbors'], expected))
-      throw new Error(`${id} 的周围原子填写有误，请核对与中心原子相连的元素种类和数量。`);
+      throw new Error(`${id}: incorrect surrounding atoms. Please verify neighboring elements and counts.`);
     const count = doc['unpairedElectrons'] ?? 0;
     if (count !== spec.radicals)
-      throw new Error(`${id} 的未成对电子数不符合该物种特性，请判断其属于稳定分子还是自由基。`);
+      throw new Error(`${id}: incorrect number of unpaired electrons for this chemical species.`);
     if (count) radicals = [spec.center];
   } else {
     if (!sameElements(doc['atoms'], spec.ids.map((n: string) => elements[n])))
-      throw new Error(`${id} 的原子组成有误，请检查化学式中的元素与原子个数。`);
+      throw new Error(`${id}: atomic composition is incorrect. Please check formula elements and counts.`);
     if (spec.kind === 'atom') {
       if (doc['unpairedElectrons'] !== 1)
-        throw new Error('未成对电子数填写有误，请思考该自由基最外层电子分布。');
+        throw new Error('Incorrect unpaired electron count for radical valence distribution.');
       positions.br = [0, 0, 0];
       radicals = ['br'];
     }
@@ -165,13 +166,13 @@ export function structure(doc: any, template: any): MoleculeModel {
             ),
           ];
     lengths = doc['bondLengths'];
-    if (!object(lengths)) throw new Error('请填写「bondLengths」，单位为 Å。');
+    if (!object(lengths)) throw new Error('Please provide "bondLengths" in Ångströms (Å).');
     for (const k of required)
       if (!own(lengths, k) || !Number.isFinite(lengths[k]) || lengths[k] <= 0 || lengths[k] > 10)
-        throw new Error(`键长「${k}」数值无效，应填写大于 0 的合理共价键长（Å）。`);
+        throw new Error(`Invalid bond length for "${k}". Please enter a reasonable positive value in Å.`);
     for (const k of Object.keys(lengths))
       if (!required.includes(k))
-        throw new Error(`键长「${k}」不属于当前分子的成键类型，请检查。`);
+        throw new Error(`Bond length "${k}" is not a valid bond in this molecule.`);
   }
   if (spec.kind === 'pair') {
     const half = lengths[spec.bond] / 2;
@@ -183,32 +184,32 @@ export function structure(doc: any, template: any): MoleculeModel {
     positions[spec.center] = [0, 0, 0];
     const angles = doc.bondAngles;
     const required = id === 'CH3Br' ? ['H-C-H', 'H-C-Br'] : ['H-C-H'];
-    if (!object(angles)) throw new Error('请填写 bondAngles，单位为度。');
+    if (!object(angles)) throw new Error('Please provide bondAngles in degrees (°).');
     for (const k of required)
       if (!Number.isFinite(angles[k]) || angles[k] <= 0 || angles[k] >= 180)
-        throw new Error(`bondAngles.${k} 应为 0 到 180 之间的角度（度）。`);
+        throw new Error(`bondAngles.${k} must be an angle between 0° and 180°.`);
     if (Object.keys(angles).some((k) => !required.includes(k)))
-      throw new Error('bondAngles 含有此结构不支持的键角名称。');
+      throw new Error('bondAngles contains unsupported angle keys for this structure.');
     const ideal = (Math.acos(-1 / 3) * 180) / Math.PI;
     let axialCos = 0;
     if (id === 'CH3') {
       if (Math.abs(angles['H-C-H'] - 120) > 0.1)
         throw new Error(
-          'bondAngles：H-C-H 键角不符合该分子的空间对称性，请结合中心原子的排布分析平面夹角。'
+          'bondAngles: H-C-H angle does not match trigonal planar molecular symmetry (expected 120°).'
         );
     } else if (id === 'CH4' || doc.geometry === 'regularTetrahedral') {
       if (required.some((k) => Math.abs(angles[k] - ideal) > 0.1))
-        throw new Error('bondAngles：键角不符合空间几何对称性，请思考等价共价键在空间的夹角。');
+        throw new Error('bondAngles: angle does not match regular tetrahedral symmetry (expected 109.471°).');
       axialCos = -1 / 3;
     } else {
       const angle = angles['H-C-Br'];
       if (angle <= 90 || angle >= 180)
-        throw new Error('bondAngles.H-C-Br：键角范围异常，请核对钝角/锐角合理范围。');
+        throw new Error('bondAngles.H-C-Br: angle out of range.');
       axialCos = Math.cos((angle * Math.PI) / 180);
       const derived = (Math.acos(1.5 * axialCos * axialCos - 0.5) * 180) / Math.PI;
       if (Math.abs(angles['H-C-H'] - derived) > 0.1)
         throw new Error(
-          `bondAngles 不相容：H-C-Br 与 H-C-H 存在空间几何制约关系，请核对两组键角的空间匹配。`
+          `bondAngles incompatible: H-C-Br and H-C-H are constrained by 3D tetrahedral geometry.`
         );
     }
     spec.neighbors.forEach((n: string, i: number) => {
@@ -257,18 +258,18 @@ export function apply(
   const next = clone(config);
   const changed: string[] = [];
   if (!Array.isArray(files) || !files.length || files.length > 6)
-    return { errors: ['每次请选择 1—6 个分子 JSON 文件。'], warnings: [], changed: [] };
+    return { errors: ['Please select 1 to 6 molecule JSON files.'], warnings: [], changed: [] };
   for (const file of files) {
     try {
       const d = file.data;
       const id = identify(d);
-      if (seen.has(id)) throw new Error(`同一批次重复提交了 ${id}。每种分子请选择一份。`);
+      if (seen.has(id)) throw new Error(`Duplicate submission for ${id}. Please submit one file per molecule.`);
       seen.add(id);
-      if (!own(next.molecules, id)) throw new Error(`不认识分子 ${id}。`);
+      if (!own(next.molecules, id)) throw new Error(`Unrecognized molecule ${id}.`);
       next.molecules[id] = structure(d, next.molecules[id]);
       changed.push(id);
     } catch (e: any) {
-      errors.push(`${file.name || '分子文件'}：${e.message}`);
+      errors.push(`${file.name || 'Molecule file'}: ${e.message}`);
     }
   }
   if (errors.length) return { errors, warnings: [], changed: [] };
@@ -283,28 +284,28 @@ export function assemble(bundle: any): ChemConfig {
     !Array.isArray(bundle.steps) ||
     !Array.isArray(bundle.students)
   )
-    throw new Error('教师配置或分子文件不完整。');
+    throw new Error('Teacher configuration or molecule files are incomplete.');
   const { moleculeFiles, stepFiles, ...project } = bundle.project;
   const molecules: Record<string, MoleculeModel> = {};
   const seen = new Set<string>();
   for (const d of bundle.students) {
     const id = identify(d);
-    if (!own(bundle.catalog, id)) throw new Error('缺少此化学式的教师参考配置。');
-    if (seen.has(id)) throw new Error(`分子文件重复：${id}。`);
+    if (!own(bundle.catalog, id)) throw new Error('Missing teacher reference configuration for this chemical formula.');
+    if (seen.has(id)) throw new Error(`Duplicate molecule file: ${id}.`);
     seen.add(id);
     try {
       molecules[id] = structure(d, bundle.catalog[id]);
     } catch (e: any) {
-      throw new Error(`${id}.json：${e.message}`);
+      throw new Error(`${id}.json: ${e.message}`);
     }
   }
   return { ...clone(project), molecules, steps: clone(bundle.steps) };
 }
 
 export function exportMolecule(config: ChemConfig, id: string) {
-  if (!own(config.molecules, id)) throw new Error('请选择一个分子。');
+  if (!own(config.molecules, id)) throw new Error('Please select a molecule.');
   const doc = config.molecules[id].studentDefinition;
-  if (!doc) throw new Error('当前分子缺少结构描述，请重新加载默认文件。');
+  if (!doc) throw new Error('Missing structure definition for this molecule; please reload default files.');
   return clone(doc);
 }
 
@@ -355,7 +356,7 @@ export function checkManifest(project: any) {
           s.startsWith('.')
       )
     )
-      throw new Error(`${key} 需要 ${size} 个不重复的 JSON 文件名。`);
+      throw new Error(`${key} requires ${size} unique JSON filenames.`);
   }
 }
 

@@ -77,11 +77,60 @@ const createEmptyPipelineData = (): PipelineData => ({
   },
 });
 
+export function buildGuidedStudentDoc(builderDoc: any): any {
+  const nodes = builderDoc.nodes || [];
+  const bonds = builderDoc.bonds || [];
+  const radicals = nodes.filter((n: any) => n.radical === 1).length;
+
+  const nonHNodes = nodes.filter((n: any) => n.element !== 'H');
+  const centerNode = nonHNodes[0] || nodes[0];
+
+  let center = '';
+  let neighbors: string[] = [];
+  const atoms = nodes.map((n: any) => n.element);
+
+  if (centerNode && nodes.length > 2) {
+    center = centerNode.element;
+    const neighborIds = bonds
+      .filter((b: any) => b.from === centerNode.id || b.to === centerNode.id)
+      .map((b: any) => (b.from === centerNode.id ? b.to : b.from));
+    neighbors = neighborIds
+      .map((id: string) => nodes.find((n: any) => n.id === id)?.element)
+      .filter(Boolean);
+  }
+
+  const guidedDoc: any = {
+    name: builderDoc.name,
+    formula: builderDoc.formula,
+    geometry: builderDoc.geometry,
+    hybridization: builderDoc.hybridization || 'none',
+    bondLengths: builderDoc.bondLengths || {},
+    bondAngles: builderDoc.bondAngles || {},
+    description: builderDoc.description || '',
+    nodes: builderDoc.nodes,
+    bonds: builderDoc.bonds,
+  };
+
+  if (center && neighbors.length > 0) {
+    guidedDoc.center = center;
+    guidedDoc.neighbors = neighbors;
+  }
+  if (atoms.length <= 2) {
+    guidedDoc.atoms = atoms;
+  }
+  if (radicals > 0) {
+    guidedDoc.unpairedElectrons = radicals;
+  }
+
+  return guidedDoc;
+}
+
 export interface ChemStoreState {
   screen: 'gate' | 'pipeline' | 'stage';
   baseData: typeof CHEM_DEFAULT_FILES;
   slotState: Record<string, SlotStatus>;
   previewSlotId: string | null;
+  builderSlotId: string | null;
 
   // Step 2: Pipeline
   pipelineData: PipelineData;
@@ -116,6 +165,9 @@ export interface ChemStoreState {
   showToast: (msg: string) => void;
   setScreen: (screen: 'gate' | 'pipeline' | 'stage') => void;
   setPreviewSlotId: (id: string | null) => void;
+  openBuilderForSlot: (slotId: string) => void;
+  closeBuilderForSlot: () => void;
+  saveDocForSlot: (slotId: string, builderDoc: any) => { success: boolean; error?: string };
   setConfigDialogOpen: (open: boolean) => void;
   setHelpDialogOpen: (open: boolean) => void;
   verifySingleDoc: (doc: any, expectedId?: string | null) => {
@@ -182,6 +234,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
   baseData: CHEM_DEFAULT_FILES,
   slotState: initialSlots,
   previewSlotId: null,
+  builderSlotId: null,
 
   pipelineData: createInitialPipelineData(),
   selectedPoolMol: null,
@@ -219,6 +272,19 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
 
   setScreen: (screen) => set({ screen }),
   setPreviewSlotId: (id) => set({ previewSlotId: id }),
+  openBuilderForSlot: (slotId) => set({ builderSlotId: slotId }),
+  closeBuilderForSlot: () => set({ builderSlotId: null }),
+  saveDocForSlot: (slotId, builderDoc) => {
+    const guidedDoc = buildGuidedStudentDoc(builderDoc);
+    const result = get().verifySingleDoc(guidedDoc, slotId);
+    if (result.success) {
+      get().showToast(`Verified: ${guidedDoc.name} (${guidedDoc.formula}) configuration is valid!`);
+    } else {
+      get().showToast(`Verification issue: ${result.error}`);
+    }
+    set({ builderSlotId: null });
+    return result;
+  },
   setConfigDialogOpen: (open) => {
     if (open) get().pause();
     set({ configDialogOpen: open });
@@ -302,7 +368,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
           ...get().slotState,
           [targetId]: {
             status: 'error',
-            doc: null,
+            doc,
             mol: null,
             error: err.message,
             warnings: [],

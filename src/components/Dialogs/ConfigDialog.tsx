@@ -38,7 +38,7 @@ export const ConfigDialog: React.FC = () => {
         setTimeout(() => URL.revokeObjectURL(a.href), 1000);
       }, index * 120);
     });
-    showToast('已开始下载 6 个学生分子 JSON 文件。');
+    showToast('Started downloading 6 student molecule JSON files.');
   };
 
   return (
@@ -48,20 +48,20 @@ export const ConfigDialog: React.FC = () => {
         <Dialog.Content className="radix-dialog-content dialog-surface" aria-labelledby="config-title">
           <div className="dialog-header">
             <div>
-              <span className="small-label">JSON 配置与校验</span>
+              <span className="small-label">JSON CONFIGURATION & VERIFICATION</span>
               <Dialog.Title asChild>
-                <h2 id="config-title">课堂配置管理</h2>
+                <h2 id="config-title">Classroom Configuration Management</h2>
               </Dialog.Title>
             </div>
             <Dialog.Close asChild>
-              <button className="icon-button" id="config-close" type="button" aria-label="关闭配置">
+              <button className="icon-button" id="config-close" type="button" aria-label="Close Configuration">
                 <X size={18} />
               </button>
             </Dialog.Close>
           </div>
 
           <p className="dialog-intro">
-            学生只需编辑各自负责的分子 JSON（如 <code>CH4.json</code>、<code>Br2.json</code>），导入后程序会自动识别分子并更新全部七步反应动画。
+            Students can edit their assigned molecule JSON files (e.g. <code>CH4.json</code>, <code>Br2.json</code>). When imported, the system verifies the structures and updates all 7 reaction steps.
           </p>
 
           <div
@@ -73,8 +73,8 @@ export const ConfigDialog: React.FC = () => {
             <span className="file-symbol" aria-hidden="true">
               {'{ }'}
             </span>
-            <strong>选择 CH4.json、CH3.json、Br2.json 等分子配置文件</strong>
-            <span>支持一次选多个文件 · 浏览器本地解析，不会上传服务器</span>
+            <strong>Select CH4.json, CH3.json, Br2.json, or other molecule files</strong>
+            <span>Multi-file selection supported · Parsed locally in your browser</span>
             <button
               type="button"
               className="primary-button"
@@ -84,7 +84,7 @@ export const ConfigDialog: React.FC = () => {
               }}
             >
               <Upload size={16} />
-              <span>导入学生分子 JSON</span>
+              <span>Import Student Molecule JSON</span>
             </button>
             <input
               ref={fileInputRef}
@@ -102,7 +102,7 @@ export const ConfigDialog: React.FC = () => {
           </div>
 
           <div className="config-source">
-            <span>当前配置来源</span>
+            <span>Current Configuration Source</span>
             <strong id="config-source">{sourceName}</strong>
           </div>
 
@@ -114,8 +114,8 @@ export const ConfigDialog: React.FC = () => {
             >
               <strong>
                 {validationReport.accepted
-                  ? '✓ 配置校验通过，已应用至当前场景。'
-                  : '✗ 配置未通过校验，已保留原场景：'}
+                  ? '✓ Configuration verified and applied to current simulation.'
+                  : '✗ Verification failed, keeping existing configuration:'}
               </strong>
               {validationReport.errors.length > 0 && (
                 <ul>
@@ -143,7 +143,7 @@ export const ConfigDialog: React.FC = () => {
                 onClick={handleExportStudents}
               >
                 <Download size={15} />
-                <span>下载 6 个分子 JSON</span>
+                <span>Download 6 Molecule JSONs</span>
               </button>
               <button
                 className="text-button top-action-btn"
@@ -152,7 +152,7 @@ export const ConfigDialog: React.FC = () => {
                 onClick={handleExportCurrent}
               >
                 <Download size={15} />
-                <span>导出完整配置</span>
+                <span>Export Full Config</span>
               </button>
             </div>
             <button
@@ -162,7 +162,7 @@ export const ConfigDialog: React.FC = () => {
               onClick={() => reloadDefaultConfig()}
             >
               <RotateCcw size={15} />
-              <span>恢复默认配置</span>
+              <span>Reset to Default</span>
             </button>
           </div>
         </Dialog.Content>

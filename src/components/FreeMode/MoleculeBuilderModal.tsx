@@ -18,8 +18,8 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import { useFreeChemStore } from '../../store/useFreeChemStore';
-import { useChemStore } from '../../store/useChemStore';
+import { useFreeChemStore, getSampleDocForSlot } from '../../store/useFreeChemStore';
+import { useChemStore, REQUIRED_SLOTS } from '../../store/useChemStore';
 import {
   CATEGORY_LABELS,
   ELEMENT_MAP,
@@ -98,13 +98,84 @@ function isTopologyConnected(nodes: TopologyNode[], bonds: TopologyBond[]): bool
   return visited.size === nodes.length;
 }
 
+/**
+ * Fits 2D topology nodes comfortably within the 500x320 SVG viewport
+ * preventing any atom sphere from overflowing the canvas borders.
+ */
+function fitNodesToViewport(nodes: TopologyNode[]): TopologyNode[] {
+  if (nodes.length <= 1) return nodes;
+  const paddingX = 40;
+  const paddingY = 32;
+  const viewW = 500;
+  const viewH = 320;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  for (const n of nodes) {
+    const x = n.x ?? 250;
+    const y = n.y ?? 160;
+    const r = n.element === 'H' ? 20 : 25;
+    if (x - r < minX) minX = x - r;
+    if (x + r > maxX) maxX = x + r;
+    if (y - r < minY) minY = y - r;
+    if (y + r > maxY) maxY = y + r;
+  }
+
+  const molW = maxX - minX;
+  const molH = maxY - minY;
+  const maxAllowedW = viewW - paddingX * 2;
+  const maxAllowedH = viewH - paddingY * 2;
+
+  let scale = 1;
+  if (molW > maxAllowedW || molH > maxAllowedH) {
+    scale = Math.min(maxAllowedW / Math.max(1, molW), maxAllowedH / Math.max(1, molH));
+  }
+
+  const curCx = (minX + maxX) / 2;
+  const curCy = (minY + maxY) / 2;
+  const targetCx = 250;
+  const targetCy = 160;
+
+  return nodes.map((n) => {
+    const ox = n.x ?? 250;
+    const oy = n.y ?? 160;
+    return {
+      ...n,
+      x: Math.round(targetCx + (ox - curCx) * scale),
+      y: Math.round(targetCy + (oy - curCy) * scale),
+    };
+  });
+}
+
 export const MoleculeBuilderModal: React.FC = () => {
   const builderOpen = useFreeChemStore((s) => s.builderOpen);
   const editingMolId = useFreeChemStore((s) => s.editingMolId);
   const molecules = useFreeChemStore((s) => s.molecules);
-  const closeBuilder = useFreeChemStore((s) => s.closeBuilder);
+  const closeFreeBuilder = useFreeChemStore((s) => s.closeBuilder);
   const saveMoleculeDoc = useFreeChemStore((s) => s.saveMoleculeDoc);
+
+  // Guided Mode bindings
+  const guidedSlotId = useChemStore((s) => s.builderSlotId);
+  const guidedSlotState = useChemStore((s) => s.slotState);
+  const closeGuidedBuilder = useChemStore((s) => s.closeBuilderForSlot);
+  const saveDocForSlot = useChemStore((s) => s.saveDocForSlot);
   const showToast = useChemStore((s) => s.showToast);
+
+  const isModalOpen = builderOpen || !!guidedSlotId;
+  const guidedSlot = guidedSlotId
+    ? REQUIRED_SLOTS.find((s) => s.id === guidedSlotId) || null
+    : null;
+
+  const handleCloseModal = useCallback(() => {
+    if (guidedSlotId) {
+      closeGuidedBuilder();
+    } else {
+      closeFreeBuilder();
+    }
+  }, [guidedSlotId, closeGuidedBuilder, closeFreeBuilder]);
 
   const editingItem = useMemo(
     () => (editingMolId ? molecules.find((m) => m.id === editingMolId) || null : null),
@@ -170,16 +241,18 @@ export const MoleculeBuilderModal: React.FC = () => {
     return () => {
       el.removeEventListener('wheel', handleNativeWheel);
     };
-  }, [builderOpen]);
+  }, [isModalOpen]);
 
-  const resetEmptyBuilder = useCallback(() => {
+  const resetEmptyBuilder = useCallback((keepMetadata = false) => {
     setNodes([]);
     setBonds([]);
     setSelectedNodeId(null);
     setSelectedBondId(null);
-    setName('');
-    setFormula('');
-    setDescription('');
+    if (!keepMetadata) {
+      setName('');
+      setFormula('');
+      setDescription('');
+    }
     setGeometry('');
     setHybridization('');
     setBondLengthsInput({});
@@ -188,56 +261,224 @@ export const MoleculeBuilderModal: React.FC = () => {
     setTopoPan({ x: 0, y: 0 });
   }, []);
 
-  // Sync internal state when opening modal (new vs editing)
+  /**
+   * Helper: Automatically synthesize recommended default parameters into state
+   * so adding atoms or connecting bonds immediately generates 3D coordinates.
+   */
+  const synthesizeDefaultsForNodesAndBonds = useCallback(
+    (
+      currentNodes: TopologyNode[],
+      currentBonds: TopologyBond[],
+      currentBLMap: Record<string, string>,
+      currentBAMap: Record<string, string>,
+      overrideGeometry?: string,
+      overrideHybridization?: string,
+      overrideName?: string,
+      overrideFormula?: string,
+      overrideDescription?: string
+    ) => {
+      const nodeMap = new Map(currentNodes.map((n) => [n.id, n]));
+      const updatedBL = { ...currentBLMap };
+      for (const b of currentBonds) {
+        const n1 = nodeMap.get(b.from);
+        const n2 = nodeMap.get(b.to);
+        if (!n1 || !n2) continue;
+        const key = getCanonicalBondKey(n1.element, n2.element);
+        const parts = key.split('-');
+        const defaultLen = String(getRecommendedBondLength(n1.element, n2.element, b.order));
+        if (!updatedBL[key]) {
+          updatedBL[key] = defaultLen;
+        }
+        if (parts.length === 2) {
+          const rev = `${parts[1]}-${parts[0]}`;
+          if (!updatedBL[rev]) {
+            updatedBL[rev] = updatedBL[key];
+          }
+        }
+      }
+
+      const adj = new Map<string, string[]>();
+      currentNodes.forEach((n) => adj.set(n.id, []));
+      currentBonds.forEach((b) => {
+        if (adj.has(b.from) && adj.has(b.to)) {
+          adj.get(b.from)!.push(b.to);
+          adj.get(b.to)!.push(b.from);
+        }
+      });
+
+      const sortedCenters = [...currentNodes].sort(
+        (a, b) => (adj.get(b.id)?.length || 0) - (adj.get(a.id)?.length || 0)
+      );
+      const primaryCenter = sortedCenters[0];
+      let recommendedGeometry = overrideGeometry || geometry;
+      let recommendedHybridization = overrideHybridization || hybridization;
+
+      const updatedBA = { ...currentBAMap };
+
+      if (primaryCenter) {
+        const primaryNbEls = (adj.get(primaryCenter.id) || []).map(
+          (id) => nodeMap.get(id)!.element
+        );
+        const rec = recommendCenterConfig(
+          primaryCenter.element,
+          primaryNbEls,
+          primaryCenter.radical
+        );
+        if (!recommendedGeometry) {
+          recommendedGeometry = rec.geometry;
+        }
+        if (!recommendedHybridization) {
+          recommendedHybridization = rec.hybridization;
+        }
+
+        for (const [k, v] of Object.entries(rec.bondAngles)) {
+          if (!updatedBA[k]) {
+            updatedBA[k] = String(v);
+          }
+          const parts = k.split('-');
+          if (parts.length === 3) {
+            const rev = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            if (!updatedBA[rev]) {
+              updatedBA[rev] = String(v);
+            }
+          }
+        }
+      }
+
+      const inferred = inferFormulaAndName(currentNodes, currentBonds);
+      return {
+        name: overrideName || name || inferred.name,
+        formula: overrideFormula || formula || inferred.formula,
+        description: overrideDescription || description || inferred.description,
+        geometry: recommendedGeometry || (currentNodes.length === 2 ? 'diatomic' : 'monatomic'),
+        hybridization: recommendedHybridization || 'none',
+        bondLengths: updatedBL,
+        bondAngles: updatedBA,
+      };
+    },
+    [geometry, hybridization, name, formula, description]
+  );
+
+  // Sync internal state when opening modal (supports Free mode & Guided mode)
   useEffect(() => {
-    if (!builderOpen) return;
-    if (editingItem && editingItem.doc) {
-      const doc = editingItem.doc;
-      const initialNodes: TopologyNode[] = (doc.nodes || []).map((n: any, idx: number) => ({
+    if (!isModalOpen) return;
+
+    let targetDoc: any = null;
+    if (guidedSlotId) {
+      const existingSlotDoc = guidedSlotState[guidedSlotId]?.doc;
+      if (
+        existingSlotDoc &&
+        ((Array.isArray(existingSlotDoc.nodes) && existingSlotDoc.nodes.length > 0) ||
+          existingSlotDoc.center ||
+          (Array.isArray(existingSlotDoc.atoms) && existingSlotDoc.atoms.length > 0))
+      ) {
+        targetDoc = existingSlotDoc;
+      } else {
+        // 重置后或初次配置：只保留名字、化学式和描述，其余结构节点与参数全部置空，让学生自己填
+        const slotMeta = REQUIRED_SLOTS.find((s) => s.id === guidedSlotId);
+        const sampleDoc = getSampleDocForSlot(guidedSlotId);
+        const metaName = slotMeta?.name || sampleDoc?.name || '';
+        const metaFormula = slotMeta?.formula || sampleDoc?.formula || '';
+        const metaDesc =
+          sampleDoc?.description || `Construct the 3D molecular structure for ${metaName} (${metaFormula}).`;
+
+        resetEmptyBuilder(false);
+        setName(metaName);
+        setFormula(metaFormula);
+        setDescription(metaDesc);
+        return;
+      }
+    } else if (editingItem && editingItem.doc) {
+      targetDoc = editingItem.doc;
+    }
+
+    if (targetDoc) {
+      let topo: any;
+      try {
+        topo = normalizeDocToTopology(targetDoc);
+      } catch (err) {
+        console.warn('Failed to normalize targetDoc, falling back to sample preset:', err);
+        const fallback = guidedSlotId ? getSampleDocForSlot(guidedSlotId) : null;
+        topo = fallback ? normalizeDocToTopology(fallback) : { nodes: [], bonds: [] };
+      }
+
+      const rawNodes: TopologyNode[] = (topo.nodes || []).map((n: any, idx: number) => ({
         id: n.id || `atom_${idx + 1}`,
         element: n.element || 'C',
         radical: n.radical || 0,
         x: n.x ?? 250 + (idx % 3) * 60,
         y: n.y ?? 160 + Math.floor(idx / 3) * 60,
       }));
-      const initialBonds: TopologyBond[] = (doc.bonds || []).map((b: any, idx: number) => ({
+      const initialBonds: TopologyBond[] = (topo.bonds || []).map((b: any, idx: number) => ({
         id: b.id || `bond_${idx + 1}`,
         from: b.from,
         to: b.to,
         order: (b.order || 1) as 1 | 2 | 3,
       }));
 
+      // Automatically guarantee all atom spheres fit comfortably inside the canvas viewport
+      const initialNodes = fitNodesToViewport(rawNodes);
+
       setNodes(initialNodes);
       setBonds(initialBonds);
       setSelectedNodeId(initialNodes[0]?.id || null);
       setSelectedBondId(null);
-      setName(doc.name || '');
-      setFormula(doc.formula || '');
-      setDescription(doc.description || '');
-      setGeometry(doc.geometry || '');
-      setHybridization(doc.hybridization || '');
+      setName(targetDoc.name || topo.name || '');
+      setFormula(targetDoc.formula || topo.formula || '');
+      setDescription(targetDoc.description || topo.description || '');
 
       const blMap: Record<string, string> = {};
-      if (doc.bondLengths) {
-        for (const [k, v] of Object.entries(doc.bondLengths)) {
+      if (targetDoc.bondLengths) {
+        for (const [k, v] of Object.entries(targetDoc.bondLengths)) {
           blMap[k] = String(v);
+          const parts = k.split('-');
+          if (parts.length === 2) {
+            blMap[`${parts[1]}-${parts[0]}`] = String(v);
+            blMap[getCanonicalBondKey(parts[0], parts[1])] = String(v);
+          }
         }
       }
-      setBondLengthsInput(blMap);
 
       const baMap: Record<string, string> = {};
-      if (doc.bondAngles) {
-        for (const [k, v] of Object.entries(doc.bondAngles)) {
+      if (targetDoc.bondAngles) {
+        for (const [k, v] of Object.entries(targetDoc.bondAngles)) {
           baMap[k] = String(v);
+          const parts = k.split('-');
+          if (parts.length === 3) {
+            baMap[`${parts[2]}-${parts[1]}-${parts[0]}`] = String(v);
+          }
         }
       }
-      setBondAnglesInput(baMap);
+
+      const autoParams = synthesizeDefaultsForNodesAndBonds(
+        initialNodes,
+        initialBonds,
+        blMap,
+        baMap,
+        targetDoc.geometry,
+        targetDoc.hybridization,
+        targetDoc.name,
+        targetDoc.formula,
+        targetDoc.description
+      );
+
+      setGeometry(targetDoc.geometry || autoParams.geometry);
+      setHybridization(targetDoc.hybridization || autoParams.hybridization);
+      setBondLengthsInput(autoParams.bondLengths);
+      setBondAnglesInput(autoParams.bondAngles);
       setTopoZoom(1);
       setTopoPan({ x: 0, y: 0 });
     } else {
       resetEmptyBuilder();
     }
-  }, [builderOpen, editingItem, resetEmptyBuilder]);
+  }, [
+    isModalOpen,
+    guidedSlotId,
+    guidedSlotState,
+    editingItem,
+    resetEmptyBuilder,
+    synthesizeDefaultsForNodesAndBonds,
+  ]);
 
   // Active bonds and angle keys
   const activeBondKeys = useMemo(() => {
@@ -283,81 +524,6 @@ export const MoleculeBuilderModal: React.FC = () => {
     return [...keys];
   }, [nodes, bonds]);
 
-  /**
-   * Helper: Automatically synthesize recommended default parameters into state
-   * so adding atoms or connecting bonds immediately generates 3D coordinates.
-   */
-  const synthesizeDefaultsForNodesAndBonds = (
-    currentNodes: TopologyNode[],
-    currentBonds: TopologyBond[],
-    currentBLMap: Record<string, string>,
-    currentBAMap: Record<string, string>
-  ) => {
-    const nodeMap = new Map(currentNodes.map((n) => [n.id, n]));
-    const updatedBL = { ...currentBLMap };
-    for (const b of currentBonds) {
-      const n1 = nodeMap.get(b.from);
-      const n2 = nodeMap.get(b.to);
-      if (!n1 || !n2) continue;
-      const key = getCanonicalBondKey(n1.element, n2.element);
-      if (!updatedBL[key]) {
-        updatedBL[key] = String(getRecommendedBondLength(n1.element, n2.element, b.order));
-      }
-    }
-
-    const adj = new Map<string, string[]>();
-    currentNodes.forEach((n) => adj.set(n.id, []));
-    currentBonds.forEach((b) => {
-      if (adj.has(b.from) && adj.has(b.to)) {
-        adj.get(b.from)!.push(b.to);
-        adj.get(b.to)!.push(b.from);
-      }
-    });
-
-    const sortedCenters = [...currentNodes].sort(
-      (a, b) => (adj.get(b.id)?.length || 0) - (adj.get(a.id)?.length || 0)
-    );
-    const primaryCenter = sortedCenters[0];
-    let recommendedGeometry = geometry;
-    let recommendedHybridization = hybridization;
-
-    const updatedBA = { ...currentBAMap };
-
-    if (primaryCenter) {
-      const primaryNbEls = (adj.get(primaryCenter.id) || []).map(
-        (id) => nodeMap.get(id)!.element
-      );
-      const rec = recommendCenterConfig(
-        primaryCenter.element,
-        primaryNbEls,
-        primaryCenter.radical
-      );
-      if (!recommendedGeometry) {
-        recommendedGeometry = rec.geometry;
-      }
-      if (!recommendedHybridization) {
-        recommendedHybridization = rec.hybridization;
-      }
-
-      for (const [k, v] of Object.entries(rec.bondAngles)) {
-        if (!updatedBA[k]) {
-          updatedBA[k] = String(v);
-        }
-      }
-    }
-
-    const inferred = inferFormulaAndName(currentNodes, currentBonds);
-    return {
-      name: name || inferred.name,
-      formula: formula || inferred.formula,
-      description: description || inferred.description,
-      geometry: recommendedGeometry || (currentNodes.length === 2 ? 'diatomic' : 'monatomic'),
-      hybridization: recommendedHybridization || 'none',
-      bondLengths: updatedBL,
-      bondAngles: updatedBA,
-    };
-  };
-
   // Add an atom of `symbol` to the 2D topology canvas
   const addAtomNode = (symbol: string, customPos?: { x: number; y: number }) => {
     setActiveElement(symbol);
@@ -387,7 +553,7 @@ export const MoleculeBuilderModal: React.FC = () => {
       ).length;
       const angle = (existingNbs * Math.PI) / 2 - Math.PI / 2 + (nodes.length % 4) * 0.45;
       const candX = Math.round((anchor.x ?? 250) + 120 * Math.cos(angle));
-      const candY = Math.round((anchor.y ?? 160) + 120 * Math.sin(angle));
+      const candY = Math.round((anchor.y ?? 160) + 105 * Math.sin(angle));
 
       // Guarantee new atom is inside the user's visible canvas area
       if (candX >= minX && candX <= maxX && candY >= minY && candY <= maxY) {
@@ -426,9 +592,11 @@ export const MoleculeBuilderModal: React.FC = () => {
     setSelectedNodeId(newId);
     showToast(`Added ${symbol} atom to canvas`);
     setSelectedBondId(null);
-    setName(autoParams.name);
-    setFormula(autoParams.formula);
-    setDescription(autoParams.description);
+    if (!guidedSlotId) {
+      setName(autoParams.name);
+      setFormula(autoParams.formula);
+      setDescription(autoParams.description);
+    }
     setGeometry(autoParams.geometry);
     setHybridization(autoParams.hybridization);
     setBondLengthsInput(autoParams.bondLengths);
@@ -503,8 +671,8 @@ export const MoleculeBuilderModal: React.FC = () => {
         id: hId,
         element: 'H',
         radical: 0,
-        x: Math.round((target.x ?? 250) + 82 * Math.cos(angle)),
-        y: Math.round((target.y ?? 160) + 82 * Math.sin(angle)),
+        x: Math.round((target.x ?? 250) + 120 * Math.cos(angle)),
+        y: Math.round((target.y ?? 160) + 105 * Math.sin(angle)),
       });
       newBonds.push({
         id: `b_${target.id}_${hId}`,
@@ -523,9 +691,11 @@ export const MoleculeBuilderModal: React.FC = () => {
 
     setNodes(newNodes);
     setBonds(newBonds);
-    setName(autoParams.name);
-    setFormula(autoParams.formula);
-    setDescription(autoParams.description);
+    if (!guidedSlotId) {
+      setName(autoParams.name);
+      setFormula(autoParams.formula);
+      setDescription(autoParams.description);
+    }
     setGeometry(autoParams.geometry);
     setHybridization(autoParams.hybridization);
     setBondLengthsInput(autoParams.bondLengths);
@@ -576,7 +746,7 @@ export const MoleculeBuilderModal: React.FC = () => {
     );
 
     if (nextNodes.length === 0) {
-      resetEmptyBuilder();
+      resetEmptyBuilder(!!guidedSlotId);
       return;
     }
 
@@ -590,9 +760,11 @@ export const MoleculeBuilderModal: React.FC = () => {
     setNodes(nextNodes);
     setBonds(nextBonds);
     setSelectedNodeId(nextNodes[0]?.id || null);
-    setName(autoParams.name);
-    setFormula(autoParams.formula);
-    setDescription(autoParams.description);
+    if (!guidedSlotId) {
+      setName(autoParams.name);
+      setFormula(autoParams.formula);
+      setDescription(autoParams.description);
+    }
     setGeometry(autoParams.geometry);
     setHybridization(autoParams.hybridization);
     setBondLengthsInput(autoParams.bondLengths);
@@ -608,7 +780,7 @@ export const MoleculeBuilderModal: React.FC = () => {
 
   // Listen to keyboard Delete / Backspace keys to remove selected atom or bond
   useEffect(() => {
-    if (!builderOpen) return;
+    if (!isModalOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
       const isInput =
@@ -632,29 +804,7 @@ export const MoleculeBuilderModal: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  });
-
-  // ONE-CLICK AUTO-FILL (Fills recommended VSEPR geometry, bond lengths & angles)
-  const handleFillRecommendedDefaults = () => {
-    if (nodes.length === 0) {
-      showToast('Please select an element from the periodic table to add atoms first.');
-      return;
-    }
-    const autoParams = synthesizeDefaultsForNodesAndBonds(
-      nodes,
-      bonds,
-      {},
-      {}
-    );
-    setFormula(autoParams.formula);
-    setName(autoParams.name);
-    setDescription(autoParams.description);
-    setGeometry(autoParams.geometry);
-    setHybridization(autoParams.hybridization);
-    setBondLengthsInput(autoParams.bondLengths);
-    setBondAnglesInput(autoParams.bondAngles);
-    showToast('Auto-filled recommended parameters!');
-  };
+  }, [isModalOpen, selectedNodeId, selectedBondId, nodes, bonds, bondLengthsInput, bondAnglesInput]);
 
   const connectedGraph = useMemo(() => isTopologyConnected(nodes, bonds), [nodes, bonds]);
 
@@ -674,13 +824,19 @@ export const MoleculeBuilderModal: React.FC = () => {
     if (!connectedGraph) return null;
 
     const missingBondLengths = activeBondKeys.some((k) => {
-      const val = Number(bondLengthsInput[k]);
-      return !bondLengthsInput[k] || !Number.isFinite(val) || val <= 0;
+      const parts = k.split('-');
+      const altK = parts.length === 2 ? `${parts[1]}-${parts[0]}` : k;
+      const raw = bondLengthsInput[k] ?? bondLengthsInput[altK];
+      const val = Number(raw);
+      return !raw || !Number.isFinite(val) || val <= 0;
     });
     const needsGeometry = nodes.length >= 1 && !geometry;
     const missingAngles = activeAngleKeys.some((k) => {
-      const val = Number(bondAnglesInput[k]);
-      return !bondAnglesInput[k] || !Number.isFinite(val) || val <= 0;
+      const parts = k.split('-');
+      const altK = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : k;
+      const raw = bondAnglesInput[k] ?? bondAnglesInput[altK];
+      const val = Number(raw);
+      return !raw || !Number.isFinite(val) || val <= 0;
     });
 
     if (missingBondLengths || needsGeometry || missingAngles) {
@@ -689,11 +845,15 @@ export const MoleculeBuilderModal: React.FC = () => {
 
     const parsedLengths: Record<string, number> = {};
     for (const k of activeBondKeys) {
-      parsedLengths[k] = Number(bondLengthsInput[k]);
+      const parts = k.split('-');
+      const altK = parts.length === 2 ? `${parts[1]}-${parts[0]}` : k;
+      parsedLengths[k] = Number(bondLengthsInput[k] ?? bondLengthsInput[altK]);
     }
     const parsedAngles: Record<string, number> = {};
     for (const k of activeAngleKeys) {
-      parsedAngles[k] = Number(bondAnglesInput[k]);
+      const parts = k.split('-');
+      const altK = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : k;
+      parsedAngles[k] = Number(bondAnglesInput[k] ?? bondAnglesInput[altK]);
     }
 
     const nodeMap = new Map(nodes.map((n) => [n.id, n]));
@@ -796,9 +956,14 @@ export const MoleculeBuilderModal: React.FC = () => {
       return;
     }
 
-    saveMoleculeDoc(currentDoc, editingMolId);
-    showToast(`Saved substance ${currentDoc.formula} (${currentDoc.name}) successfully!`);
-    closeBuilder();
+    if (guidedSlotId) {
+      saveDocForSlot(guidedSlotId, currentDoc);
+      handleCloseModal();
+    } else {
+      saveMoleculeDoc(currentDoc, editingMolId);
+      showToast(`Saved substance ${currentDoc.formula} (${currentDoc.name}) successfully!`);
+      handleCloseModal();
+    }
   };
 
   // 3D Preview Three.js WebGL rendering
@@ -1101,9 +1266,25 @@ export const MoleculeBuilderModal: React.FC = () => {
   useEffect(() => {
     previewWrapRef.current = previewWrapEl;
     previewVpRef.current = previewVpEl;
-    if (previewWrapEl && previewVpEl && builderOpen) {
+    if (previewWrapEl && previewVpEl && isModalOpen) {
       setupThreePreview();
       updateThreeModel(previewMol);
+
+      // Force resize and model update in case dialog entrance animation alters layout dimensions
+      const timer = setTimeout(() => {
+        if (threeContextRef.current) {
+          threeContextRef.current.resize();
+        }
+        updateThreeModel(previewMol);
+      }, 50);
+
+      return () => {
+        clearTimeout(timer);
+        if (threeContextRef.current) {
+          threeContextRef.current.cleanup();
+          threeContextRef.current = null;
+        }
+      };
     }
     return () => {
       if (threeContextRef.current) {
@@ -1111,11 +1292,13 @@ export const MoleculeBuilderModal: React.FC = () => {
         threeContextRef.current = null;
       }
     };
-  }, [previewWrapEl, previewVpEl, builderOpen, setupThreePreview, updateThreeModel, previewMol]);
+  }, [previewWrapEl, previewVpEl, isModalOpen, setupThreePreview, updateThreeModel, previewMol]);
 
   useEffect(() => {
-    updateThreeModel(previewMol);
-  }, [previewMol, updateThreeModel]);
+    if (isModalOpen && threeContextRef.current) {
+      updateThreeModel(previewMol);
+    }
+  }, [previewMol, updateThreeModel, isModalOpen]);
 
   // 2D SVG ViewBox calculation
   const vbW = 500 / topoZoom;
@@ -1127,7 +1310,7 @@ export const MoleculeBuilderModal: React.FC = () => {
   const selectedBond = selectedBondId ? bonds.find((b) => b.id === selectedBondId) : null;
 
   return (
-    <Dialog.Root open={builderOpen} onOpenChange={(open) => !open && closeBuilder()}>
+    <Dialog.Root open={isModalOpen} onOpenChange={(open) => !open && handleCloseModal()}>
       <Dialog.Portal>
         <Dialog.Overlay className="radix-dialog-overlay" />
         <Dialog.Content
@@ -1137,14 +1320,27 @@ export const MoleculeBuilderModal: React.FC = () => {
           {/* Top Header: Title on left, Close on right */}
           <div className="dialog-header mol-builder-header">
             <div>
-              <span className="small-label">INTERACTIVE MOLECULE BUILDER</span>
+              <span className="small-label">
+                {guidedSlot ? 'GUIDED CURRICULUM · MOLECULE CONFIGURATION' : 'INTERACTIVE MOLECULE BUILDER'}
+              </span>
               <Dialog.Title asChild>
-                <h2>{editingMolId ? 'Edit Chemical Substance' : 'Add Chemical Substance'}</h2>
+                <h2>
+                  {guidedSlot
+                    ? `Configure Structure · ${guidedSlot.name} (${guidedSlot.formula})`
+                    : editingMolId
+                    ? 'Edit Chemical Substance'
+                    : 'Add Chemical Substance'}
+                </h2>
               </Dialog.Title>
             </div>
             <div className="mol-builder-header-actions">
               <Dialog.Close asChild>
-                <button className="icon-button" aria-label="Close Builder" title="Close">
+                <button
+                  className="icon-button"
+                  aria-label="Close Builder"
+                  title="Close"
+                  onClick={handleCloseModal}
+                >
                   <X size={20} />
                 </button>
               </Dialog.Close>
@@ -1352,7 +1548,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                       <button
                         type="button"
                         className="canvas-mini-btn danger"
-                        onClick={resetEmptyBuilder}
+                        onClick={() => resetEmptyBuilder(!!guidedSlotId)}
                         title="Clear entire structure"
                         aria-label="Clear entire structure"
                       >
@@ -1903,7 +2099,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                             ? 'Add atoms from the periodic table above to build a 3D molecular model.'
                             : !connectedGraph
                             ? 'Unconnected atoms detected — connect all atoms on the 2D canvas or delete isolated atoms.'
-                            : 'Complete parameters on the right or click "Auto-Fill" to generate the 3D model.'}
+                            : 'Complete parameters on the right to generate the 3D model.'}
                         </p>
                       </div>
                     )}
@@ -1911,23 +2107,13 @@ export const MoleculeBuilderModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Right Column: Parameters Configuration Form (with Auto-Fill in top right) */}
+              {/* Right Column: Parameters Configuration Form */}
               <div className="builder-params-col">
                 <div className="builder-params-top">
                   <div>
                     <h3>2. Structure & Bond Parameters</h3>
                     <p>Adjust spatial geometry, hybridization, and bond parameters</p>
                   </div>
-                  <button
-                    type="button"
-                    id="builder-autofill-defaults-btn"
-                    className="autofill-defaults-btn"
-                    onClick={handleFillRecommendedDefaults}
-                    title="Auto-fill recommended VSEPR geometry, hybridization, bond lengths, and angles"
-                  >
-                    <Sparkles size={15} />
-                    <span>Auto-Fill</span>
-                  </button>
                 </div>
 
                 <div className="builder-params-scroll">
@@ -2112,7 +2298,7 @@ export const MoleculeBuilderModal: React.FC = () => {
               <button
                 type="button"
                 className="toolbar-btn-outline"
-                onClick={closeBuilder}
+                onClick={handleCloseModal}
               >
                 Cancel
               </button>
