@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, HelpCircle, RotateCcw } from 'lucide-react';
 import { useFreeChemStore } from '../../store/useFreeChemStore';
+import { CustomSelect } from '../Common/CustomSelect';
 import {
   formatFormulaHtml,
   sampleFreeStage,
@@ -774,23 +775,22 @@ export const FreeStageScreen: React.FC = () => {
           </div>
 
           <div className="fixed-bottom-right play-options">
-            <label className="speed-label">
+            <div className="speed-label">
               <span>Speed</span>
-              <div className="select-wrapper speed-select-wrapper">
-                <select
-                  className="speed-select"
-                  aria-label="Animation Speed"
-                  value={String(speed)}
-                  onChange={(e) => setSpeed(Number(e.target.value))}
-                >
-                  <option value="0.5">0.5×</option>
-                  <option value="1">1×</option>
-                  <option value="1.5">1.5×</option>
-                  <option value="2">2×</option>
-                </select>
-                <ChevronDown size={14} className="select-chevron" />
-              </div>
-            </label>
+              <CustomSelect
+                size="sm"
+                className="speed-custom-select"
+                ariaLabel="Animation Speed"
+                value={String(speed)}
+                onChange={(val) => setSpeed(Number(val))}
+                options={[
+                  { value: '0.5', label: '0.5×' },
+                  { value: '1', label: '1×' },
+                  { value: '1.5', label: '1.5×' },
+                  { value: '2', label: '2×' },
+                ]}
+              />
+            </div>
             <button
               type="button"
               className="icon-button"

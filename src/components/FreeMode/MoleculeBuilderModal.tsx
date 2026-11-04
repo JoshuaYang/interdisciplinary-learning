@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useFreeChemStore, getSampleDocForSlot } from '../../store/useFreeChemStore';
 import { useChemStore, REQUIRED_SLOTS } from '../../store/useChemStore';
+import { CustomSelect } from '../Common/CustomSelect';
 import {
   CATEGORY_LABELS,
   ELEMENT_MAP,
@@ -170,6 +171,7 @@ export const MoleculeBuilderModal: React.FC = () => {
     : null;
 
   const handleCloseModal = useCallback(() => {
+    lastTargetRef.current = null;
     if (guidedSlotId) {
       closeGuidedBuilder();
     } else {
@@ -359,9 +361,26 @@ export const MoleculeBuilderModal: React.FC = () => {
     [geometry, hybridization, name, formula, description]
   );
 
+  const lastTargetRef = useRef<string | null>(null);
+
   // Sync internal state when opening modal (supports Free mode & Guided mode)
   useEffect(() => {
-    if (!isModalOpen) return;
+    if (!isModalOpen) {
+      lastTargetRef.current = null;
+      return;
+    }
+
+    const currentTargetKey = guidedSlotId
+      ? `guided_${guidedSlotId}`
+      : editingMolId
+      ? `free_${editingMolId}`
+      : 'free_new';
+
+    // 仅在弹窗打开时针对当前目标初始化一次，避免编辑过程中依赖更新重复清空用户添加的内容
+    if (lastTargetRef.current === currentTargetKey) {
+      return;
+    }
+    lastTargetRef.current = currentTargetKey;
 
     let targetDoc: any = null;
     if (guidedSlotId) {
@@ -421,7 +440,7 @@ export const MoleculeBuilderModal: React.FC = () => {
 
       setNodes(initialNodes);
       setBonds(initialBonds);
-      setSelectedNodeId(initialNodes[0]?.id || null);
+      setSelectedNodeId(null);
       setSelectedBondId(null);
       setName(targetDoc.name || topo.name || '');
       setFormula(targetDoc.formula || topo.formula || '');
@@ -2171,40 +2190,24 @@ export const MoleculeBuilderModal: React.FC = () => {
                       </div>
                     </div>
                     <div className="param-grid-2">
-                      <label className="param-field">
+                      <div className="param-field">
                         <span>Spatial Geometry (geometry) *</span>
-                        <div className="select-wrapper">
-                          <select
-                            value={geometry}
-                            onChange={(e) => setGeometry(e.target.value)}
-                          >
-                            <option value="">Select Spatial Geometry…</option>
-                            {GEOMETRY_OPTIONS.map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown size={14} className="select-chevron" />
-                        </div>
-                      </label>
-                      <label className="param-field">
+                        <CustomSelect
+                          value={geometry}
+                          onChange={(val) => setGeometry(val)}
+                          options={GEOMETRY_OPTIONS}
+                          placeholder="Select Spatial Geometry…"
+                        />
+                      </div>
+                      <div className="param-field">
                         <span>Central Hybridization (hybridization)</span>
-                        <div className="select-wrapper">
-                          <select
-                            value={hybridization}
-                            onChange={(e) => setHybridization(e.target.value)}
-                          >
-                            <option value="">Select Hybridization…</option>
-                            {HYBRIDIZATION_OPTIONS.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown size={14} className="select-chevron" />
-                        </div>
-                      </label>
+                        <CustomSelect
+                          value={hybridization}
+                          onChange={(val) => setHybridization(val)}
+                          options={HYBRIDIZATION_OPTIONS}
+                          placeholder="Select Hybridization…"
+                        />
+                      </div>
                     </div>
                   </div>
 

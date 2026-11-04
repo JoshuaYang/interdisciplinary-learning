@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useChemStore } from '../../store/useChemStore';
+import { CustomSelect } from '../Common/CustomSelect';
 import * as core from '../../engine/core';
 import * as deduction from '../../engine/deduction';
 import type { ChemConfig, CompiledState, StepInstance } from '../../types/chem';
@@ -877,22 +878,13 @@ export const StageScreen: React.FC = () => {
                         <span className="deduction-q-num">01</span>
                         <span>Which reaction stage does this step belong to?</span>
                       </label>
-                      <div className="select-wrapper">
-                        <select
-                          id="deduce-phase"
-                          className="deduction-select"
-                          value={selPhase}
-                          onChange={(e) => setSelPhase(e.target.value)}
-                        >
-                          <option value="">Select reaction stage…</option>
-                          {stepData.phaseOptions?.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown size={16} className="select-chevron" />
-                      </div>
+                      <CustomSelect
+                        id="deduce-phase"
+                        value={selPhase}
+                        onChange={(val) => setSelPhase(val)}
+                        options={stepData.phaseOptions || []}
+                        placeholder="Select reaction stage…"
+                      />
                     </div>
 
                     <div className="deduction-field">
@@ -900,22 +892,13 @@ export const StageScreen: React.FC = () => {
                         <span className="deduction-q-num">02</span>
                         <span>{stepData.fieldLabel || 'Reaction Equation'}?</span>
                       </label>
-                      <div className="select-wrapper">
-                        <select
-                          id="deduce-equation"
-                          className="deduction-select"
-                          value={selEq}
-                          onChange={(e) => setSelEq(e.target.value)}
-                        >
-                          <option value="">Select species change…</option>
-                          {stepData.equationOptions?.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown size={16} className="select-chevron" />
-                      </div>
+                      <CustomSelect
+                        id="deduce-equation"
+                        value={selEq}
+                        onChange={(val) => setSelEq(val)}
+                        options={stepData.equationOptions || []}
+                        placeholder="Select species change…"
+                      />
                     </div>
 
                     <div className="deduction-field">
@@ -923,22 +906,13 @@ export const StageScreen: React.FC = () => {
                         <span className="deduction-q-num">03</span>
                         <span>Broken Covalent Bond in this step?</span>
                       </label>
-                      <div className="select-wrapper">
-                        <select
-                          id="deduce-break"
-                          className="deduction-select"
-                          value={selBreak}
-                          onChange={(e) => setSelBreak(e.target.value)}
-                        >
-                          <option value="">Select broken bond…</option>
-                          {stepData.breakBondOptions?.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown size={16} className="select-chevron" />
-                      </div>
+                      <CustomSelect
+                        id="deduce-break"
+                        value={selBreak}
+                        onChange={(val) => setSelBreak(val)}
+                        options={stepData.breakBondOptions || []}
+                        placeholder="Select broken bond…"
+                      />
                     </div>
 
                     <div className="deduction-field">
@@ -946,22 +920,13 @@ export const StageScreen: React.FC = () => {
                         <span className="deduction-q-num">04</span>
                         <span>Formed Covalent Bond in this step?</span>
                       </label>
-                      <div className="select-wrapper">
-                        <select
-                          id="deduce-form"
-                          className="deduction-select"
-                          value={selForm}
-                          onChange={(e) => setSelForm(e.target.value)}
-                        >
-                          <option value="">Select formed bond…</option>
-                          {stepData.formBondOptions?.map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown size={16} className="select-chevron" />
-                      </div>
+                      <CustomSelect
+                        id="deduce-form"
+                        value={selForm}
+                        onChange={(val) => setSelForm(val)}
+                        options={stepData.formBondOptions || []}
+                        placeholder="Select formed bond…"
+                      />
                     </div>
                   </div>
                 ) : (
@@ -1089,24 +1054,23 @@ export const StageScreen: React.FC = () => {
           </div>
 
           <div className="fixed-bottom-right play-options">
-            <label className="speed-label">
+            <div className="speed-label">
               <span>Speed</span>
-              <div className="select-wrapper speed-select-wrapper">
-                <select
-                  id="speed"
-                  className="speed-select"
-                  aria-label="Animation Speed"
-                  value={String(speed)}
-                  onChange={(e) => setSpeed(Number(e.target.value))}
-                >
-                  <option value="0.5">0.5×</option>
-                  <option value="1">1×</option>
-                  <option value="1.5">1.5×</option>
-                  <option value="2">2×</option>
-                </select>
-                <ChevronDown size={14} className="select-chevron" />
-              </div>
-            </label>
+              <CustomSelect
+                id="speed"
+                size="sm"
+                className="speed-custom-select"
+                ariaLabel="Animation Speed"
+                value={String(speed)}
+                onChange={(val) => setSpeed(Number(val))}
+                options={[
+                  { value: '0.5', label: '0.5×' },
+                  { value: '1', label: '1×' },
+                  { value: '1.5', label: '1.5×' },
+                  { value: '2', label: '2×' },
+                ]}
+              />
+            </div>
             <button
               id="restart"
               type="button"

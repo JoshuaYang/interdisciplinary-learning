@@ -15,10 +15,10 @@ export const HomeEntry: React.FC = () => {
           </span>
           <div>
             <div className="identity-title-row">
-              <h1>3D Interactive Chemical Reaction Workbench</h1>
+              <h1>ChemReaction 3D</h1>
             </div>
             <p>
-              Chemistry × Computing <span>/</span> Molecular Geometry & Reaction Mechanism Visualization Platform
+              Molecular Geometry & Reaction Workbench
             </p>
           </div>
         </div>

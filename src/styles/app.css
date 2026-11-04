@@ -177,6 +177,170 @@ summary:focus-visible,
 }
 
 /* ============================================================================
+ * Modern Radix Custom Dropdown Components
+ * ============================================================================ */
+.custom-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid var(--line-strong, #cbd5e1);
+  color: var(--ink, #0f172a);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  user-select: none;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.custom-select-trigger-md {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 8px;
+}
+
+.custom-select-trigger-sm {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.custom-select-trigger:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.custom-select-trigger:focus-visible,
+.custom-select-trigger[data-state="open"] {
+  background: #ffffff;
+  border-color: var(--accent, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+.custom-select-trigger:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+  cursor: not-allowed;
+}
+
+.custom-select-value-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.custom-select-value-wrap [data-placeholder] {
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+.custom-select-chevron {
+  flex-shrink: 0;
+  margin-left: 8px;
+  color: #64748b;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
+}
+
+.custom-select-trigger[data-state="open"] .custom-select-chevron {
+  transform: rotate(180deg);
+  color: var(--accent, #2563eb);
+}
+
+.custom-select-content {
+  z-index: 10050;
+  min-width: var(--radix-select-trigger-width, 160px);
+  max-width: 480px;
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 10px;
+  box-shadow: 0 14px 34px -4px rgba(15, 23, 42, 0.14), 0 4px 12px -2px rgba(15, 23, 42, 0.08);
+  padding: 5px;
+  overflow: hidden;
+  animation: customSelectFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes customSelectFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.custom-select-viewport {
+  padding: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.custom-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1e293b;
+  line-height: 1.35;
+  user-select: none;
+  cursor: pointer;
+  outline: none;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.custom-select-item[data-highlighted] {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.custom-select-item[data-state="checked"] {
+  font-weight: 600;
+  color: #1d4ed8;
+  background: rgba(239, 246, 255, 0.7);
+}
+
+.custom-select-item[data-disabled] {
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.custom-select-item-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.custom-select-item-desc {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.custom-select-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 10px;
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+/* ============================================================================
  * 1. Top Navigation Header & Read-Only Workflow Stepper
  * ============================================================================ */
 .app-header {
@@ -1947,6 +2111,21 @@ input[type="range"] {
   color: var(--ink-secondary);
   font-weight: 600;
   white-space: nowrap;
+}
+
+.speed-custom-select {
+  width: 78px !important;
+  min-width: 78px !important;
+  height: 32px !important;
+  font-weight: 600;
+  border-radius: 6px !important;
+  padding: 0 8px !important;
+}
+
+.deduction-field .custom-select-trigger {
+  height: 40px;
+  border-radius: 8px;
+  font-size: 13.5px;
 }
 
 .speed-select-wrapper {
