@@ -400,15 +400,15 @@ export const MoleculePreviewModal: React.FC = () => {
                 <div className="help-popover-title">3D View Controls</div>
                 <div className="help-popover-item">
                   <span className="help-key">Drag</span>
-                  <span>Rotate 3D model</span>
+                  <span className="help-desc">Rotate 3D model</span>
                 </div>
                 <div className="help-popover-item">
                   <span className="help-key">Wheel</span>
-                  <span>Zoom in / out</span>
+                  <span className="help-desc">Zoom in / out</span>
                 </div>
                 <div className="help-popover-item">
                   <span className="help-key">Reset</span>
-                  <span>Reset camera view</span>
+                  <span className="help-desc">Reset camera view</span>
                 </div>
               </div>
             </div>

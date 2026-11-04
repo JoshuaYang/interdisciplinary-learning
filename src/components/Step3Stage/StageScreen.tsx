@@ -724,19 +724,19 @@ export const StageScreen: React.FC = () => {
               <div className="help-popover-title">3D Stage Controls</div>
               <div className="help-popover-item">
                 <span className="help-key">Drag</span>
-                <span>Rotate 3D model</span>
+                <span className="help-desc">Rotate 3D model</span>
               </div>
               <div className="help-popover-item">
                 <span className="help-key">Wheel</span>
-                <span>Zoom in / out</span>
+                <span className="help-desc">Zoom in / out</span>
               </div>
               <div className="help-popover-item">
-                <span className="help-key">Right Drag</span>
-                <span>Pan viewport</span>
+                <span className="help-key">Pan</span>
+                <span className="help-desc">Right-drag viewport</span>
               </div>
               <div className="help-popover-item">
                 <span className="help-key">Space</span>
-                <span>Play / Pause</span>
+                <span className="help-desc">Play / Pause</span>
               </div>
             </div>
           </div>

@@ -116,6 +116,7 @@ export const MoleculeBuilderModal: React.FC = () => {
   const [bonds, setBonds] = useState<TopologyBond[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedBondId, setSelectedBondId] = useState<string | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [activeElement, setActiveElement] = useState<string | null>(null);
   const [showFullPeriodicTable, setShowFullPeriodicTable] = useState<boolean>(false);
   const [categoryFilter, setCategoryFilter] = useState<ElementCategory | 'all'>('all');
@@ -1606,6 +1607,8 @@ export const MoleculeBuilderModal: React.FC = () => {
                         const x = n.x ?? 250;
                         const y = n.y ?? 160;
                         const isSelected = selectedNodeId === n.id;
+                        const isHovered = hoveredNodeId === n.id;
+                        const showHandle = isSelected || isHovered;
                         const bgHex = getElementColorHex(n.element);
                         const isLight = ['H', 'He', 'Be', 'B', 'Ne'].includes(n.element);
                         const r = n.element === 'H' ? 20 : 25;
@@ -1613,8 +1616,12 @@ export const MoleculeBuilderModal: React.FC = () => {
                         return (
                           <g
                             key={n.id}
-                            className={`topo-node-group ${isSelected ? 'selected' : ''}`}
+                            className={`topo-node-group ${isSelected ? 'selected' : ''} ${isHovered ? 'hovered' : ''}`}
                             transform={`translate(${x}, ${y})`}
+                            onPointerEnter={() => setHoveredNodeId(n.id)}
+                            onPointerLeave={() =>
+                              setHoveredNodeId((cur) => (cur === n.id ? null : cur))
+                            }
                             onPointerDown={(e) => {
                               e.stopPropagation();
                               activePointerDownNodeRef.current = n;
@@ -1685,7 +1692,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                                 strokeWidth="1.6"
                               />
                             )}
-                            {isSelected && (
+                            {showHandle && (
                               <g
                                 className="topo-connect-handle"
                                 transform={`translate(${r * 0.72 + 6}, ${-r * 0.72 - 6})`}
@@ -1727,23 +1734,23 @@ export const MoleculeBuilderModal: React.FC = () => {
                         <div className="help-popover-title">Canvas Shortcuts</div>
                         <div className="help-popover-item">
                           <span className="help-key">Click</span>
-                          <span>Select atom or bond</span>
+                          <span className="help-desc">Select atom or bond</span>
                         </div>
                         <div className="help-popover-item">
                           <span className="help-key">Drag</span>
-                          <span>Move atom position</span>
+                          <span className="help-desc">Move atom position</span>
                         </div>
                         <div className="help-popover-item">
-                          <span className="help-key">+ Handle</span>
-                          <span>Drag handle to bond atoms</span>
+                          <span className="help-key">Bond +</span>
+                          <span className="help-desc">Drag to bond atoms</span>
                         </div>
                         <div className="help-popover-item">
                           <span className="help-key">Del</span>
-                          <span>Delete selected item</span>
+                          <span className="help-desc">Delete selected item</span>
                         </div>
                         <div className="help-popover-item">
                           <span className="help-key">Wheel</span>
-                          <span>Zoom canvas in / out</span>
+                          <span className="help-desc">Zoom canvas in / out</span>
                         </div>
                       </div>
                     </div>
@@ -1831,15 +1838,15 @@ export const MoleculeBuilderModal: React.FC = () => {
                             <div className="help-popover-title">3D Model Controls</div>
                             <div className="help-popover-item">
                               <span className="help-key">Drag</span>
-                              <span>Rotate 3D molecule</span>
+                              <span className="help-desc">Rotate 3D molecule</span>
                             </div>
                             <div className="help-popover-item">
-                              <span className="help-key">Scroll</span>
-                              <span>Zoom 3D model in / out</span>
+                              <span className="help-key">Wheel</span>
+                              <span className="help-desc">Zoom in / out</span>
                             </div>
                             <div className="help-popover-item">
                               <span className="help-key">Reset</span>
-                              <span>Reset camera angle</span>
+                              <span className="help-desc">Reset camera angle</span>
                             </div>
                           </div>
                         </div>
