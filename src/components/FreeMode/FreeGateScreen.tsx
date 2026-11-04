@@ -18,6 +18,7 @@ import { useChemStore } from '../../store/useChemStore';
 import { createZipBlob } from '../../engine/zipExporter';
 import { FreeMoleculePreviewModal } from './FreeMoleculePreviewModal';
 import { MoleculeBuilderModal } from './MoleculeBuilderModal';
+import { ConfirmModal } from '../Common/ConfirmModal';
 
 export const FreeGateScreen: React.FC = () => {
   const molecules = useFreeChemStore((s) => s.molecules);
@@ -34,6 +35,7 @@ export const FreeGateScreen: React.FC = () => {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [screenDragover, setScreenDragover] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   // Close dropdown menu when clicking outside
   useEffect(() => {
@@ -77,12 +79,7 @@ export const FreeGateScreen: React.FC = () => {
   const handleClearAllWithConfirm = () => {
     setMoreMenuOpen(false);
     if (molecules.length === 0) return;
-    const ok = window.confirm(
-      `Are you sure you want to delete all ${molecules.length} chemical substances from the library? This action cannot be undone.`
-    );
-    if (ok) {
-      clearAllMolecules();
-    }
+    setConfirmClearOpen(true);
   };
 
   return (
@@ -388,6 +385,15 @@ export const FreeGateScreen: React.FC = () => {
 
         <FreeMoleculePreviewModal />
         <MoleculeBuilderModal />
+        <ConfirmModal
+          open={confirmClearOpen}
+          onOpenChange={setConfirmClearOpen}
+          title="Clear Substance Library?"
+          description={`Are you sure you want to delete all ${molecules.length} chemical substances from the library? This action cannot be undone.`}
+          confirmLabel="Delete All"
+          danger={true}
+          onConfirm={clearAllMolecules}
+        />
       </section>
     </Tooltip.Provider>
   );

@@ -501,7 +501,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       compiledStages: compiled,
       stageIndex: 0,
       progress: 0,
-      playing: true,
+      playing: false,
       continuous: false,
       selection: null,
       screen: 'stage',

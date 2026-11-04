@@ -18,6 +18,7 @@ import {
   type SlotDef,
 } from '../../store/useChemStore';
 import { PIPELINE_STEPS, verifyStage } from '../../engine/deduction';
+import { ConfirmModal } from '../Common/ConfirmModal';
 
 interface DraggablePoolChipProps {
   slot: SlotDef;
@@ -195,6 +196,7 @@ export const PipelineScreen: React.FC = () => {
   const showToast = useChemStore((s) => s.showToast);
 
   const [activeDragMolId, setActiveDragMolId] = useState<string | null>(null);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -220,12 +222,7 @@ export const PipelineScreen: React.FC = () => {
   };
 
   const handleResetPipelineWithConfirm = () => {
-    const ok = window.confirm(
-      'Are you sure you want to clear all reaction stages and placed species?'
-    );
-    if (ok) {
-      resetPipeline();
-    }
+    setConfirmResetOpen(true);
   };
 
   const currentStep = PIPELINE_STEPS[activePipelineTab] || PIPELINE_STEPS[0];
@@ -478,6 +475,16 @@ export const PipelineScreen: React.FC = () => {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      <ConfirmModal
+        open={confirmResetOpen}
+        onOpenChange={setConfirmResetOpen}
+        title="Reset Reaction Stages?"
+        description="Are you sure you want to clear all placed chemical species across all stages? This action cannot be undone."
+        confirmLabel="Reset All"
+        danger={true}
+        onConfirm={resetPipeline}
+      />
     </section>
   );
 };

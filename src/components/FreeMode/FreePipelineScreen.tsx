@@ -15,6 +15,7 @@ import { ArrowLeft, ArrowRight, Edit3, Package, Plus, RotateCcw, Trash2, X } fro
 import { useFreeChemStore } from '../../store/useFreeChemStore';
 import { useChemStore } from '../../store/useChemStore';
 import type { FreeMoleculeItem } from '../../engine/freeReactionEngine';
+import { ConfirmModal } from '../Common/ConfirmModal';
 
 interface DraggableMolChipProps {
   item: FreeMoleculeItem;
@@ -190,6 +191,7 @@ export const FreePipelineScreen: React.FC = () => {
   const showToast = useChemStore((s) => s.showToast);
 
   const [activeDragMolId, setActiveDragMolId] = useState<string | null>(null);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
 
   const moleculesMap = new Map<string, FreeMoleculeItem>(
     molecules.map((m) => [m.id, m])
@@ -219,12 +221,7 @@ export const FreePipelineScreen: React.FC = () => {
   };
 
   const handleClearCurrentStageWithConfirm = () => {
-    const ok = window.confirm(
-      'Are you sure you want to clear reactants and products in the current stage?'
-    );
-    if (ok) {
-      clearCurrentStageZones();
-    }
+    setConfirmClearOpen(true);
   };
 
   const currentStage = stages[activeStageTab] || stages[0];
@@ -333,55 +330,57 @@ export const FreePipelineScreen: React.FC = () => {
           {/* Active Stage Editor: Stage Name + [Reactants] ➔ [Products] */}
           {currentStage && (
             <div className="pipeline-active-stage">
-              <div className="track-header free-track-header">
-                <div className="stage-name-editor">
-                  <Edit3 size={16} className="stage-name-icon" />
-                  <label htmlFor="free-stage-name-input" className="stage-name-label">
-                    Stage Name:
-                  </label>
-                  <input
-                    id="free-stage-name-input"
-                    type="text"
-                    className="stage-name-input"
-                    value={currentStage.name}
-                    placeholder="Enter stage name…"
-                    onChange={(e) => renameStage(currentStage.id, e.target.value)}
+              <div className="pipeline-track-card">
+                <div className="track-header free-track-header">
+                  <div className="stage-name-editor">
+                    <Edit3 size={16} className="stage-name-icon" />
+                    <label htmlFor="free-stage-name-input" className="stage-name-label">
+                      Stage Name:
+                    </label>
+                    <input
+                      id="free-stage-name-input"
+                      type="text"
+                      className="stage-name-input"
+                      value={currentStage.name}
+                      placeholder="Enter stage name…"
+                      onChange={(e) => renameStage(currentStage.id, e.target.value)}
+                    />
+                  </div>
+                  {stages.length > 1 && (
+                    <button
+                      type="button"
+                      className="stage-delete-btn"
+                      title="Delete stage"
+                      aria-label="Delete stage"
+                      onClick={() => removeStage(currentStage.id)}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Clean [Reactants] ➔ [Products] Layout */}
+                <div className="track-flow">
+                  <FreeDropZone
+                    stageId={currentStage.id}
+                    role="reactants"
+                    titleText="Reactants (Before Reaction)"
+                    particles={currentStage.reactants}
+                    moleculesMap={moleculesMap}
+                  />
+                  <div className="track-arrow-zone">
+                    <span className="track-arrow" aria-hidden="true">
+                      ➔
+                    </span>
+                  </div>
+                  <FreeDropZone
+                    stageId={currentStage.id}
+                    role="products"
+                    titleText="Products (After Reaction)"
+                    particles={currentStage.products}
+                    moleculesMap={moleculesMap}
                   />
                 </div>
-                {stages.length > 1 && (
-                  <button
-                    type="button"
-                    className="stage-delete-btn"
-                    title="Delete stage"
-                    aria-label="Delete stage"
-                    onClick={() => removeStage(currentStage.id)}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              </div>
-
-              {/* Clean [Reactants] ➔ [Products] Layout */}
-              <div className="track-flow">
-                <FreeDropZone
-                  stageId={currentStage.id}
-                  role="reactants"
-                  titleText="Reactants (Before Reaction)"
-                  particles={currentStage.reactants}
-                  moleculesMap={moleculesMap}
-                />
-                <div className="track-arrow-zone">
-                  <span className="track-arrow" aria-hidden="true">
-                    ➔
-                  </span>
-                </div>
-                <FreeDropZone
-                  stageId={currentStage.id}
-                  role="products"
-                  titleText="Products (After Reaction)"
-                  particles={currentStage.products}
-                  moleculesMap={moleculesMap}
-                />
               </div>
             </div>
           )}
@@ -430,6 +429,16 @@ export const FreePipelineScreen: React.FC = () => {
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      <ConfirmModal
+        open={confirmClearOpen}
+        onOpenChange={setConfirmClearOpen}
+        title="Clear Current Stage?"
+        description="Are you sure you want to clear all placed reactants and products in this stage? This cannot be undone."
+        confirmLabel="Clear Stage"
+        danger={true}
+        onConfirm={clearCurrentStageZones}
+      />
     </section>
   );
 };

@@ -351,9 +351,9 @@ export const MoleculeBuilderModal: React.FC = () => {
       const existingNbs = bonds.filter(
         (b) => b.from === anchor.id || b.to === anchor.id
       ).length;
-      const angle = (existingNbs * Math.PI) / 2 - Math.PI / 2 + (nodes.length % 3) * 0.25;
-      x = Math.round((anchor.x ?? 250) + 84 * Math.cos(angle));
-      y = Math.round((anchor.y ?? 160) + 84 * Math.sin(angle));
+      const angle = (existingNbs * Math.PI) / 2 - Math.PI / 2 + (nodes.length % 3) * 0.35;
+      x = Math.round((anchor.x ?? 250) + 125 * Math.cos(angle));
+      y = Math.round((anchor.y ?? 160) + 125 * Math.sin(angle));
     }
 
     const newNode: TopologyNode = {
@@ -366,15 +366,6 @@ export const MoleculeBuilderModal: React.FC = () => {
 
     const nextNodes = [...nodes, newNode];
     const nextBonds = [...bonds];
-
-    if (selectedNodeId && nodes.some((n) => n.id === selectedNodeId)) {
-      nextBonds.push({
-        id: `b_${selectedNodeId}_${newId}`,
-        from: selectedNodeId,
-        to: newId,
-        order: 1,
-      });
-    }
 
     // Auto-populate recommended defaults so 3D renders immediately!
     const autoParams = synthesizeDefaultsForNodesAndBonds(
@@ -1124,12 +1115,12 @@ export const MoleculeBuilderModal: React.FC = () => {
                     title={
                       showFullPeriodicTable
                         ? 'Collapse Periodic Table'
-                        : 'Expand Full Periodic Table (118 Elements)'
+                        : 'Expand Full Periodic Table'
                     }
                     aria-label="Toggle Periodic Table"
                   >
                     <Grid size={15} />
-                    <span>{showFullPeriodicTable ? 'Collapse Table' : 'Full Periodic Table (118)'}</span>
+                    <span>{showFullPeriodicTable ? 'Collapse Table' : 'Full Periodic Table'}</span>
                     {showFullPeriodicTable ? (
                       <ChevronUp size={14} />
                     ) : (
@@ -1298,7 +1289,15 @@ export const MoleculeBuilderModal: React.FC = () => {
                   </div>
 
                   {/* 2D Interactive Topology Canvas: Unified Click, Drag-to-Move, and Drag-to-Connect */}
-                  <div className="topology-canvas-wrap" ref={svgWrapRef}>
+                  <div
+                    className="topology-canvas-wrap"
+                    ref={svgWrapRef}
+                    onWheel={(e) => {
+                      e.preventDefault();
+                      const factor = e.deltaY < 0 ? 1.1 : 0.9;
+                      setTopoZoom((z) => Math.min(2.5, Math.max(0.4, Number((z * factor).toFixed(2)))));
+                    }}
+                  >
                     <svg
                       ref={svgRef}
                       className="topology-svg"
@@ -1636,7 +1635,8 @@ export const MoleculeBuilderModal: React.FC = () => {
                                   }
                                 }}
                               >
-                                <circle r="8.5" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
+                                <circle r="14" fill="transparent" />
+                                <circle className="handle-dot" r="8.5" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
                                 <line x1="-3.5" y1="0" x2="3.5" y2="0" stroke="#ffffff" strokeWidth="1.6" strokeLinecap="round" />
                                 <line x1="0" y1="-3.5" x2="0" y2="3.5" stroke="#ffffff" strokeWidth="1.6" strokeLinecap="round" />
                               </g>
@@ -1648,7 +1648,7 @@ export const MoleculeBuilderModal: React.FC = () => {
 
                     {/* Floating mini guide in canvas corner */}
                     <div className="canvas-floating-guide">
-                      <span>Click to select · Drag atom to move · Drag + handle or Shift+drag to bond · Del to remove</span>
+                      <span>Drag <b>+</b> to bond · Drag atom to move · Del to delete</span>
                     </div>
 
                     {/* 2D Zoom & Reset Controls */}
@@ -1850,7 +1850,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                             <option value="">Select Spatial Geometry…</option>
                             {GEOMETRY_OPTIONS.map((opt) => (
                               <option key={opt.value} value={opt.value}>
-                                {opt.label} ({opt.value})
+                                {opt.label}
                               </option>
                             ))}
                           </select>
