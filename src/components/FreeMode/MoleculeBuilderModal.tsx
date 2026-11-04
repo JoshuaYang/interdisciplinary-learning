@@ -2191,7 +2191,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                     </div>
                     <div className="param-grid-2">
                       <div className="param-field">
-                        <span>Spatial Geometry (geometry) *</span>
+                        <span>Spatial Geometry (geometry)</span>
                         <CustomSelect
                           value={geometry}
                           onChange={(val) => setGeometry(val)}
@@ -2216,7 +2216,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                     <div className="param-group-title">
                       <div className="param-title-left">
                         <Ruler size={16} className="param-icon ruler-icon" />
-                        <span>Bond Lengths (bondLengths · in Å) *</span>
+                        <span>Bond Lengths (bondLengths · in Å)</span>
                       </div>
                     </div>
                     {activeBondKeys.length === 0 ? (
@@ -2256,7 +2256,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                     <div className="param-group-title">
                       <div className="param-title-left">
                         <Compass size={16} className="param-icon compass-icon" />
-                        <span>Bond Angles (bondAngles · in °) *</span>
+                        <span>Bond Angles (bondAngles · in °)</span>
                       </div>
                     </div>
                     {activeAngleKeys.length === 0 ? (
