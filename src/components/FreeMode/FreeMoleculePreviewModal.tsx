@@ -133,6 +133,9 @@ export const FreeMoleculePreviewModal: React.FC = () => {
       }
 
       const axis = new THREE.Vector3(0, 1, 0);
+      const zAxis = new THREE.Vector3(0, 0, 1);
+      const xAxis = new THREE.Vector3(1, 0, 0);
+
       for (const b of mol.bonds || []) {
         const p1 = posMap.get(b.atoms[0]);
         const p2 = posMap.get(b.atoms[1]);
@@ -141,21 +144,43 @@ export const FreeMoleculePreviewModal: React.FC = () => {
         const v2 = new THREE.Vector3(...p2);
         const dir = v2.clone().sub(v1);
         const len = dir.length();
+        const bondDir = dir.clone().normalize();
 
-        b.atoms.forEach((atomId, idx) => {
-          const el = elemMap.get(atomId) || 'C';
-          const m = new THREE.Mesh(
-            cylinderGeo,
-            new THREE.MeshStandardMaterial({
-              color: new THREE.Color(getElementColor(el)),
-              roughness: 0.5,
-            })
-          );
-          m.position.copy(v1).lerp(v2, idx === 0 ? 0.25 : 0.75);
-          m.quaternion.setFromUnitVectors(axis, dir.clone().normalize());
-          m.scale.set(0.068, len / 2, 0.068);
-          root.add(m);
-        });
+        const refAxis = Math.abs(bondDir.dot(zAxis)) < 0.88 ? zAxis : xAxis;
+        const normal = bondDir.clone().cross(refAxis).normalize();
+
+        const bondOrder = (b as any).order || 1;
+        let offsets: number[] = [0];
+        let cylRadius = 0.065;
+
+        if (bondOrder === 2) {
+          offsets = [-0.09, 0.09];
+          cylRadius = 0.052;
+        } else if (bondOrder === 3) {
+          offsets = [-0.13, 0, 0.13];
+          cylRadius = 0.044;
+        }
+
+        for (const off of offsets) {
+          const shift = normal.clone().multiplyScalar(off);
+          const sv1 = v1.clone().add(shift);
+          const sv2 = v2.clone().add(shift);
+
+          b.atoms.forEach((atomId, idx) => {
+            const el = elemMap.get(atomId) || 'C';
+            const m = new THREE.Mesh(
+              cylinderGeo,
+              new THREE.MeshStandardMaterial({
+                color: new THREE.Color(getElementColor(el)),
+                roughness: 0.5,
+              })
+            );
+            m.position.copy(sv1).lerp(sv2, idx === 0 ? 0.25 : 0.75);
+            m.quaternion.setFromUnitVectors(axis, bondDir);
+            m.scale.set(cylRadius, len / 2, cylRadius);
+            root.add(m);
+          });
+        }
       }
 
       const rotation = { x: 0.24, y: 0.42 };

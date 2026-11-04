@@ -371,9 +371,9 @@ export const PipelineScreen: React.FC = () => {
                           />
                           <div className="track-arrow-zone">
                             <span className="track-condition-tag">Coupling</span>
-                            <span className="track-arrow" aria-hidden="true">
-                              ➔
-                            </span>
+                            <div className="track-arrow-circle" aria-hidden="true">
+                              <ArrowRight size={18} />
+                            </div>
                           </div>
                           <DropZone
                             stageId={currentStep.id}
@@ -397,9 +397,9 @@ export const PipelineScreen: React.FC = () => {
                   />
                   <div className="track-arrow-zone">
                     <span className="track-condition-tag">{currentStep.condition}</span>
-                    <span className="track-arrow" aria-hidden="true">
-                      ➔
-                    </span>
+                    <div className="track-arrow-circle" aria-hidden="true">
+                      <ArrowRight size={20} />
+                    </div>
                   </div>
                   <DropZone
                     stageId={currentStep.id}

@@ -50,6 +50,23 @@ export const App: React.FC = () => {
     }
   }, [appMode]);
 
+  // Subtle interactive mouse spotlight glow
+  useEffect(() => {
+    let rafId: number;
+    const handlePointerMove = (e: PointerEvent) => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        document.documentElement.style.setProperty('--mouse-x', `${e.clientX}px`);
+        document.documentElement.style.setProperty('--mouse-y', `${e.clientY}px`);
+      });
+    };
+    window.addEventListener('pointermove', handlePointerMove, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   useEffect(() => {
     loadDefault();
 

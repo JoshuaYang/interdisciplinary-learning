@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronUp,
   Grid,
+  HelpCircle,
   RotateCcw,
   Sparkles,
   Trash2,
@@ -344,17 +345,40 @@ export const MoleculeBuilderModal: React.FC = () => {
     const sameCount = nodes.filter((n) => n.element === symbol).length;
     const newId = `${symbol.toLowerCase()}${sameCount + 1}_${Date.now().toString(36).slice(-2)}`;
 
-    let x = customPos?.x ?? 250;
-    let y = customPos?.y ?? 160;
+    // Visible viewport boundaries based on current zoom and pan
+    const curVbW = 500 / topoZoom;
+    const curVbH = 320 / topoZoom;
+    const curVbX = topoPan.x - (curVbW - 500) / 2;
+    const curVbY = topoPan.y - (curVbH - 320) / 2;
+    const minX = Math.round(curVbX + 55);
+    const maxX = Math.round(curVbX + curVbW - 55);
+    const minY = Math.round(curVbY + 55);
+    const maxY = Math.round(curVbY + curVbH - 55);
+
+    let x = customPos?.x ?? Math.round(curVbX + curVbW / 2);
+    let y = customPos?.y ?? Math.round(curVbY + curVbH / 2);
+
     if (!customPos && nodes.length > 0) {
       const anchor = nodes.find((n) => n.id === selectedNodeId) || nodes[nodes.length - 1];
       const existingNbs = bonds.filter(
         (b) => b.from === anchor.id || b.to === anchor.id
       ).length;
-      const angle = (existingNbs * Math.PI) / 2 - Math.PI / 2 + (nodes.length % 3) * 0.35;
-      x = Math.round((anchor.x ?? 250) + 125 * Math.cos(angle));
-      y = Math.round((anchor.y ?? 160) + 125 * Math.sin(angle));
+      const angle = (existingNbs * Math.PI) / 2 - Math.PI / 2 + (nodes.length % 4) * 0.45;
+      const candX = Math.round((anchor.x ?? 250) + 120 * Math.cos(angle));
+      const candY = Math.round((anchor.y ?? 160) + 120 * Math.sin(angle));
+
+      // Guarantee new atom is inside the user's visible canvas area
+      if (candX >= minX && candX <= maxX && candY >= minY && candY <= maxY) {
+        x = candX;
+        y = candY;
+      } else {
+        const offsetIdx = nodes.length % 6;
+        x = Math.round(curVbX + curVbW / 2 + ((offsetIdx % 3) - 1) * 75);
+        y = Math.round(curVbY + curVbH / 2 + (Math.floor(offsetIdx / 3) === 0 ? -45 : 45));
+      }
     }
+    x = Math.max(minX, Math.min(maxX, x));
+    y = Math.max(minY, Math.min(maxY, y));
 
     const newNode: TopologyNode = {
       id: newId,
@@ -378,6 +402,7 @@ export const MoleculeBuilderModal: React.FC = () => {
     setNodes(nextNodes);
     setBonds(nextBonds);
     setSelectedNodeId(newId);
+    showToast(`Added ${symbol} atom to canvas`);
     setSelectedBondId(null);
     setName(autoParams.name);
     setFormula(autoParams.formula);
@@ -996,27 +1021,53 @@ export const MoleculeBuilderModal: React.FC = () => {
     }
 
     const axis = new THREE.Vector3(0, 1, 0);
+    const zAxis = new THREE.Vector3(0, 0, 1);
+    const xAxis = new THREE.Vector3(1, 0, 0);
+
     for (const b of mol.bonds) {
       const p1 = posMap.get(b.atoms[0]);
       const p2 = posMap.get(b.atoms[1]);
       if (!p1 || !p2) continue;
       const dir = p2.clone().sub(p1);
       const len = dir.length();
+      const bondDir = dir.clone().normalize();
 
-      b.atoms.forEach((atomId, idx) => {
-        const el = elemMap.get(atomId) || 'C';
-        const m = new THREE.Mesh(
-          cylinderGeo,
-          new THREE.MeshStandardMaterial({
-            color: new THREE.Color(getElementColor(el)),
-            roughness: 0.5,
-          })
-        );
-        m.position.copy(p1).lerp(p2, idx === 0 ? 0.25 : 0.75);
-        m.quaternion.setFromUnitVectors(axis, dir.clone().normalize());
-        m.scale.set(0.068, len / 2, 0.068);
-        root.add(m);
-      });
+      // Orthogonal normal vector to offset multiple bonds
+      const refAxis = Math.abs(bondDir.dot(zAxis)) < 0.88 ? zAxis : xAxis;
+      const normal = bondDir.clone().cross(refAxis).normalize();
+
+      const bondOrder = (b as any).order || 1;
+      let offsets: number[] = [0];
+      let cylRadius = 0.065;
+
+      if (bondOrder === 2) {
+        offsets = [-0.09, 0.09];
+        cylRadius = 0.052;
+      } else if (bondOrder === 3) {
+        offsets = [-0.13, 0, 0.13];
+        cylRadius = 0.044;
+      }
+
+      for (const off of offsets) {
+        const shift = normal.clone().multiplyScalar(off);
+        const sp1 = p1.clone().add(shift);
+        const sp2 = p2.clone().add(shift);
+
+        b.atoms.forEach((atomId, idx) => {
+          const el = elemMap.get(atomId) || 'C';
+          const m = new THREE.Mesh(
+            cylinderGeo,
+            new THREE.MeshStandardMaterial({
+              color: new THREE.Color(getElementColor(el)),
+              roughness: 0.5,
+            })
+          );
+          m.position.copy(sp1).lerp(sp2, idx === 0 ? 0.25 : 0.75);
+          m.quaternion.setFromUnitVectors(axis, bondDir);
+          m.scale.set(cylRadius, len / 2, cylRadius);
+          root.add(m);
+        });
+      }
     }
 
     resize();
@@ -1646,9 +1697,39 @@ export const MoleculeBuilderModal: React.FC = () => {
                       })}
                     </svg>
 
-                    {/* Floating mini guide in canvas corner */}
-                    <div className="canvas-floating-guide">
-                      <span>Drag <b>+</b> to bond · Drag atom to move · Del to delete</span>
+                    {/* Floating help trigger in 2D canvas corner */}
+                    <div className="canvas-help-trigger">
+                      <button
+                        type="button"
+                        className="canvas-help-icon-btn"
+                        title="Canvas Shortcuts"
+                        aria-label="Canvas Shortcuts"
+                      >
+                        <HelpCircle size={15} />
+                      </button>
+                      <div className="canvas-help-popover">
+                        <div className="help-popover-title">Canvas Shortcuts</div>
+                        <div className="help-popover-item">
+                          <span className="help-key">Click</span>
+                          <span>Select atom or bond</span>
+                        </div>
+                        <div className="help-popover-item">
+                          <span className="help-key">Drag</span>
+                          <span>Move atom position</span>
+                        </div>
+                        <div className="help-popover-item">
+                          <span className="help-key">+ Handle</span>
+                          <span>Drag handle to bond atoms</span>
+                        </div>
+                        <div className="help-popover-item">
+                          <span className="help-key">Del</span>
+                          <span>Delete selected item</span>
+                        </div>
+                        <div className="help-popover-item">
+                          <span className="help-key">Wheel</span>
+                          <span>Zoom canvas in / out</span>
+                        </div>
+                      </div>
                     </div>
 
                     {/* 2D Zoom & Reset Controls */}
@@ -1720,7 +1801,32 @@ export const MoleculeBuilderModal: React.FC = () => {
 
                     {previewMol ? (
                       <>
-                        <div className="builder-3d-hint">Drag to rotate · Scroll to zoom</div>
+                        {/* Floating help trigger in 3D preview corner */}
+                        <div className="canvas-help-trigger">
+                          <button
+                            type="button"
+                            className="canvas-help-icon-btn"
+                            title="3D Model Controls"
+                            aria-label="3D Model Controls"
+                          >
+                            <HelpCircle size={15} />
+                          </button>
+                          <div className="canvas-help-popover">
+                            <div className="help-popover-title">3D Model Controls</div>
+                            <div className="help-popover-item">
+                              <span className="help-key">Drag</span>
+                              <span>Rotate 3D molecule</span>
+                            </div>
+                            <div className="help-popover-item">
+                              <span className="help-key">Scroll</span>
+                              <span>Zoom 3D model in / out</span>
+                            </div>
+                            <div className="help-popover-item">
+                              <span className="help-key">Reset</span>
+                              <span>Reset camera angle</span>
+                            </div>
+                          </div>
+                        </div>
                         <div className="canvas-zoom-bar">
                           <button
                             type="button"

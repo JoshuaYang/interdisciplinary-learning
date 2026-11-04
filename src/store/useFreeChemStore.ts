@@ -160,42 +160,53 @@ function createItemFromDoc(doc: Record<string, any>, forceId?: string): FreeMole
   };
 }
 
-function buildInitialSampleState(): {
+function buildInitialSampleState(full = false): {
   molecules: FreeMoleculeItem[];
   stages: FreeStageDef[];
 } {
   nextMolSeq = 1;
   nextStageSeq = 1;
-  const molecules = SAMPLE_MOLECULE_DOCS.map((d) => createItemFromDoc(d));
+  // Default to 3 concise, essential molecules so the UI is tidy
+  const docs = full ? SAMPLE_MOLECULE_DOCS : SAMPLE_MOLECULE_DOCS.slice(0, 3);
+  const molecules = docs.map((d) => createItemFromDoc(d));
   const findId = (formula: string) =>
     molecules.find((m) => m.mol.formula === formula)?.id || molecules[0].id;
 
-  const stages: FreeStageDef[] = [
-    {
-      id: `stage_${nextStageSeq++}`,
-      name: 'Stage 1: Homolytic Cleavage',
-      reactants: [findId('Br2')],
-      products: [findId('Br·'), findId('Br·')],
-    },
-    {
-      id: `stage_${nextStageSeq++}`,
-      name: 'Stage 2: Hydrogen Abstraction',
-      reactants: [findId('CH4'), findId('Br·')],
-      products: [findId('CH3·'), findId('HBr')],
-    },
-    {
-      id: `stage_${nextStageSeq++}`,
-      name: 'Stage 3: Radical Substitution',
-      reactants: [findId('CH3·'), findId('Br2')],
-      products: [findId('CH3Br'), findId('Br·')],
-    },
-    {
-      id: `stage_${nextStageSeq++}`,
-      name: 'Stage 4: Methyl Combination',
-      reactants: [findId('CH3·'), findId('CH3·')],
-      products: [findId('CH3CH3')],
-    },
-  ];
+  const stages: FreeStageDef[] = full
+    ? [
+        {
+          id: `stage_${nextStageSeq++}`,
+          name: 'Homolytic Cleavage',
+          reactants: [findId('Br2')],
+          products: [findId('Br·'), findId('Br·')],
+        },
+        {
+          id: `stage_${nextStageSeq++}`,
+          name: 'Hydrogen Abstraction',
+          reactants: [findId('CH4'), findId('Br·')],
+          products: [findId('CH3·'), findId('HBr')],
+        },
+        {
+          id: `stage_${nextStageSeq++}`,
+          name: 'Radical Substitution',
+          reactants: [findId('CH3·'), findId('Br2')],
+          products: [findId('CH3Br'), findId('Br·')],
+        },
+        {
+          id: `stage_${nextStageSeq++}`,
+          name: 'Methyl Combination',
+          reactants: [findId('CH3·'), findId('CH3·')],
+          products: [findId('CH3CH3')],
+        },
+      ]
+    : [
+        {
+          id: `stage_${nextStageSeq++}`,
+          name: 'Homolytic Cleavage',
+          reactants: [findId('Br2')],
+          products: [findId('Br·'), findId('Br·')],
+        },
+      ];
   return { molecules, stages };
 }
 
@@ -377,7 +388,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
   },
 
   loadSampleMolecules: () => {
-    const sample = buildInitialSampleState();
+    const sample = buildInitialSampleState(true);
     set({
       molecules: sample.molecules,
       stages: sample.stages,

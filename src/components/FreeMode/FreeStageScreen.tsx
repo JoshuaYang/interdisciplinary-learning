@@ -490,20 +490,25 @@ export const FreeStageScreen: React.FC = () => {
             <span>Reaction Stages ({compiledStages.length})</span>
           </div>
           <nav id="free-steps" aria-label="Select Reaction Stage">
-            {compiledStages.map((st, i) => (
-              <button
-                key={st.stageId}
-                type="button"
-                className="step-button solved"
-                aria-current={i === stageIndex ? 'step' : undefined}
-                onClick={() => goStage(i, true)}
-              >
-                <span className="step-num mono">{String(i + 1).padStart(2, '0')}</span>
-                <span className="step-text">
-                  <span className="step-name">{st.name}</span>
-                </span>
-              </button>
-            ))}
+            {compiledStages.map((st, i) => {
+              const displayStepName = (st.name || '')
+                .replace(/^(?:stage|step)\s*\d+[\s:：\-_.]*/i, '')
+                .trim() || `Reaction Step ${i + 1}`;
+              return (
+                <button
+                  key={st.stageId}
+                  type="button"
+                  className="step-button solved"
+                  aria-current={i === stageIndex ? 'step' : undefined}
+                  onClick={() => goStage(i, true)}
+                >
+                  <span className="step-num mono">{String(i + 1).padStart(2, '0')}</span>
+                  <span className="step-text">
+                    <span className="step-name">{displayStepName}</span>
+                  </span>
+                </button>
+              );
+            })}
           </nav>
         </aside>
 

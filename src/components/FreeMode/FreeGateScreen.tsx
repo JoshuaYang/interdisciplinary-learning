@@ -36,6 +36,7 @@ export const FreeGateScreen: React.FC = () => {
   const [screenDragover, setScreenDragover] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [molToDelete, setMolToDelete] = useState<{ id: string; name: string; formula: string } | null>(null);
 
   // Close dropdown menu when clicking outside
   useEffect(() => {
@@ -298,7 +299,13 @@ export const FreeGateScreen: React.FC = () => {
                         className="card-mini-icon-btn danger"
                         title="Delete substance"
                         aria-label="Delete substance"
-                        onClick={() => deleteMolecule(item.id)}
+                        onClick={() =>
+                          setMolToDelete({
+                            id: item.id,
+                            name: mol.name,
+                            formula: mol.formula,
+                          })
+                        }
                       >
                         <Trash2 size={15} />
                       </button>
@@ -393,6 +400,20 @@ export const FreeGateScreen: React.FC = () => {
           confirmLabel="Delete All"
           danger={true}
           onConfirm={clearAllMolecules}
+        />
+        <ConfirmModal
+          open={Boolean(molToDelete)}
+          onOpenChange={(open) => !open && setMolToDelete(null)}
+          title={`Delete ${molToDelete?.formula || 'Substance'}?`}
+          description={`Are you sure you want to delete "${molToDelete?.name || ''} (${molToDelete?.formula || ''})" from your library?`}
+          confirmLabel="Delete"
+          danger={true}
+          onConfirm={() => {
+            if (molToDelete) {
+              deleteMolecule(molToDelete.id);
+              setMolToDelete(null);
+            }
+          }}
         />
       </section>
     </Tooltip.Provider>

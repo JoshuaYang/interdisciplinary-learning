@@ -192,6 +192,7 @@ export const FreePipelineScreen: React.FC = () => {
 
   const [activeDragMolId, setActiveDragMolId] = useState<string | null>(null);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+  const [stageToDelete, setStageToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const moleculesMap = new Map<string, FreeMoleculeItem>(
     molecules.map((m) => [m.id, m])
@@ -299,38 +300,38 @@ export const FreePipelineScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Stage Selector Bar (Segmented Pills + Clean Add Stage Button) */}
-          <div className="stage-bar-header">
-            <div className="stage-pills-track" role="tablist" aria-label="Reaction Stages">
-              {stages.map((st, idx) => (
-                <button
-                  key={st.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={idx === activeStageTab}
-                  className={`stage-pill-tab ${idx === activeStageTab ? 'active' : ''}`}
-                  onClick={() => setActiveStageTab(idx)}
-                >
-                  <span className="tab-badge">{idx + 1}</span>
-                  <span>{st.name || `Stage ${idx + 1}`}</span>
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="stage-add-pill-btn"
-              onClick={() => addStage()}
-              title="Add a new reaction stage"
-            >
-              <Plus size={16} />
-              <span>Add Stage</span>
-            </button>
-          </div>
-
-          {/* Active Stage Editor: Stage Name + [Reactants] ➔ [Products] */}
+          {/* Integrated Stage Assembly Studio Card */}
           {currentStage && (
             <div className="pipeline-active-stage">
               <div className="pipeline-track-card">
+                {/* Stage Tabs Bar (Integrated at top of card) */}
+                <div className="stage-bar-header">
+                  <div className="stage-pills-track" role="tablist" aria-label="Reaction Stages">
+                    {stages.map((st, idx) => (
+                      <button
+                        key={st.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={idx === activeStageTab}
+                        className={`stage-pill-tab ${idx === activeStageTab ? 'active' : ''}`}
+                        onClick={() => setActiveStageTab(idx)}
+                      >
+                        <span className="tab-badge">{idx + 1}</span>
+                        <span>{st.name || `Stage ${idx + 1}`}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="stage-add-pill-btn"
+                    onClick={() => addStage()}
+                    title="Add a new reaction stage"
+                  >
+                    <Plus size={16} />
+                    <span>Add Stage</span>
+                  </button>
+                </div>
+
                 <div className="track-header free-track-header">
                   <div className="stage-name-editor">
                     <Edit3 size={16} className="stage-name-icon" />
@@ -352,14 +353,19 @@ export const FreePipelineScreen: React.FC = () => {
                       className="stage-delete-btn"
                       title="Delete stage"
                       aria-label="Delete stage"
-                      onClick={() => removeStage(currentStage.id)}
+                      onClick={() =>
+                        setStageToDelete({
+                          id: currentStage.id,
+                          name: currentStage.name || 'this reaction stage',
+                        })
+                      }
                     >
                       <Trash2 size={16} />
                     </button>
                   )}
                 </div>
 
-                {/* Clean [Reactants] ➔ [Products] Layout */}
+                {/* Integrated Reaction Chamber Tunnel */}
                 <div className="track-flow">
                   <FreeDropZone
                     stageId={currentStage.id}
@@ -369,9 +375,10 @@ export const FreePipelineScreen: React.FC = () => {
                     moleculesMap={moleculesMap}
                   />
                   <div className="track-arrow-zone">
-                    <span className="track-arrow" aria-hidden="true">
-                      ➔
-                    </span>
+                    <span className="track-conduit-pill">Reaction</span>
+                    <div className="track-arrow-circle" aria-hidden="true">
+                      <ArrowRight size={20} />
+                    </div>
                   </div>
                   <FreeDropZone
                     stageId={currentStage.id}
@@ -438,6 +445,20 @@ export const FreePipelineScreen: React.FC = () => {
         confirmLabel="Clear Stage"
         danger={true}
         onConfirm={clearCurrentStageZones}
+      />
+      <ConfirmModal
+        open={Boolean(stageToDelete)}
+        onOpenChange={(open) => !open && setStageToDelete(null)}
+        title="Delete Reaction Stage?"
+        description={`Are you sure you want to delete "${stageToDelete?.name || ''}"? This action cannot be undone.`}
+        confirmLabel="Delete Stage"
+        danger={true}
+        onConfirm={() => {
+          if (stageToDelete) {
+            removeStage(stageToDelete.id);
+            setStageToDelete(null);
+          }
+        }}
       />
     </section>
   );
