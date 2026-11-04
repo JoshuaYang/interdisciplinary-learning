@@ -11,14 +11,14 @@ export const HomeEntry: React.FC = () => {
       <header className="app-header">
         <div className="identity">
           <span className="mark" aria-hidden="true">
-            <Atom size={22} strokeWidth={2} />
+            <Atom size={24} strokeWidth={2} />
           </span>
           <div>
             <div className="identity-title-row">
-              <h1>微观化学反应三维交互实验台</h1>
+              <h1>3D Interactive Chemical Reaction Workbench</h1>
             </div>
             <p>
-              化学 × 信息技术 <span>/</span> 分子构型与断键成键机理可视化平台
+              Chemistry × Computing <span>/</span> Molecular Geometry & Reaction Mechanism Visualization Platform
             </p>
           </div>
         </div>
@@ -27,15 +27,15 @@ export const HomeEntry: React.FC = () => {
       <main className="home-entry-main">
         <div className="home-entry-container">
           <div className="home-hero">
-            <span className="small-label">SELECT WORKBENCH MODE · 选择实验台模式</span>
-            <h2>请选择要进入的实验模式</h2>
+            <span className="small-label">SELECT WORKBENCH MODE</span>
+            <h2>Choose Your Reaction Workbench</h2>
             <p>
-              支持「甲烷自由基取代标准教学闯关」与「全周期自定义分子与反应阶段自由构建」双模式
+              Supports both Guided Radical Substitution Curriculum and Universal Free-Form Reaction Construction
             </p>
           </div>
 
           <div className="home-cards-grid">
-            {/* 卡片 1：原有的定题闯关页面 */}
+            {/* Card 1: Guided Radical Substitution */}
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
@@ -45,28 +45,28 @@ export const HomeEntry: React.FC = () => {
             >
               <div className="home-card-top">
                 <span className="home-card-icon guided">
-                  <FlaskConical size={24} />
+                  <FlaskConical size={26} />
                 </span>
-                <span className="home-card-badge">标准教学闯关</span>
+                <span className="home-card-badge">Guided Curriculum</span>
               </div>
 
-              <h3>甲烷的自由基取代</h3>
+              <h3>Radical Substitution of Methane</h3>
               <p className="home-card-desc">
-                围绕甲烷与溴单质的光照自由基取代反应，依次完成 6 种核心微粒配置核验、链引发/链增长/链终止反应序列拼装，以及 7 步三维反应机理推演问答。
+                Explore the photochemical radical bromination of methane by verifying 6 core molecular species, assembling chain initiation, propagation, and termination pathways, and solving 7 interactive 3D mechanism steps.
               </p>
 
               <ul className="home-card-features">
                 <li>
-                  <Layers size={15} />
-                  <span>内置 6 种标准微粒结构核验与 3D 球棍预览</span>
+                  <Layers size={16} />
+                  <span>6 core molecular structure verifications with interactive 3D ball-and-stick previews</span>
                 </li>
                 <li>
-                  <Compass size={15} />
-                  <span>四阶段反应链路拖拽装配与即时正误反馈</span>
+                  <Compass size={16} />
+                  <span>4-stage chain reaction pathway assembly with real-time validation</span>
                 </li>
                 <li>
-                  <Atom size={15} />
-                  <span>7 步三维断键成键动画与交互式机理推演闯关</span>
+                  <Atom size={16} />
+                  <span>7-step 3D bond-breaking and bond-forming animations with guided deduction</span>
                 </li>
               </ul>
 
@@ -79,12 +79,12 @@ export const HomeEntry: React.FC = () => {
                   setAppMode('guided');
                 }}
               >
-                <span>进入标准教学实验台</span>
+                <span>Enter Guided Workbench</span>
                 <ArrowRight size={18} />
               </button>
             </motion.div>
 
-            {/* 卡片 2：全新的自由反应实验台 */}
+            {/* Card 2: Free Chemical Reaction Workbench */}
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
@@ -94,28 +94,28 @@ export const HomeEntry: React.FC = () => {
             >
               <div className="home-card-top">
                 <span className="home-card-icon free">
-                  <Sparkles size={24} />
+                  <Sparkles size={26} />
                 </span>
-                <span className="home-card-badge accent">自由构建模式</span>
+                <span className="home-card-badge accent">Free-Form Builder</span>
               </div>
 
-              <h3>自由化学反应实验台</h3>
+              <h3>Free Chemical Reaction Workbench</h3>
               <p className="home-card-desc">
-                基于全周期元素周期表交互式搭建任意分子拓扑（或导入/导出 JSON），自由增减与命名反应阶段，全自动解算三维分子构型并生成分子靠近、断键重组与分离动画。
+                Build any molecule interactively from the 118-element periodic table (or import/export JSON), freely add and name reaction stages, and automatically generate 3D molecular structures and reaction animations.
               </p>
 
               <ul className="home-card-features">
                 <li>
-                  <Sparkles size={15} />
-                  <span>118 元素周期表点选连键 + 一键填入推荐构型与键长</span>
+                  <Sparkles size={16} />
+                  <span>118-element periodic table builder with one-click recommended VSEPR geometry & bond lengths</span>
                 </li>
                 <li>
-                  <Layers size={15} />
-                  <span>动态增删反应阶段、自由命名并拖拽组合反应物与生成物</span>
+                  <Layers size={16} />
+                  <span>Dynamically add, rename, or remove reaction stages and drag-and-drop reactants & products</span>
                 </li>
                 <li>
-                  <Atom size={15} />
-                  <span>全自动原子配对追踪，生成三维结合、断键与分离动画</span>
+                  <Atom size={16} />
+                  <span>Automatic atom-mapping and 3D molecular approach, bond rearrangement, and separation animations</span>
                 </li>
               </ul>
 
@@ -128,7 +128,7 @@ export const HomeEntry: React.FC = () => {
                   setAppMode('free');
                 }}
               >
-                <span>进入自由反应实验台</span>
+                <span>Enter Free Reaction Workbench</span>
                 <ArrowRight size={18} />
               </button>
             </motion.div>

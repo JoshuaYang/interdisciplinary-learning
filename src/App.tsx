@@ -100,7 +100,7 @@ export const App: React.FC = () => {
         if (s.index < Math.min(6, s.unlockedMaxStep + 1)) {
           s.go(s.index + 1, false);
         } else {
-          s.showToast('🔒 请先完成当前步骤推演，才能前往下一步。');
+          s.showToast('Complete the current step deduction to unlock the next step.');
         }
       } else if (e.code === 'ArrowLeft') {
         e.preventDefault();

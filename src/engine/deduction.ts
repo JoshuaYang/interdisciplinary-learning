@@ -36,18 +36,18 @@ export interface PipelineStepDef {
 export const STEPS_DATA: DeductionStepData[] = [
   {
     index: 0,
-    title: '初始分子',
+    title: 'Initial Species',
     isObservation: true,
-    phase: '准备',
-    summary: '体系准备就绪：观察甲烷的正四面体立体构型与溴单质的双原子分子结构。',
+    phase: 'Preparation',
+    summary: 'System ready: observe the regular tetrahedral geometry of methane and the diatomic structure of bromine.',
   },
   {
     index: 1,
-    title: '光照激发',
+    title: 'Photoexcitation',
     isObservation: false,
-    phase: '引发',
-    phaseOptions: ['引发', '链增长 ①', '链增长 ②', '净反应总结'],
-    fieldLabel: '微粒变化与反应式',
+    phase: 'Initiation',
+    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Net Summary'],
+    fieldLabel: 'Species Change & Equation',
     equation: 'Br₂ → 2 Br·',
     equationOptions: [
       'Br₂ → 2 Br·',
@@ -56,53 +56,53 @@ export const STEPS_DATA: DeductionStepData[] = [
       'CH₃· + Br₂ → CH₃Br + Br·',
     ],
     breakBond: 'Br—Br',
-    breakBondOptions: ['无', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
-    formBond: '无',
-    formBondOptions: ['无', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
+    breakBondOptions: ['None', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
+    formBond: 'None',
+    formBondOptions: ['None', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
     hints: {
       phase:
-        '思考：在光照 hν 作用下，初始稳定的非自由基分子发生均裂并产生初始自由基，这属于哪个阶段？',
-      equation: '思考：观察此时受到光照照射的分子，它是如何裂解为两个相同微粒的？',
-      breakBond: '思考：反应物为溴单质分子，被光能均裂的是分子内部的哪种共价键？',
-      formBond: '思考：均裂过程产生孤立自由基，当前步骤是否有新共价键生成？',
+        'Hint: Under UV light (hν), a stable non-radical molecule undergoes homolysis to generate initial radicals. Which stage is this?',
+      equation: 'Hint: Observe the irradiated molecule—how does it cleave into two identical reactive species?',
+      breakBond: 'Hint: The reactant is a bromine molecule. Which covalent bond undergoes homolytic cleavage?',
+      formBond: 'Hint: Homolytic cleavage only separates atoms into isolated radicals. Is any new bond formed in this step?',
     },
     summary:
-      '光能促使 Br—Br 键均裂，一对成键电子各自归属一个溴原子，产生 2 个高活性的溴自由基（Br·）。',
+      'Light energy drives homolytic cleavage of the Br—Br bond, splitting the bonding electron pair equally to produce two reactive bromine radicals (Br·).',
   },
   {
     index: 2,
-    title: '接近甲烷',
+    title: 'Approach CH₄',
     isObservation: false,
-    phase: '链增长 ①',
-    phaseOptions: ['引发', '链增长 ①', '链增长 ②', '净反应总结'],
-    fieldLabel: '反应微粒动态',
-    equation: 'Br· 与 CH₄ 相互接近',
+    phase: 'Propagation ①',
+    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Net Summary'],
+    fieldLabel: 'Particle Dynamics',
+    equation: 'Br· approaches CH₄',
     equationOptions: [
-      'Br· 与 CH₄ 相互接近',
-      'Br· 与 Br· 相互结合',
-      'CH₃· 与 Br₂ 相互接近',
-      'HBr 与 CH₃Br 相互碰撞',
+      'Br· approaches CH₄',
+      'Br· combines with Br·',
+      'CH₃· approaches Br₂',
+      'HBr collides with CH₃Br',
     ],
-    breakBond: '无',
-    breakBondOptions: ['无', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
-    formBond: '无',
-    formBondOptions: ['无', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
+    breakBond: 'None',
+    breakBondOptions: ['None', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
+    formBond: 'None',
+    formBondOptions: ['None', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
     hints: {
-      phase: '思考：引发阶段产生的活性自由基开始寻找底物分子碰撞，反应进入了哪个阶段？',
-      equation: '思考：均裂生成的活性溴自由基，首先在体系中向哪种底物分子靠拢？',
-      breakBond: '思考：注意观察微粒距离，此时主要发生空间相对位移，化学键是否已经发生断裂？',
-      formBond: '思考：此时仅处于碰撞取向准备阶段，是否已经形成了新化学键？',
+      phase: 'Hint: The reactive radical generated in initiation starts approaching a substrate molecule. Which stage has the reaction entered?',
+      equation: 'Hint: Which substrate molecule does the reactive bromine radical approach first?',
+      breakBond: 'Hint: Notice the interatomic distance—only spatial alignment is happening here. Has any bond broken yet?',
+      formBond: 'Hint: The particles are only aligning for collision. Has any new covalent bond formed yet?',
     },
     summary:
-      '高活性的溴自由基（Br·）向甲烷（CH₄）分子的一个 C—H 键方向靠近，形成有效碰撞取向。',
+      'A highly reactive bromine radical (Br·) approaches one of the C—H bonds of methane (CH₄) in an effective collision orientation.',
   },
   {
     index: 3,
-    title: '碰撞反应 ①',
+    title: 'Collision ①',
     isObservation: false,
-    phase: '链增长 ①',
-    phaseOptions: ['引发', '链增长 ①', '链增长 ②', '净反应总结'],
-    fieldLabel: '微粒变化与反应式',
+    phase: 'Propagation ①',
+    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Net Summary'],
+    fieldLabel: 'Species Change & Equation',
     equation: 'Br· + CH₄ → CH₃· + HBr',
     equationOptions: [
       'Br· + CH₄ → CH₃· + HBr',
@@ -111,51 +111,51 @@ export const STEPS_DATA: DeductionStepData[] = [
       'CH₄ + Br₂ → CH₃Br + HBr',
     ],
     breakBond: 'C—H',
-    breakBondOptions: ['无', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
+    breakBondOptions: ['None', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
     formBond: 'H—Br',
-    formBondOptions: ['无', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
+    formBondOptions: ['None', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
     hints: {
-      phase: '思考：本步骤仍属于消耗一种自由基、生成另一种自由基的链循环阶段，是哪一步？',
-      equation: '思考：高活性溴自由基从烷烃中夺取了什么原子？留下了什么含碳中间体？',
-      breakBond: '思考：甲烷分子中哪一个共价键被均裂，使氢原子被夺走？',
-      formBond: '思考：被夺走的氢原子与溴微粒结合生成了什么共价键？',
+      phase: 'Hint: This step consumes one radical and generates a new carbon radical in the first propagation step.',
+      equation: 'Hint: What atom does the bromine radical abstract from methane, and what carbon intermediate remains?',
+      breakBond: 'Hint: Which covalent bond in methane undergoes homolysis as the hydrogen atom is abstracted?',
+      formBond: 'Hint: What new covalent bond forms when the abstracted hydrogen combines with the bromine radical?',
     },
-    summary: 'C—H 键断裂，生成 H—Br 键；留下的甲基自由基变为平面三角形构型（CH₃·）。',
+    summary: 'The C—H bond breaks and an H—Br bond forms; the remaining methyl radical adopts a trigonal planar geometry (CH₃·).',
   },
   {
     index: 4,
-    title: '接近另一分子 Br₂',
+    title: 'Approach Br₂',
     isObservation: false,
-    phase: '链增长 ②',
-    phaseOptions: ['引发', '链增长 ①', '链增长 ②', '净反应总结'],
-    fieldLabel: '反应微粒动态',
-    equation: 'CH₃· 与 Br₂ 相互接近',
+    phase: 'Propagation ②',
+    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Net Summary'],
+    fieldLabel: 'Particle Dynamics',
+    equation: 'CH₃· approaches Br₂',
     equationOptions: [
-      'CH₃· 与 Br₂ 相互接近',
-      'CH₃· 与 CH₃· 相互结合',
-      'CH₃· 与 HBr 相互碰撞',
-      'Br· 与 Br· 相互结合',
+      'CH₃· approaches Br₂',
+      'CH₃· combines with CH₃·',
+      'CH₃· collides with HBr',
+      'Br· combines with Br·',
     ],
-    breakBond: '无',
-    breakBondOptions: ['无', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
-    formBond: '无',
-    formBondOptions: ['无', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
+    breakBond: 'None',
+    breakBondOptions: ['None', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
+    formBond: 'None',
+    formBondOptions: ['None', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
     hints: {
-      phase: '思考：甲基自由基进入第二轮链反应，这属于哪个阶段？',
-      equation: '思考：活泼的甲基自由基在体系中将向哪种反应物分子靠拢并准备夺取原子？',
-      breakBond: '思考：空间距离调整与接近过程中，化学键是否已经断裂？',
-      formBond: '思考：微粒尚未接触反应前，是否有新化学键形成？',
+      phase: 'Hint: The methyl radical enters the second propagation step of the chain cycle.',
+      equation: 'Hint: Which reactant molecule does the reactive methyl radical approach to abstract a halogen atom?',
+      breakBond: 'Hint: During spatial approach prior to collision, has any covalent bond broken yet?',
+      formBond: 'Hint: Before the reactive collision occurs, has any new covalent bond formed?',
     },
     summary:
-      '甲基自由基（CH₃·）向体系中另一分子溴单质（Br₂）靠拢，准备夺取其中的一个溴原子。',
+      'The methyl radical (CH₃·) approaches another bromine molecule (Br₂) in the system, preparing to abstract a bromine atom.',
   },
   {
     index: 5,
-    title: '碰撞反应 ②',
+    title: 'Collision ②',
     isObservation: false,
-    phase: '链增长 ②',
-    phaseOptions: ['引发', '链增长 ①', '链增长 ②', '净反应总结'],
-    fieldLabel: '微粒变化与反应式',
+    phase: 'Propagation ②',
+    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Net Summary'],
+    fieldLabel: 'Species Change & Equation',
     equation: 'CH₃· + Br₂ → CH₃Br + Br·',
     equationOptions: [
       'CH₃· + Br₂ → CH₃Br + Br·',
@@ -164,26 +164,26 @@ export const STEPS_DATA: DeductionStepData[] = [
       'CH₄ + Br₂ → CH₃Br + HBr',
     ],
     breakBond: 'Br—Br',
-    breakBondOptions: ['无', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
+    breakBondOptions: ['None', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
     formBond: 'C—Br',
-    formBondOptions: ['无', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
+    formBondOptions: ['None', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
     hints: {
-      phase: '思考：这是产生一溴甲烷目标产物并再生催化活性自由基的循环步，属于哪个阶段？',
+      phase: 'Hint: This step produces bromomethane and regenerates a bromine radical to sustain the chain cycle.',
       equation:
-        '思考：甲基自由基与溴单质反应后，除了生成一溴甲烷，还会再生出什么活性自由基延续链反应？',
-      breakBond: '思考：甲基自由基进攻溴单质分子时，哪一个共价键发生了均裂？',
-      formBond: '思考：碳原子与新结合的溴原子之间形成了什么新化学键？',
+        'Hint: When the methyl radical reacts with bromine, in addition to bromomethane, what radical is regenerated?',
+      breakBond: 'Hint: When the methyl radical attacks the bromine molecule, which covalent bond cleaves?',
+      formBond: 'Hint: What new covalent bond forms between the carbon atom and the newly attached bromine atom?',
     },
     summary:
-      'Br—Br 键均裂，生成 C—Br 键；得到一溴甲烷（CH₃Br），并重新释放出 1 个 Br·，让链反应循环继续！',
+      'The Br—Br bond cleaves and a C—Br bond forms, yielding bromomethane (CH₃Br) and regenerating a Br· radical so the chain cycle continues!',
   },
   {
     index: 6,
-    title: '产物总结',
+    title: 'Net Summary',
     isObservation: false,
-    phase: '净反应总结',
-    phaseOptions: ['引发', '链增长 ①', '链增长 ②', '净反应总结'],
-    fieldLabel: '总反应方程式',
+    phase: 'Net Summary',
+    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Net Summary'],
+    fieldLabel: 'Overall Reaction Equation',
     equation: 'CH₄ + Br₂ → CH₃Br + HBr',
     equationOptions: [
       'CH₄ + Br₂ → CH₃Br + HBr',
@@ -191,18 +191,18 @@ export const STEPS_DATA: DeductionStepData[] = [
       '2 CH₃· → CH₃—CH₃',
       'Br· + Br· → Br₂',
     ],
-    breakBond: 'C—H、Br—Br',
-    breakBondOptions: ['无', 'Br—Br', 'C—H', 'C—H、Br—Br', 'C—Br、H—Br'],
-    formBond: 'C—Br、H—Br',
-    formBondOptions: ['无', 'Br—Br', 'C—H', 'C—H、Br—Br', 'C—Br、H—Br'],
+    breakBond: 'C—H, Br—Br',
+    breakBondOptions: ['None', 'Br—Br', 'C—H', 'C—H, Br—Br', 'C—Br, H—Br'],
+    formBond: 'C—Br, H—Br',
+    formBondOptions: ['None', 'Br—Br', 'C—H', 'C—H, Br—Br', 'C—Br, H—Br'],
     hints: {
-      phase: '思考：纵观整个自由基取代过程，此时对全过程的物料变化进行归纳，属于什么阶段？',
-      equation: '思考：将链增长两步反应相加（消去中间自由基），得到一溴代反应的总化学方程式是什么？',
-      breakBond: '思考：从始态物料到终态产物，总共发生了哪些共价键的实质断裂？',
-      formBond: '思考：最终产物一溴甲烷和溴化氢中，分别新生成了什么共价键？',
+      phase: 'Hint: Reviewing the overall material transformation across the entire substitution process corresponds to which stage?',
+      equation: 'Hint: Adding the two propagation steps together (canceling radical intermediates) gives what overall equation?',
+      breakBond: 'Hint: From initial reactants to final products, which covalent bonds are net broken?',
+      formBond: 'Hint: In the final products bromomethane and hydrogen bromide, which covalent bonds are newly formed?',
     },
     summary:
-      '甲烷与溴单质发生自由基取代反应的净反应为 CH₄ + Br₂ → CH₃Br + HBr，实质断裂 C—H 键与 Br—Br 键，生成 C—Br 键与 H—Br 键。',
+      'The net radical substitution reaction between methane and bromine is CH₄ + Br₂ → CH₃Br + HBr, breaking C—H and Br—Br bonds and forming C—Br and H—Br bonds.',
   },
 ];
 
@@ -222,13 +222,13 @@ export function verify(
 } {
   const step = STEPS_DATA[stepIndex];
   if (!step) {
-    return { ok: false, hint: '步骤不存在。' };
+    return { ok: false, hint: 'Step does not exist.' };
   }
   if (step.isObservation) {
     return { ok: true, summary: step.summary };
   }
   if (!submission) {
-    return { ok: false, hint: '请先完成推演选项填写。' };
+    return { ok: false, hint: 'Please complete all deduction fields first.' };
   }
   if (submission.phase !== step.phase) {
     return { ok: false, errorField: 'phase', hint: step.hints!.phase };
@@ -248,34 +248,34 @@ export function verify(
 export const PIPELINE_STEPS: PipelineStepDef[] = [
   {
     id: 'initiation',
-    phaseName: '阶段一：链引发',
-    condition: 'hν 光照',
-    summary: '溴单质受光照激发，Br—Br 键均裂产生 2 个活性溴自由基',
+    phaseName: 'Stage 1: Chain Initiation',
+    condition: 'hν UV Light',
+    summary: 'Bromine absorbs light energy and undergoes homolytic Br—Br cleavage to produce 2 reactive bromine radicals',
     expectedReactants: ['Br2'],
     expectedProducts: ['Br', 'Br'],
   },
   {
     id: 'propagation1',
-    phaseName: '阶段二：链增长 ①（夺氢反应）',
-    condition: '碰撞取向',
-    summary: '高活性溴自由基夺取甲烷中的 H 原子，生成甲基自由基与溴化氢',
+    phaseName: 'Stage 2: Propagation ① (H-Abstraction)',
+    condition: 'Collision Alignment',
+    summary: 'A reactive bromine radical abstracts a hydrogen atom from methane to form a methyl radical and HBr',
     expectedReactants: ['CH4', 'Br'],
     expectedProducts: ['CH3', 'HBr'],
   },
   {
     id: 'propagation2',
-    phaseName: '阶段三：链增长 ②（成键与再生）',
-    condition: '碰撞取向',
-    summary: '甲基自由基进攻另一分子溴单质，生成一溴甲烷产物并再生溴自由基继续引发循环',
+    phaseName: 'Stage 3: Propagation ② (Halogen Transfer)',
+    condition: 'Collision Alignment',
+    summary: 'The methyl radical attacks another bromine molecule, forming bromomethane and regenerating a bromine radical',
     expectedReactants: ['CH3', 'Br2'],
     expectedProducts: ['CH3Br', 'Br'],
   },
   {
     id: 'termination',
-    phaseName: '阶段四：链终止',
-    condition: '自由基成键',
+    phaseName: 'Stage 4: Chain Termination',
+    condition: 'Radical Coupling',
     summary:
-      '体系中的活性自由基两两结合形成稳定共价键，自由基消失，链反应终止（请拼出全部 3 种结合方式）',
+      'Reactive radicals combine pairwise to form stable covalent bonds, terminating the chain reaction (assemble all 3 coupling pathways)',
     isMultiReaction: true,
     expectedReactions: [
       { reactants: ['Br', 'Br'], products: ['Br2'] },
@@ -301,7 +301,7 @@ function verifyTerminationStage(step: PipelineStepDef, stageData: any) {
     return {
       ok: false,
       empty: true,
-      hint: `「${step.phaseName}」共有 3 种自由基结合方式，请补充完整。`,
+      hint: `"${step.phaseName}" has 3 radical coupling pathways. Please complete all of them.`,
     };
   }
 
@@ -317,14 +317,14 @@ function verifyTerminationStage(step: PipelineStepDef, stageData: any) {
       return {
         ok: false,
         empty: i === 0,
-        hint: `「${step.phaseName}」第 ${rowNum} 条反应尚未放置任何反应物，请从微粒池拖入自由基。`,
+        hint: `Pathway #${rowNum} in "${step.phaseName}" has no reactants yet. Drag radicals from the pool above.`,
       };
     }
     if (pList.length === 0) {
       return {
         ok: false,
         empty: false,
-        hint: `「${step.phaseName}」第 ${rowNum} 条反应尚未放置生成物，请拖入成键后的稳定分子。`,
+        hint: `Pathway #${rowNum} in "${step.phaseName}" has no products yet. Drag the coupled stable molecule.`,
       };
     }
 
@@ -333,7 +333,7 @@ function verifyTerminationStage(step: PipelineStepDef, stageData: any) {
       return {
         ok: false,
         empty: false,
-        hint: `思考【链终止 · 第 ${rowNum} 条反应物】：链终止是由两个带有未成对电子（·）的活性自由基相互碰撞结合的过程，请检查第 ${rowNum} 条反应的反应物种类与个数。`,
+        hint: `Hint [Chain Termination · Pathway #${rowNum} Reactants]: Chain termination is the coupling of two reactive radicals carrying unpaired electrons (·). Check the reactant types and count.`,
       };
     }
 
@@ -342,7 +342,7 @@ function verifyTerminationStage(step: PipelineStepDef, stageData: any) {
       return {
         ok: false,
         empty: false,
-        hint: `思考【链终止 · 第 ${rowNum} 条反应物】：请检查放入的两个自由基组合是否合理。`,
+        hint: `Hint [Chain Termination · Pathway #${rowNum} Reactants]: Please check whether the two radicals placed are valid.`,
       };
     }
 
@@ -350,7 +350,7 @@ function verifyTerminationStage(step: PipelineStepDef, stageData: any) {
       return {
         ok: false,
         empty: false,
-        hint: `思考【链终止 · 第 ${rowNum} 条生成物】：当这两个自由基的孤电子配对成键时，根据元素与原子个数守恒，应当结合成哪一个稳定分子？`,
+        hint: `Hint [Chain Termination · Pathway #${rowNum} Products]: By conservation of atoms, which stable molecule forms when these two radicals pair their unpaired electrons?`,
       };
     }
 
@@ -358,13 +358,13 @@ function verifyTerminationStage(step: PipelineStepDef, stageData: any) {
       return {
         ok: false,
         empty: false,
-        hint: `思考【链终止 · 第 ${rowNum} 条反应】：该反应与上方已拼装的反应重复了！体系中有 Br· 和 CH₃· 两种自由基，请写出它们两两结合的全部 3 种不同组合。`,
+        hint: `Hint [Chain Termination · Pathway #${rowNum}]: Duplicate reaction pathway! With Br· and CH₃· in the system, assemble all 3 distinct pairwise combinations.`,
       };
     }
     matchedIndices.add(expIdx);
   }
 
-  return { ok: true, message: `「${step.phaseName}」全部 3 条反应装配正确！` };
+  return { ok: true, message: `All 3 pathways in "${step.phaseName}" assembled correctly!` };
 }
 
 export function verifyStage(
@@ -372,7 +372,7 @@ export function verifyStage(
   stageData: any
 ): { ok: boolean; empty?: boolean; hint?: string; message?: string } {
   const step = PIPELINE_STEPS.find((s) => s.id === stageId);
-  if (!step) return { ok: false, hint: '未知反应阶段' };
+  if (!step) return { ok: false, hint: 'Unknown reaction stage' };
 
   if (step.id === 'termination') {
     return verifyTerminationStage(step, stageData);
@@ -385,14 +385,14 @@ export function verifyStage(
     return {
       ok: false,
       empty: true,
-      hint: `「${step.phaseName}」尚未放置任何反应物，请从上方微粒池拖入参与反应的分子。`,
+      hint: `"${step.phaseName}" has no reactants placed yet. Drag participating species from the pool above.`,
     };
   }
   if (products.length === 0) {
     return {
       ok: false,
       empty: false,
-      hint: `「${step.phaseName}」尚未放置任何生成物，请拖入反应生成的微粒。`,
+      hint: `"${step.phaseName}" has no products placed yet. Drag resulting species from the pool above.`,
     };
   }
 
@@ -401,14 +401,14 @@ export function verifyStage(
       return {
         ok: false,
         empty: false,
-        hint: '思考【链引发 · 反应物】：在光照激发下，体系中主要是哪种非自由基分子的化学键键能较低、最容易发生均裂？注意检查参与反应的分子种类与数量。',
+        hint: 'Hint [Initiation · Reactants]: Under UV irradiation, which non-radical molecule has the lowest bond dissociation energy and undergoes homolysis first?',
       };
     }
     if (!compareLists(products, step.expectedProducts!)) {
       return {
         ok: false,
         empty: false,
-        hint: '思考【链引发 · 生成物】：卤素单质分子均裂后，化学键断裂平分电子；根据质量守恒与共价键特点，共生成了几个带有孤电子的什么自由基？',
+        hint: 'Hint [Initiation · Products]: After homolytic cleavage of the halogen molecule, how many radicals with unpaired electrons are produced?',
       };
     }
   } else if (step.id === 'propagation1') {
@@ -416,14 +416,14 @@ export function verifyStage(
       return {
         ok: false,
         empty: false,
-        hint: '思考【链增长 ① · 反应物】：引发出的高活性自由基开始搜寻反应底物，首先是哪种自由基与哪种烷烃分子发生碰撞？请核实放入的微粒。',
+        hint: 'Hint [Propagation ① · Reactants]: Which reactive radical generated in initiation collides with which alkane substrate molecule?',
       };
     }
     if (!compareLists(products, step.expectedProducts!)) {
       return {
         ok: false,
         empty: false,
-        hint: '思考【链增长 ① · 生成物】：烷烃失去一个氢原子后留下的自由基是什么？夺走的氢原子与反应微粒结合生成了什么产物？',
+        hint: 'Hint [Propagation ① · Products]: What radical remains after methane loses a hydrogen atom, and what molecule forms when that hydrogen combines with the bromine radical?',
       };
     }
   } else if (step.id === 'propagation2') {
@@ -431,18 +431,18 @@ export function verifyStage(
       return {
         ok: false,
         empty: false,
-        hint: '思考【链增长 ② · 反应物】：第一轮链反应留下的碳自由基非常活泼，它将在体系中与大量存在的哪种底物分子继续碰撞？',
+        hint: 'Hint [Propagation ② · Reactants]: Which abundant reactant molecule does the reactive methyl radical collide with next?',
       };
     }
     if (!compareLists(products, step.expectedProducts!)) {
       return {
         ok: false,
         empty: false,
-        hint: '思考【链增长 ② · 生成物】：这一步除了生成目标有机物外，还需产生什么活性微粒，以确保链反应可以自发循环进行下去？',
+        hint: 'Hint [Propagation ② · Products]: Besides forming the target bromomethane product, what active radical is regenerated to keep the chain cycle running?',
       };
     }
   }
-  return { ok: true, message: `「${step.phaseName}」装配正确！` };
+  return { ok: true, message: `"${step.phaseName}" assembled correctly!` };
 }
 
 export function verifyPipeline(userPipeline: any): {
@@ -452,7 +452,7 @@ export function verifyPipeline(userPipeline: any): {
   message?: string;
 } {
   if (!userPipeline || typeof userPipeline !== 'object') {
-    return { ok: false, hint: '装配插槽数据无效，请拖入微粒后重试。' };
+    return { ok: false, hint: 'Invalid pipeline slot data. Please drag species into the slots and try again.' };
   }
 
   for (let i = 0; i < PIPELINE_STEPS.length; i++) {
@@ -464,7 +464,7 @@ export function verifyPipeline(userPipeline: any): {
     }
   }
 
-  return { ok: true, message: '🎉 全链路微观反应序列装配完全正确！' };
+  return { ok: true, message: '🎉 All microscopic reaction stages assembled accurately!' };
 }
 
 export const ChemDeduction = {

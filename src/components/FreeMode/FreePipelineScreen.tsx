@@ -11,7 +11,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, ArrowRight, Edit3, Package, Plus, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Edit3, Package, Plus, RotateCcw, Trash2, X } from 'lucide-react';
 import { useFreeChemStore } from '../../store/useFreeChemStore';
 import { useChemStore } from '../../store/useChemStore';
 import type { FreeMoleculeItem } from '../../engine/freeReactionEngine';
@@ -111,7 +111,9 @@ const FreeDropZone: React.FC<FreeDropZoneProps> = ({
       <div className="dropzone-header">
         <span className="dropzone-title">{titleText}</span>
         <span className="dropzone-count">
-          {particles.length ? `共 ${particles.length} 个物质` : '空'}
+          {particles.length
+            ? `${particles.length} substance${particles.length > 1 ? 's' : ''}`
+            : 'Empty'}
         </span>
       </div>
 
@@ -126,7 +128,7 @@ const FreeDropZone: React.FC<FreeDropZoneProps> = ({
               className="dropzone-empty-prompt"
             >
               <span className="dropzone-empty-icon">＋</span>
-              <span>从上方物质池拖入或点击放入</span>
+              <span>Drag from the substance pool above or click to place</span>
             </motion.div>
           ) : (
             particles.map((molId, itemIdx) => {
@@ -135,10 +137,10 @@ const FreeDropZone: React.FC<FreeDropZoneProps> = ({
                 <motion.div
                   key={`${molId}-${itemIdx}`}
                   layout
-                  initial={{ scale: 0.75, opacity: 0 }}
+                  initial={{ scale: 0.82, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.65, opacity: 0 }}
-                  transition={{ type: 'spring', stiffness: 480, damping: 28 }}
+                  exit={{ scale: 0.7, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                   className="dropzone-particle-item"
                 >
                   <span
@@ -151,13 +153,14 @@ const FreeDropZone: React.FC<FreeDropZoneProps> = ({
                   <button
                     type="button"
                     className="particle-remove-btn"
-                    title="移除此物质"
+                    title="Remove this substance"
+                    aria-label="Remove this substance"
                     onClick={(e) => {
                       e.stopPropagation();
                       removeMolFromStageZone(stageId, role, itemIdx);
                     }}
                   >
-                    <X size={13} />
+                    <X size={14} />
                   </button>
                 </motion.div>
               );
@@ -221,8 +224,8 @@ export const FreePipelineScreen: React.FC = () => {
   return (
     <section
       id="free-pipeline-screen"
-      className="pipeline-screen"
-      aria-label="自定义反应阶段编排"
+      className="pipeline-screen has-fixed-bottom-bar"
+      aria-label="Reaction Stage Orchestration"
     >
       <DndContext
         sensors={sensors}
@@ -233,47 +236,40 @@ export const FreePipelineScreen: React.FC = () => {
           <div className="pipeline-header">
             <div>
               <span className="small-label">STEP 2 / 3 · STAGE ORCHESTRATION</span>
-              <h2>编排反应阶段</h2>
+              <h2>Orchestrate Reaction Stages</h2>
               <p className="pipeline-subtitle">
-                自由增减反应阶段并命名，为每个阶段指定反应前与反应后的化学物质。
+                Add, rename, or remove reaction stages freely, and assign reactants and products for each stage.
               </p>
             </div>
             <div className="pipeline-header-actions">
               <button
                 type="button"
-                className="primary-button top-action-btn"
-                onClick={() => addStage()}
-              >
-                <Plus size={16} />
-                <span>新增阶段</span>
-              </button>
-              <button
-                type="button"
-                className="text-button top-action-btn"
+                className="toolbar-icon-btn"
+                title="Clear current stage reactants & products"
+                aria-label="Clear current stage"
                 onClick={clearCurrentStageZones}
               >
-                <Trash2 size={16} />
-                <span>清空当前阶段</span>
+                <RotateCcw size={17} />
               </button>
             </div>
           </div>
 
-          {/* 顶部可用微粒池 */}
+          {/* Top Available Substance Pool */}
           <div className="molecule-pool-card">
             <div className="pool-title">
               <span>
                 <Package
-                  size={17}
-                  style={{ display: 'inline', verticalAlign: '-3px', marginRight: 6 }}
+                  size={18}
+                  style={{ display: 'inline', verticalAlign: '-3px', marginRight: 7 }}
                 />
-                已构建的化学物质池
+                Available Chemical Substance Pool
               </span>
-              <small>拖拽或点击化学物质放入下方「反应前」或「反应后」区域</small>
+              <small>Drag or click a substance to place it into "Reactants" or "Products" below</small>
             </div>
             <div className="molecule-chips">
               {molecules.length === 0 ? (
                 <div className="pool-empty-hint">
-                  暂未添加化学物质，请先返回第 1 步构建或上传分子。
+                  No chemical substances yet. Please return to Step 1 to build or upload molecules.
                 </div>
               ) : (
                 molecules.map((item) => (
@@ -287,7 +283,7 @@ export const FreePipelineScreen: React.FC = () => {
                       } else {
                         setSelectedPoolMolId(item.id);
                         showToast(
-                          `已选取 ${item.mol.name} (${item.mol.formula})，点击下方「反应前」或「反应后」区域即可放入。`
+                          `Selected ${item.mol.name} (${item.mol.formula}). Click "Reactants" or "Products" below to place it.`
                         );
                       }
                     }}
@@ -297,33 +293,35 @@ export const FreePipelineScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* 动态阶段 Tab 栏（支持点击切换、新增阶段） */}
-          <div className="pipeline-tabs-nav free-tabs-nav" role="tablist">
-            {stages.map((st, idx) => (
-              <button
-                key={st.id}
-                type="button"
-                role="tab"
-                aria-selected={idx === activeStageTab}
-                className="pipeline-tab-btn"
-                onClick={() => setActiveStageTab(idx)}
-              >
-                <span className="tab-badge">{idx + 1}</span>
-                <span>{st.name || `阶段 ${idx + 1}`}</span>
-              </button>
-            ))}
+          {/* Stage Selector Bar (Segmented Pills + Clean Add Stage Button) */}
+          <div className="stage-bar-header">
+            <div className="stage-pills-track" role="tablist" aria-label="Reaction Stages">
+              {stages.map((st, idx) => (
+                <button
+                  key={st.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={idx === activeStageTab}
+                  className={`stage-pill-tab ${idx === activeStageTab ? 'active' : ''}`}
+                  onClick={() => setActiveStageTab(idx)}
+                >
+                  <span className="tab-badge">{idx + 1}</span>
+                  <span>{st.name || `Stage ${idx + 1}`}</span>
+                </button>
+              ))}
+            </div>
             <button
               type="button"
-              className="pipeline-tab-add-btn"
+              className="stage-add-pill-btn"
               onClick={() => addStage()}
-              title="新增一个反应阶段"
+              title="Add a new reaction stage"
             >
-              <Plus size={15} />
-              <span>新增阶段</span>
+              <Plus size={16} />
+              <span>Add Stage</span>
             </button>
           </div>
 
-          {/* 当前选中阶段的编辑区：阶段名称输入框 + [反应前] ➔ [反应后]（无多余描述与条件） */}
+          {/* Active Stage Editor: Stage Name + [Reactants] ➔ [Products] */}
           {currentStage && (
             <div className="pipeline-active-stage">
               <motion.div
@@ -335,37 +333,39 @@ export const FreePipelineScreen: React.FC = () => {
               >
                 <div className="track-header free-track-header">
                   <div className="stage-name-editor">
-                    <Edit3 size={15} className="stage-name-icon" />
+                    <Edit3 size={16} className="stage-name-icon" />
                     <label htmlFor="free-stage-name-input" className="stage-name-label">
-                      阶段名称：
+                      Stage Name:
                     </label>
                     <input
                       id="free-stage-name-input"
                       type="text"
                       className="stage-name-input"
                       value={currentStage.name}
-                      placeholder="输入阶段名称…"
+                      placeholder="Enter stage name…"
                       onChange={(e) => renameStage(currentStage.id, e.target.value)}
                     />
                   </div>
                   {stages.length > 1 && (
                     <button
                       type="button"
-                      className="text-button danger-text-btn"
+                      className="stage-delete-btn"
+                      title="Delete stage"
+                      aria-label="Delete stage"
                       onClick={() => removeStage(currentStage.id)}
                     >
-                      <Trash2 size={14} />
-                      <span>删除此阶段</span>
+                      <Trash2 size={15} />
+                      <span>Delete</span>
                     </button>
                   )}
                 </div>
 
-                {/* 纯净的 [反应前物质] ➔ [反应后物质] 结构 */}
+                {/* Clean [Reactants] ➔ [Products] Layout */}
                 <div className="track-flow">
                   <FreeDropZone
                     stageId={currentStage.id}
                     role="reactants"
-                    titleText="反应前化学物质"
+                    titleText="Reactants (Before Reaction)"
                     particles={currentStage.reactants}
                     moleculesMap={moleculesMap}
                   />
@@ -377,7 +377,7 @@ export const FreePipelineScreen: React.FC = () => {
                   <FreeDropZone
                     stageId={currentStage.id}
                     role="products"
-                    titleText="反应后化学物质"
+                    titleText="Products (After Reaction)"
                     particles={currentStage.products}
                     moleculesMap={moleculesMap}
                   />
@@ -385,34 +385,37 @@ export const FreePipelineScreen: React.FC = () => {
               </motion.div>
             </div>
           )}
+        </div>
 
-          {/* 底部流转控制栏 */}
-          <div className="pipeline-footer">
-            <div className="pipeline-footer-left">
+        {/* Full-Width Fixed Bottom Step Bar */}
+        <div className="fixed-bottom-bar">
+          <div className="fixed-bottom-bar-inner">
+            <div className="fixed-bottom-left">
               <button
                 type="button"
-                className="text-button footer-back-btn"
+                className="toolbar-btn-outline"
                 onClick={() => setScreen('gate')}
               >
-                <ArrowLeft size={16} />
-                <span>上一步：分子结构构建</span>
+                <ArrowLeft size={17} />
+                <span>Previous</span>
               </button>
             </div>
-            <div className="pipeline-footer-right">
+            <div className="fixed-bottom-right">
               <button
                 id="free-enter-stage-btn"
                 type="button"
                 className="primary-button enter-stage-btn"
                 onClick={enterStage}
               >
-                <span>下一步：生成三维反应动画</span>
+                <span>Next</span>
                 <ArrowRight size={18} />
               </button>
             </div>
           </div>
         </div>
 
-        <DragOverlay>
+        {/* Disable dropAnimation so the dragged chip does NOT fly back to the pool on release */}
+        <DragOverlay dropAnimation={null}>
           {activeDragItem ? (
             <div
               className="mol-chip selected-for-place"

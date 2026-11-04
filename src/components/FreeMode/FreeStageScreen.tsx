@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { ChevronDown, Play, RotateCcw, Sparkles } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { useFreeChemStore } from '../../store/useFreeChemStore';
 import {
   formatFormulaHtml,
@@ -32,7 +32,6 @@ export const FreeStageScreen: React.FC = () => {
   const triggerResetView = useFreeChemStore((s) => s.triggerResetView);
   const setProgress = useFreeChemStore((s) => s.setProgress);
   const setSpeed = useFreeChemStore((s) => s.setSpeed);
-  const setSelection = useFreeChemStore((s) => s.setSelection);
   const setScreen = useFreeChemStore((s) => s.setScreen);
 
   const stageRef = useRef<HTMLElement>(null);
@@ -67,7 +66,7 @@ export const FreeStageScreen: React.FC = () => {
         preserveDrawingBuffer: false,
       });
     } catch (e: any) {
-      setLoadError('无法初始化 WebGL 三维渲染器：' + e.message);
+      setLoadError('Failed to initialize WebGL 3D renderer: ' + e.message);
       return;
     }
 
@@ -442,13 +441,13 @@ export const FreeStageScreen: React.FC = () => {
   if (!currentStage) {
     return (
       <div className="free-stage-empty">
-        <p>暂未配置反应阶段，请返回第 2 步添加阶段与反应物质。</p>
+        <p>No reaction stages configured yet. Please return to Step 2 to add stages and substances.</p>
         <button
           type="button"
           className="primary-button"
           onClick={() => setScreen('pipeline')}
         >
-          返回反应阶段编排
+          Back to Stage Orchestration
         </button>
       </div>
     );
@@ -461,202 +460,287 @@ export const FreeStageScreen: React.FC = () => {
   ];
 
   let playIcon = '▶';
-  let playText = '播放动画';
+  let playText = 'Play';
   if (playing) {
     playIcon = 'Ⅱ';
-    playText = '暂停';
+    playText = 'Pause';
   } else if (progress >= 1) {
     playIcon = '↻';
-    playText = '重新播放';
+    playText = 'Replay';
   } else if (progress > 0) {
     playIcon = '▶';
-    playText = '继续播放';
+    playText = 'Resume';
   }
 
   const phaseHintText =
     progress < 0.35
-      ? '反应前物质相互靠近…'
+      ? 'Reactants approaching…'
       : progress < 0.68
-      ? '化学键断裂与重组过渡中…'
+      ? 'Bonds breaking & reforming…'
       : progress < 1
-      ? '生成物分子分离定型中…'
-      : '当前阶段反应完成';
+      ? 'Products separating…'
+      : 'Stage complete';
 
   return (
-    <div className="app-layout" id="free-main-stage">
-      {/* 左侧自定义阶段列表（全部直接解锁可点） */}
-      <aside className="sidebar" aria-label="自定义反应阶段">
-        <div className="sidebar-heading">
-          <span>反应阶段 ({compiledStages.length})</span>
-          <button
-            type="button"
-            className="text-button sidebar-return-btn"
-            onClick={() => setScreen('pipeline')}
+    <div className="stage-screen-shell">
+      <div className="app-layout has-fixed-bottom-bar-stage" id="free-main-stage">
+        {/* Left Sidebar: Custom Reaction Stages (no redundant back button here) */}
+        <aside className="sidebar" aria-label="Reaction Stages">
+          <div className="sidebar-heading">
+            <span>Reaction Stages ({compiledStages.length})</span>
+          </div>
+          <nav id="free-steps" aria-label="Select Reaction Stage">
+            {compiledStages.map((st, i) => (
+              <button
+                key={st.stageId}
+                type="button"
+                className="step-button solved"
+                aria-current={i === stageIndex ? 'step' : undefined}
+                onClick={() => goStage(i, true)}
+              >
+                <span className="step-num mono">{String(i + 1).padStart(2, '0')}</span>
+                <span className="step-text">
+                  <span className="step-name">{st.name}</span>
+                </span>
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        {/* Center 3D Reaction Stage */}
+        <main className="workspace">
+          <section className="step-heading" aria-live="polite" aria-atomic="true">
+            <h2>{currentStage.name}</h2>
+            <p
+              dangerouslySetInnerHTML={{
+                __html: formatFormulaHtml(currentStage.equationText),
+              }}
+            />
+          </section>
+
+          <section
+            className="stage"
+            ref={stageRef}
+            aria-label="Interactive 3D Reaction Stage"
           >
-            ‹ 返回编排
-          </button>
-        </div>
-        <nav id="free-steps" aria-label="选择展示阶段">
-          {compiledStages.map((st, i) => (
-            <button
-              key={st.stageId}
-              type="button"
-              className="step-button solved"
-              aria-current={i === stageIndex ? 'step' : undefined}
-              onClick={() => goStage(i, true)}
-            >
-              <span className="step-num mono">{String(i + 1).padStart(2, '0')}</span>
-              <span className="step-text">
-                <span className="step-name">{st.name}</span>
+            <div
+              id="free-viewport"
+              ref={viewportRef}
+              tabIndex={0}
+              role="img"
+              aria-label={`${currentStage.name} 3D Reaction Model`}
+            />
+            <div id="labels" ref={labelsRef} aria-hidden="true" />
+
+            <div className="stage-tools">
+              <button
+                type="button"
+                className="stage-icon-btn"
+                title="Reset camera view"
+                aria-label="Reset camera view"
+                onClick={triggerResetView}
+              >
+                <RotateCcw size={16} />
+              </button>
+            </div>
+
+            <div className="stage-legend">
+              {uniqueElements.map((el) => (
+                <span key={el}>
+                  <i
+                    className="element-dot"
+                    style={{
+                      background: getElementColorHex(el),
+                      border: el === 'H' ? '1.5px solid #94a3b8' : undefined,
+                    }}
+                  />
+                  {el}
+                </span>
+              ))}
+              <span className="radical-legend">
+                <b>·</b> Unpaired Electron
               </span>
-            </button>
-          ))}
-        </nav>
-      </aside>
+            </div>
 
-      {/* 中央三维反应舞台 */}
-      <main className="workspace">
-        <section className="step-heading" aria-live="polite" aria-atomic="true">
-          <h2>{currentStage.name}</h2>
-          <p
-            dangerouslySetInnerHTML={{
-              __html: formatFormulaHtml(currentStage.equationText),
-            }}
-          />
-        </section>
+            <div className="stage-hint">Drag to rotate · Scroll to zoom</div>
 
-        <section
-          className="stage"
-          ref={stageRef}
-          aria-label="可旋转的三维反应模型"
-        >
-          <div
-            id="free-viewport"
-            ref={viewportRef}
-            tabIndex={0}
-            role="img"
-            aria-label={`${currentStage.name} 三维反应模型`}
-          />
-          <div id="labels" ref={labelsRef} aria-hidden="true" />
+            {selectedAtom && (
+              <div id="atom-detail">
+                <strong>
+                  {selectedAtom.element} · Atom {selection}
+                </strong>
+                <br />
+                <span>
+                  Coordinates ({selectedAtom.position.map((n) => n.toFixed(3)).join(', ')}) Å
+                </span>
+                <br />
+                <span>
+                  {selectedAtom.radical > 0.5 ? 'Unpaired Electron (Radical)' : 'Closed-Shell Bonded State'}
+                </span>
+              </div>
+            )}
 
-          <div className="stage-tools">
-            <button
-              type="button"
-              className="quiet-button"
-              onClick={triggerResetView}
-            >
-              复位视角 <span aria-hidden="true">⤾</span>
-            </button>
+            {loadError && (
+              <div className="load-error" role="alert">
+                {loadError}
+              </div>
+            )}
+          </section>
+        </main>
+
+        {/* Right Summary Panel: Stage Analysis & Bond Changes (no Stage X/Y badge, no duplicate replay button) */}
+        <aside className="panel-sidebar" aria-label="Stage 3D Summary">
+          <div className="panel-header">
+            <div className="panel-title-wrap">
+              <span className="small-label">STAGE SUMMARY</span>
+              <h3>Stage Analysis & Bond Changes</h3>
+            </div>
           </div>
 
-          <div className="stage-legend">
-            {uniqueElements.map((el) => (
-              <span key={el}>
-                <i
-                  className="element-dot"
-                  style={{
-                    background: getElementColorHex(el),
-                    border: el === 'H' ? '1.5px solid #94a3b8' : undefined,
+          <section className="explanation">
+            <div className="deduction-card free-summary-card">
+              {/* 1. Stage Reaction Equation */}
+              <div className="free-summary-section">
+                <span className="free-summary-label">Stage Reaction Equation</span>
+                <div
+                  className="free-equation-box"
+                  dangerouslySetInnerHTML={{
+                    __html: formatFormulaHtml(currentStage.equationText),
                   }}
                 />
-                {el}
-              </span>
-            ))}
-            <span className="radical-legend">
-              <b>·</b> 未成对电子
-            </span>
-          </div>
+              </div>
 
-          <div className="stage-hint">拖动旋转 · 滚轮缩放</div>
+              {/* 2. Broken & Formed Covalent Bonds */}
+              <div className="free-bond-stats-grid">
+                <div className="free-bond-stat-box broken">
+                  <span className="stat-title">Broken Covalent Bonds</span>
+                  <strong>
+                    {currentStage.brokenBondLabels.length > 0
+                      ? currentStage.brokenBondLabels.join(', ')
+                      : 'None'}
+                  </strong>
+                </div>
+                <div className="free-bond-stat-box formed">
+                  <span className="stat-title">Formed Covalent Bonds</span>
+                  <strong>
+                    {currentStage.formedBondLabels.length > 0
+                      ? currentStage.formedBondLabels.join(', ')
+                      : 'None'}
+                  </strong>
+                </div>
+              </div>
 
-          {selectedAtom && (
-            <div id="atom-detail">
-              <strong>
-                {selectedAtom.element} · 原子 {selection}
-              </strong>
-              <br />
-              <span>
-                场景坐标 ({selectedAtom.position.map((n) => n.toFixed(3)).join(', ')}) Å
-              </span>
-              <br />
-              <span>
-                {selectedAtom.radical > 0.5 ? '含未成对电子 (自由基)' : '闭壳层成键状态'}
-              </span>
+              {/* 3. Reactants List */}
+              <div className="free-summary-section">
+                <span className="free-summary-label">
+                  Reactants ({currentStage.reactantMols.length})
+                </span>
+                <div className="free-mol-mini-list">
+                  {currentStage.reactantMols.map((m, idx) => (
+                    <div key={`${m.id}-${idx}`} className="free-mol-mini-item">
+                      <strong
+                        dangerouslySetInnerHTML={{
+                          __html: formatFormulaHtml(m.formula),
+                        }}
+                      />
+                      <span>{m.name}</span>
+                      <small>{m.geometry}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 4. Products List */}
+              <div className="free-summary-section">
+                <span className="free-summary-label">
+                  Products ({currentStage.productMols.length})
+                </span>
+                <div className="free-mol-mini-list">
+                  {currentStage.productMols.map((m, idx) => (
+                    <div key={`${m.id}-${idx}`} className="free-mol-mini-item">
+                      <strong
+                        dangerouslySetInnerHTML={{
+                          __html: formatFormulaHtml(m.formula),
+                        }}
+                      />
+                      <span>{m.name}</span>
+                      <small>{m.geometry}</small>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          )}
+          </section>
+        </aside>
+      </div>
 
-          {loadError && (
-            <div className="load-error" role="alert">
-              {loadError}
-            </div>
-          )}
-        </section>
-
-        {/* 底部播放控制条 */}
-        <footer className="playback">
-          <div className="transport">
+      {/* Unified Full-Width Fixed Bottom Bar (Matches Step 1 & Step 2 height & layout) */}
+      <footer className="fixed-bottom-bar stage-fixed-footer" aria-label="Stage Playback & Navigation">
+        <div className="fixed-bottom-bar-inner stage-bottom-bar-inner">
+          <div className="fixed-bottom-left">
             <button
               type="button"
-              className="text-button footer-back-btn stage-back-btn"
+              className="toolbar-btn-outline"
               onClick={() => setScreen('pipeline')}
             >
-              ‹ 阶段编排
-            </button>
-            <button
-              type="button"
-              className="icon-button transport-side"
-              aria-label="上一阶段"
-              disabled={stageIndex === 0}
-              onClick={() => goStage(stageIndex - 1, true)}
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              className="primary-button"
-              onClick={play}
-            >
-              <span aria-hidden="true">{playIcon}</span>
-              <span>{playText}</span>
-            </button>
-            <button
-              type="button"
-              className="icon-button transport-side"
-              aria-label="下一阶段"
-              disabled={stageIndex >= compiledStages.length - 1}
-              onClick={() => goStage(stageIndex + 1, true)}
-            >
-              ›
-            </button>
-            <button
-              type="button"
-              className="text-button replay-button"
-              onClick={() => goStage(stageIndex, true)}
-            >
-              ↻ <span>重播本阶段</span>
+              <ArrowLeft size={17} />
+              <span>Previous</span>
             </button>
           </div>
 
-          <div className="scrub-row">
-            <span id="animation-status">{phaseHintText}</span>
-            <input
-              type="range"
-              min="0"
-              max="1000"
-              value={Math.round(progress * 1000)}
-              aria-label="当前阶段动画进度"
-              onChange={(e) => setProgress(Number(e.target.value) / 1000, true)}
-            />
-            <span className="mono">{Math.round(progress * 100)}%</span>
+          <div className="stage-bottom-center">
+            <div className="transport">
+              <button
+                type="button"
+                className="icon-button transport-side"
+                title="Previous Stage"
+                aria-label="Previous Stage"
+                disabled={stageIndex === 0}
+                onClick={() => goStage(stageIndex - 1, true)}
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                type="button"
+                className="primary-button stage-play-btn"
+                onClick={play}
+              >
+                <span aria-hidden="true">{playIcon}</span>
+                <span>{playText}</span>
+              </button>
+              <button
+                type="button"
+                className="icon-button transport-side"
+                title="Next Stage"
+                aria-label="Next Stage"
+                disabled={stageIndex >= compiledStages.length - 1}
+                onClick={() => goStage(stageIndex + 1, true)}
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+
+            <div className="scrub-row">
+              <span id="animation-status">{phaseHintText}</span>
+              <input
+                type="range"
+                min="0"
+                max="1000"
+                value={Math.round(progress * 1000)}
+                aria-label="Stage Animation Progress"
+                onChange={(e) => setProgress(Number(e.target.value) / 1000, true)}
+              />
+              <span className="mono">{Math.round(progress * 100)}%</span>
+            </div>
           </div>
 
-          <div className="play-options">
+          <div className="fixed-bottom-right play-options">
             <label className="speed-label">
-              <span>速度</span>
+              <span>Speed</span>
               <div className="select-wrapper speed-select-wrapper">
                 <select
                   className="speed-select"
-                  aria-label="动画速度"
+                  aria-label="Animation Speed"
                   value={String(speed)}
                   onChange={(e) => setSpeed(Number(e.target.value))}
                 >
@@ -670,113 +754,16 @@ export const FreeStageScreen: React.FC = () => {
             </label>
             <button
               type="button"
-              className="text-button"
+              className="icon-button"
+              title="Restart all stages from beginning"
+              aria-label="Restart all stages"
               onClick={restart}
             >
-              重新开始
+              <RotateCcw size={16} />
             </button>
           </div>
-        </footer>
-      </main>
-
-      {/* 右侧阶段详情与断键/成键变化摘要面板（无需答题） */}
-      <aside className="panel-sidebar" aria-label="阶段三维变化摘要">
-        <div className="panel-header">
-          <div className="panel-title-wrap">
-            <span className="small-label">STAGE SUMMARY</span>
-            <h3>阶段反应与成键分析</h3>
-          </div>
-          <span className="deduction-status-badge solved">
-            阶段 {stageIndex + 1}/{compiledStages.length}
-          </span>
         </div>
-
-        <section className="explanation">
-          {/* 1. 当前阶段方程式 */}
-          <div className="deduction-card free-summary-card">
-            <div className="free-summary-section">
-              <span className="free-summary-label">当前阶段反应式</span>
-              <div
-                className="free-equation-box"
-                dangerouslySetInnerHTML={{
-                  __html: formatFormulaHtml(currentStage.equationText),
-                }}
-              />
-            </div>
-
-            {/* 2. 断键与成键统计 */}
-            <div className="free-bond-stats-grid">
-              <div className="free-bond-stat-box broken">
-                <span className="stat-title">断裂的共价键</span>
-                <strong>
-                  {currentStage.brokenBondLabels.length > 0
-                    ? currentStage.brokenBondLabels.join('、')
-                    : '无共价键断裂'}
-                </strong>
-              </div>
-              <div className="free-bond-stat-box formed">
-                <span className="stat-title">生成的共价键</span>
-                <strong>
-                  {currentStage.formedBondLabels.length > 0
-                    ? currentStage.formedBondLabels.join('、')
-                    : '无新共价键生成'}
-                </strong>
-              </div>
-            </div>
-
-            {/* 3. 反应前物质清单 */}
-            <div className="free-summary-section">
-              <span className="free-summary-label">
-                反应前物质 ({currentStage.reactantMols.length})
-              </span>
-              <div className="free-mol-mini-list">
-                {currentStage.reactantMols.map((m, idx) => (
-                  <div key={`${m.id}-${idx}`} className="free-mol-mini-item">
-                    <strong
-                      dangerouslySetInnerHTML={{
-                        __html: formatFormulaHtml(m.formula),
-                      }}
-                    />
-                    <span>{m.name}</span>
-                    <small>{m.geometry}</small>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 4. 反应后物质清单 */}
-            <div className="free-summary-section">
-              <span className="free-summary-label">
-                反应后物质 ({currentStage.productMols.length})
-              </span>
-              <div className="free-mol-mini-list">
-                {currentStage.productMols.map((m, idx) => (
-                  <div key={`${m.id}-${idx}`} className="free-mol-mini-item">
-                    <strong
-                      dangerouslySetInnerHTML={{
-                        __html: formatFormulaHtml(m.formula),
-                      }}
-                    />
-                    <span>{m.name}</span>
-                    <small>{m.geometry}</small>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="deduction-action">
-              <button
-                type="button"
-                className="primary-button deduction-btn"
-                onClick={() => goStage(stageIndex, true)}
-              >
-                <RotateCcw size={15} />
-                <span>重播本阶段结合/分离动画</span>
-              </button>
-            </div>
-          </div>
-        </section>
-      </aside>
+      </footer>
     </div>
   );
 };

@@ -13,37 +13,37 @@ export const FreeHeader: React.FC = () => {
       <div className="identity">
         <button
           type="button"
-          className="mode-back-btn"
-          title="返回实验台模式选择首页"
+          className="header-back-arrow"
+          aria-label="Back to mode selection"
+          title="Back to mode selection"
           onClick={() => setAppMode('home')}
         >
-          <ArrowLeft size={16} />
-          <span>切换模式</span>
+          <ArrowLeft size={20} strokeWidth={2.2} />
         </button>
         <span className="mark" aria-hidden="true">
           <Atom size={22} strokeWidth={2} />
         </span>
         <div>
           <div className="identity-title-row">
-            <h1>自由化学反应实验台</h1>
+            <h1>Free Chemical Reaction Workbench</h1>
           </div>
           <p>
-            自定义分子拓扑构建 <span>/</span> 多阶段三维断键成键推演
+            Custom Molecular Topology <span>/</span> Multi-Stage 3D Reaction Simulation
           </p>
         </div>
       </div>
 
-      <nav className="header-stepper" aria-label="自由实验流程步骤">
+      <nav className="header-stepper header-stepper-right" aria-label="Experiment Steps">
         <button
           type="button"
           className={`stepper-item ${screen === 'gate' ? 'active' : 'done'}`}
           onClick={() => setScreen('gate')}
         >
           <span className="stepper-num">1</span>
-          <span className="stepper-label">分子结构构建</span>
+          <span className="stepper-label">Molecular Structure</span>
         </button>
 
-        <ChevronRight size={14} className="stepper-sep" />
+        <ChevronRight size={15} className="stepper-sep" />
 
         <button
           type="button"
@@ -53,10 +53,10 @@ export const FreeHeader: React.FC = () => {
           onClick={() => setScreen('pipeline')}
         >
           <span className="stepper-num">2</span>
-          <span className="stepper-label">反应阶段编排</span>
+          <span className="stepper-label">Reaction Stages</span>
         </button>
 
-        <ChevronRight size={14} className="stepper-sep" />
+        <ChevronRight size={15} className="stepper-sep" />
 
         <button
           type="button"
@@ -64,11 +64,9 @@ export const FreeHeader: React.FC = () => {
           onClick={() => enterStage()}
         >
           <span className="stepper-num">3</span>
-          <span className="stepper-label">三维反应动画</span>
+          <span className="stepper-label">3D Animation</span>
         </button>
       </nav>
-
-      <div style={{ width: 96 }} />
     </header>
   );
 };

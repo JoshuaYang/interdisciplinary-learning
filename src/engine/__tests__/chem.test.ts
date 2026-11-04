@@ -5,6 +5,7 @@ import * as deduction from '../deduction';
 import * as freeEngine from '../freeReactionEngine';
 import { PERIODIC_TABLE } from '../cpkPalette';
 import { CHEM_DEFAULT_FILES } from '../defaultBundle';
+import { createZipBlob } from '../zipExporter';
 
 const fullBundle = () => structuredClone(CHEM_DEFAULT_FILES);
 const assembleDefault = () => files.assemble(fullBundle());
@@ -106,25 +107,25 @@ describe('Chem Engine & Deduction Suite', () => {
     const res = deduction.verifyPipeline(dupData);
     expect(res.ok).toBe(false);
     expect(res.errorStage).toBe('termination');
-    expect(res.hint).toMatch(/重复/);
+    expect(res.hint).toMatch(/Duplicate/i);
   });
 
   it('verifies step deduction questions accurately', () => {
     expect(deduction.verify(0, {}).ok).toBe(true);
     expect(
       deduction.verify(1, {
-        phase: '引发',
+        phase: 'Initiation',
         equation: 'Br₂ → 2 Br·',
         breakBond: 'Br—Br',
-        formBond: '无',
+        formBond: 'None',
       }).ok
     ).toBe(true);
     expect(
       deduction.verify(1, {
-        phase: '链增长 ①',
+        phase: 'Propagation ①',
         equation: 'Br₂ → 2 Br·',
         breakBond: 'Br—Br',
-        formBond: '无',
+        formBond: 'None',
       }).ok
     ).toBe(false);
   });
@@ -210,5 +211,16 @@ describe('Chem Engine & Deduction Suite', () => {
     expect(Object.keys(f0.atoms).length).toBe(8);
     expect(Object.keys(fMid.atoms).length).toBe(8);
     expect(Object.keys(fEnd.atoms).length).toBe(8);
+  });
+
+  it('packs multiple JSON files into a valid ZIP archive blob', async () => {
+    const blob = createZipBlob([
+      { fileName: '01-CH4.json', content: '{"formula":"CH4"}' },
+      { fileName: '02-Br2.json', content: '{"formula":"Br2"}' },
+    ]);
+    expect(blob.type).toBe('application/zip');
+    expect(blob.size).toBeGreaterThan(100);
+    const buf = new DataView(await blob.arrayBuffer());
+    expect(buf.getUint32(0, true)).toBe(0x04034b50); // PK\x03\x04 local file header
   });
 });

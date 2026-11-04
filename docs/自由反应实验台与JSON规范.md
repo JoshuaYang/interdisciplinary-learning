@@ -1,71 +1,95 @@
-# 自由化学反应实验台与 JSON 规范说明
+# 自由化学反应实验台与 JSON 规范说明 (Free Chemical Reaction Workbench & JSON Specification)
 
-本文档说明「**自由化学反应实验台**」（模式二）的三步交互流程、118 元素周期表分子构建器使用方法、统一拓扑 JSON 格式规范以及三维反应动画的自动解算原理。
-
----
-
-## 一、 三步实验流程总览
-
-### 第 1 步：分子结构构建与管理（无数量与校验门禁限制）
-- **交互式构建新分子**：点击右上角「`+ 交互式构建分子`」（或网格末尾的「`新增化学物质`」卡片），打开分子构建工作台：
-  1. **元素周期表点选**：支持完整 **1~7 周期 + 镧系/锕系（共 118 种元素）**分类筛选及高频元素快捷栏。点击元素即可向 2D 拓扑画布添加原子；若画布中已有选中的原子，新添加的原子会自动与其建立共价单键。
-  2. **2D 拓扑连键与编辑**：
-     - **连键 / 改键级**：在「连键/选择」工具下，从一个原子拖动到另一个原子即可连键；点击已有化学键可在「单键 / 双键 / 三键」间切换或断开化学键。
-     - **移动排布**：切换至「移动排布」工具（或按住 `Shift` 拖动原子）可自由调整 2D 拓扑排布。
-     - **一键补氢与自由基标记**：选中任意原子后，可点击「`+ 一键补氢`」按元素标准价态自动补齐氢原子，或点击「`· 自由基`」切换未成对电子标记。
-  3. **结构参数填写与一键默认值**：
-     - 新建分子时，右侧的 `空间构型 (geometry)`、`中心杂化 (hybridization)`、`共价键长 (bondLengths)` 与 `键角 (bondAngles)` 默认留空，供教学探究手填。
-     - 点击右上角 **「`✨ 一键填入推荐默认值`」**，系统会根据当前 2D 拓扑连接关系自动推算化学式、中文名称、VSEPR 空间构型、杂化方式及标准键长/键角，并立即在左下角渲染**实时 3D 球棍模型**。
-- **JSON 导入与导出**：
-  - 每张分子卡片右上角及构建器弹窗顶部均支持「`导出 JSON`」，可将构建好的分子保存为 `.json` 文件。
-  - 页面右上角「`上传文件`」支持批量导入或拖拽上传任意数量的分子 `.json` 文件。
+本文档详细说明「**Free Chemical Reaction Workbench（自由化学反应实验台）**」（模式二）的三步交互设计、全屏 118 元素周期表分子构建器、ZIP 压缩包批量导入/导出机制、统一拓扑 JSON 格式规范以及三维反应动画的自动解算原理。
 
 ---
 
-### 第 2 步：动态反应阶段编排
-- **物质积木池**：顶部自动汇总第 1 步构建或上传的所有化学微粒。
-- **动态阶段管理**：
-  - 点击「`+ 新增阶段`」可任意增加反应阶段；点击阶段卡片右上角「`删除此阶段`」可移除阶段。
-  - 每个阶段顶部提供**阶段名称输入框**，支持随时自定义阶段名称（如 `阶段 1：双原子均裂`、`阶段 2：夺氢反应` 等）。
-- **纯净反应物/生成物配置**：
-  - 每个阶段仅包含 `[反应前化学物质] ➔ [反应后化学物质]` 两个槽位与中间箭头，无需填写反应条件或文字描述。
-  - 支持从顶部物质池拖拽（或先点击物质再点击槽位）放入任意数量的分子，允许同种分子重复放入多次（如放入 2 个 `CH3·`）。
+## 一、 顶层导航与全局交互规范
+
+1. **每次进入实验台从 Step 1 开始**：
+   - 在首页点击进入 `Free Chemical Reaction Workbench`（或 `Radical Substitution of Methane`）时，状态机自动重置 `screen = 'gate'`（即 `Step 1 · Molecules`），确保每次进入都有清晰一致的起点。
+2. **Header 顶栏布局**：
+   - **左上角返回箭头（`.header-back-arrow`）**：仅保留简洁左箭头图标，无文字、无按钮边框，点击直接返回首页。
+   - **最右侧步骤切换器（`.header-stepper-right`）**：`1. Molecules`、`2. Reaction Stages`、`3. 3D Reaction Stage` 三个步骤 Tab 置于 Header 最右侧，支持随时点击切换。
+3. **底部固定步骤切换栏（`.fixed-bottom-bar`）**：
+   - 在 Step 1 和 Step 2 页面底部，切换栏采用 `position: fixed; bottom: 0; left: 0; right: 0` 固定在视口底部并撑满全宽，左侧展示当前分子/阶段统计，右侧提供上一步/下一步主操作按钮。
 
 ---
 
-### 第 3 步：全自动三维结构与结合/分离过渡动画
-- **无锁自由浏览**：左侧阶段导航栏列出所有自定义阶段，无需答题即可任意点击切换、单步重播或全流程连续播放，底部进度条（`0% — 100%`）在所有阶段均可自由拖动。
-- **三段式反应动力学插值（`progress: 0% -> 100%`）**：
-  1. **`0% ~ 35%`（靠近碰撞）**：反应前的多个分子从分列位置向中心反应区平滑靠近，且自动旋转使即将发生反应的活性原子朝向对方。
-  2. **`35% ~ 68%`（断键重组与构型弛豫）**：断裂的旧共价键平滑淡出，新生成的共价键平滑淡入，转移原子跨越反应中心，未成对电子（`·`）同步转移，中心基团同步完成三维构型重排（如四面体 $\leftrightarrow$ 平面三角形）。
-  3. **`68% ~ 100%`（产物分离定型）**：生成的产物分子向两侧平滑分离定型，场景悬浮标签自动由反应物切换为生成物。
-- **右侧成键分析面板**：自动展示当前阶段反应方程式、**断裂的共价键**与**新生成的共价键**统计，以及反应前/反应后物质清单。
+## 二、 三步实验流程详解
+
+### Step 1: Molecular Structure Library（分子结构构建与管理）
+
+- **右上角分组操作栏（`.gate-toolbar-group`）**：
+  1. **`+ Add Chemical Substance`（主按钮）**：打开全屏交互式分子构建器。与网格末尾虚线新增卡片的文案完全统一。
+  2. **`Upload Files`（次级描边按钮）**：支持一次选择或拖拽上传任意数量的 `.json` 分子配置文件。
+  3. **`Library Actions ▾`（下拉菜单）**：将批量与辅助操作收纳在精致的下拉菜单中，避免右上角按钮堆砌：
+     - **`Export All as ZIP (N)`**：调用 [`createZipBlob()`](file:///Users/joshua/work-big-bridge/学科融合/src/engine/zipExporter.ts#L31-L116) 将当前分子库中所有化学物质一键打包为标准 `.zip` 压缩包（`molecules-library.zip`）下载，每张分子卡片不再单独放置导出按钮，界面更清爽。
+     - **`Load Sample Library`**：一键恢复预设的 7 种示例化学物质。
+     - **`Clear All Substances`**：清空当前分子库。
+
+- **全屏交互式分子构建器（[`MoleculeBuilderModal.tsx`](file:///Users/joshua/work-big-bridge/学科融合/src/components/FreeMode/MoleculeBuilderModal.tsx)）**：
+  - **全屏大尺寸视野**：弹框尺寸为 `calc(100vw - 32px) × calc(100vh - 32px)`，内部字号、按钮、周期表原子格与 2D 拓扑画布全面放大。
+  - **118 元素全周期表**：支持完整 **Periods 1–7 + Lanthanides/Actinides（共 118 种元素）**分类筛选及常用元素快捷栏（`Common: H, C, N, O, F, Cl, Br, I, S, P, Na, Fe, Cu`）。点击元素即可向 2D 画布添加原子；若画布已有选中原子，会自动建立共价单键。
+  - **2D 拓扑画布交互**：
+    - `Bond / Select` 模式：从一个原子拖拽到另一个原子即可连键；点击已有化学键可在 `Single (1) → Double (2) → Triple (3)` 间切换键级，或点击 `Delete Bond` 断键。
+    - `Move Layout` 模式（或按住 `Shift` 拖动）：自由调整 2D 原子排布。
+    - `+ Auto Fill H`：按选中原子的常见共价键数自动补齐氢原子。
+    - `· Radical`：切换选中原子的未成对电子（`radical: 0 | 1`）标记。
+  - **参数配置与 `Auto-Fill Recommended Defaults`**：
+    - 新建分子时，右侧的 `Geometry (VSEPR)`、`Hybridization`、`Bond Lengths (Å)` 与 `Bond Angles (°)` 默认留空，方便教学练习。
+    - 点击顶部 **`Auto-Fill Recommended Defaults`** 按钮，系统会根据 2D 拓扑自动推算化学式、英文名称、VSEPR 构型、杂化方式及标准共价键长/键角，并在左下角实时渲染 3D 球棍模型。
+  - **3D 实时预览尺寸隔离机制**：
+    - 左下角 3D 预览卡片采用 `.builder-3d-stage-box`（`flex: 1; position: relative; overflow: hidden`）包裹绝对定位的 `.builder-3d-viewport`（`position: absolute; inset: 0`），配合 `grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr)` 与 `>= 1px` 尺寸守卫，确保编辑任意已有分子时 3D 视口宽度恒定不膨胀。
 
 ---
 
-## 二、 统一分子拓扑 JSON 格式规范
+### Step 2: Reaction Stages（动态反应阶段编排）
 
-自由化学反应实验台采用统一的 **`nodes + bonds` 拓扑 JSON 结构**，可统一表达单原子、双原子、单中心分子以及任意多中心链状/支链分子（如乙烷 $\text{CH}_3\text{CH}_3$、乙烯 $\text{C}_2\text{H}_4$、甲醇 $\text{CH}_3\text{OH}$ 等）。
+- **顶部物质池（`Chemical Substance Pool`）**：自动汇总 Step 1 中的所有分子，支持拖拽或点击填入下方槽位。
+- **胶囊式阶段导航栏（`.stage-bar-header`）**：
+  - 左侧 `.stage-pills-track` 以圆角分段胶囊展示各个反应阶段 Tab；
+  - 右侧 `.stage-add-pill-btn`（`+ Add Stage`）作为独立胶囊按钮与左侧对齐，视觉层次清晰美观；
+  - 删除当前阶段按钮文案简化为 **`Delete`**。
+- **无残影拖拽装配**：
+  - `<DragOverlay dropAnimation={null}>` 禁用了松手后向原位飞回的默认动画，拖入反应槽位松手即刻完成放置。
+  - 每个阶段仅需配置 `[Reactants (Before)] ➔ [Products (After)]`，中间以反应箭头连接，支持任意次数重复放入同种微粒。
+
+---
+
+### Step 3: 3D Reaction Stage（全自动三维结构与结合/分离过渡动画）
+
+- **三段式反应动力学插值（[`sampleFreeStage()`](file:///Users/joshua/work-big-bridge/学科融合/src/engine/freeReactionEngine.ts#L569-L645)）**：
+  1. **`0% ~ 35%`（Reactants Approaching）**：反应前各分子从初始位置向反应中心平滑靠拢，并自动旋转使即将断键/成键的活性原子朝向反应中心。
+  2. **`35% ~ 68%`（Bond Breaking & Forming）**：断裂的共价键平滑淡出，新生成的共价键平滑淡入，转移原子跨越反应中心，未成对电子（`·`）与中心原子三维构型同步完成平滑过渡（如四面体 $\leftrightarrow$ 平面三角形）。
+  3. **`68% ~ 100%`（Products Separating）**：反应生成的产物分子向两侧平滑分离定型，3D 悬浮标签平滑切换为产物化学式。
+- **右侧机理分析面板**：实时展示当前阶段的反应方程式、**Bonds Broken**、**Bonds Formed** 以及反应前后物质清单。
+
+---
+
+## 三、 统一分子拓扑 JSON 格式规范
+
+自由化学反应实验台采用统一的 **`nodes + bonds` 拓扑 JSON 结构**，可表达单原子、双原子、单中心分子以及任意多中心链状/支链/环状分子（如乙烷 $\text{CH}_3\text{CH}_3$、乙烯 $\text{C}_2\text{H}_4$、甲醇 $\text{CH}_3\text{OH}$ 等）。
 
 ### 字段定义
 
 | 字段名 | 类型 | 必填 | 说明 |
 | :--- | :--- | :---: | :--- |
-| `name` | `string` | 是 | 化学物质的中文名称（如 `"一溴甲烷"`、`"乙烷"`） |
+| `name` | `string` | 是 | 化学物质名称（如 `"Bromomethane"`、`"Ethane"`） |
 | `formula` | `string` | 是 | 化学式，自由基末尾带 `·`（如 `"CH4"`、`"CH3·"`、`"CH3CH3"`） |
 | `geometry` | `string` | 是 | 空间构型标识：`atomic` \| `diatomic` \| `linear` \| `bent` \| `trigonalPlanar` \| `trigonalPyramidal` \| `regularTetrahedral` \| `tetrahedral` \| `squarePlanar` \| `trigonalBipyramidal` \| `octahedral` |
 | `hybridization` | `string` | 否 | 中心原子杂化方式：`none` \| `sp` \| `sp2` \| `sp3` \| `sp3d` \| `sp3d2` |
-| `bondLengths` | `Record<string, number>` | 是 | 各共价键键长（单位 Å），键名如 `"C-H": 1.09`、`"C-C": 1.54` |
+| `bondLengths` | `Record<string, number>` | 是 | 各共价键键长（单位 Å），键名按字母序或连接序如 `"C-H": 1.09`、`"C-C": 1.54` |
 | `bondAngles` | `Record<string, number>` | 是 | 各共价键夹角（单位 °），键名如 `"H-C-H": 109.5`（单原子/双原子可为空对象 `{}`） |
 | `description` | `string` | 否 | 结构或反应特性简要说明 |
 | `nodes` | `Array<Node>` | 是 | 原子节点数组：`{ id: string, element: string, radical: 0 \| 1, x?: number, y?: number }` |
 | `bonds` | `Array<Bond>` | 是 | 化学键连接数组：`{ id: string, from: string, to: string, order: 1 \| 2 \| 3, length?: number }` |
 
-### 示例：双中心分子（乙烷 `CH3CH3.json`）
+### 示例：双中心分子（Ethane `CH3CH3.json`）
 
 ```json
 {
-  "name": "乙烷",
+  "name": "Ethane",
   "formula": "CH3CH3",
   "geometry": "tetrahedral",
   "hybridization": "sp3",
@@ -77,16 +101,16 @@
     "H-C-H": 109.5,
     "H-C-C": 109.5
   },
-  "description": "两个甲基自由基通过 C—C 单键结合生成的双中心烷烃分子。",
+  "description": "Two methyl radicals couple via a C—C single bond to form a stable ethane molecule.",
   "nodes": [
-    { "id": "c1", "element": "C", "radical": 0, "x": 170, "y": 145 },
-    { "id": "c2", "element": "C", "radical": 0, "x": 270, "y": 145 },
-    { "id": "h1", "element": "H", "radical": 0, "x": 170, "y": 70 },
-    { "id": "h2", "element": "H", "radical": 0, "x": 100, "y": 145 },
-    { "id": "h3", "element": "H", "radical": 0, "x": 170, "y": 220 },
-    { "id": "h4", "element": "H", "radical": 0, "x": 270, "y": 70 },
-    { "id": "h5", "element": "H", "radical": 0, "x": 340, "y": 145 },
-    { "id": "h6", "element": "H", "radical": 0, "x": 270, "y": 220 }
+    { "id": "c1", "element": "C", "radical": 0, "x": 185, "y": 165 },
+    { "id": "c2", "element": "C", "radical": 0, "x": 295, "y": 165 },
+    { "id": "h1", "element": "H", "radical": 0, "x": 185, "y": 82 },
+    { "id": "h2", "element": "H", "radical": 0, "x": 105, "y": 165 },
+    { "id": "h3", "element": "H", "radical": 0, "x": 185, "y": 248 },
+    { "id": "h4", "element": "H", "radical": 0, "x": 295, "y": 82 },
+    { "id": "h5", "element": "H", "radical": 0, "x": 375, "y": 165 },
+    { "id": "h6", "element": "H", "radical": 0, "x": 295, "y": 248 }
   ],
   "bonds": [
     { "id": "b1", "from": "c1", "to": "c2", "order": 1, "length": 1.54 },

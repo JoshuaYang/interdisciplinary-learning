@@ -14,19 +14,19 @@ import { useChemStore } from './useChemStore';
  */
 const SAMPLE_MOLECULE_DOCS: Record<string, any>[] = [
   {
-    name: '甲烷',
+    name: 'Methane',
     formula: 'CH4',
     geometry: 'regularTetrahedral',
     hybridization: 'sp3',
     bondLengths: { 'C-H': 1.087 },
     bondAngles: { 'H-C-H': 109.471 },
-    description: '正四面体饱和烷烃分子，C 原子采取 sp3 杂化。',
+    description: 'Regular tetrahedral saturated alkane with sp3 hybridized carbon.',
     nodes: [
-      { id: 'c1', element: 'C', radical: 0, x: 220, y: 145 },
+      { id: 'c1', element: 'C', radical: 0, x: 220, y: 155 },
       { id: 'h1', element: 'H', radical: 0, x: 220, y: 65 },
-      { id: 'h2', element: 'H', radical: 0, x: 300, y: 145 },
-      { id: 'h3', element: 'H', radical: 0, x: 220, y: 225 },
-      { id: 'h4', element: 'H', radical: 0, x: 140, y: 145 },
+      { id: 'h2', element: 'H', radical: 0, x: 310, y: 155 },
+      { id: 'h3', element: 'H', radical: 0, x: 220, y: 245 },
+      { id: 'h4', element: 'H', radical: 0, x: 130, y: 155 },
     ],
     bonds: [
       { id: 'b1', from: 'c1', to: 'h1', order: 1, length: 1.087 },
@@ -36,43 +36,43 @@ const SAMPLE_MOLECULE_DOCS: Record<string, any>[] = [
     ],
   },
   {
-    name: '溴单质',
+    name: 'Bromine',
     formula: 'Br2',
     geometry: 'diatomic',
     hybridization: 'none',
     bondLengths: { 'Br-Br': 2.281 },
     bondAngles: {},
-    description: '红棕色双原子卤素分子，受光照或加热易发生共价键均裂。',
+    description: 'Reddish-brown diatomic halogen molecule susceptible to homolytic cleavage.',
     nodes: [
-      { id: 'br1', element: 'Br', radical: 0, x: 165, y: 145 },
-      { id: 'br2', element: 'Br', radical: 0, x: 275, y: 145 },
+      { id: 'br1', element: 'Br', radical: 0, x: 165, y: 155 },
+      { id: 'br2', element: 'Br', radical: 0, x: 275, y: 155 },
     ],
     bonds: [{ id: 'b1', from: 'br1', to: 'br2', order: 1, length: 2.281 }],
   },
   {
-    name: '溴自由基',
+    name: 'Bromine Radical',
     formula: 'Br·',
     geometry: 'atomic',
     hybridization: 'none',
     bondLengths: {},
     bondAngles: {},
-    description: '含一个未成对电子的高活性溴原子自由基。',
-    nodes: [{ id: 'br1', element: 'Br', radical: 1, x: 220, y: 145 }],
+    description: 'Highly reactive bromine atom radical containing 1 unpaired electron.',
+    nodes: [{ id: 'br1', element: 'Br', radical: 1, x: 220, y: 155 }],
     bonds: [],
   },
   {
-    name: '甲基自由基',
+    name: 'Methyl Radical',
     formula: 'CH3·',
     geometry: 'trigonalPlanar',
     hybridization: 'sp2',
     bondLengths: { 'C-H': 1.076 },
     bondAngles: { 'H-C-H': 120 },
-    description: '平面三角形碳自由基，中心 C 含 1 个未成对电子。',
+    description: 'Trigonal planar carbon radical with 1 unpaired electron on the central C.',
     nodes: [
-      { id: 'c1', element: 'C', radical: 1, x: 220, y: 145 },
+      { id: 'c1', element: 'C', radical: 1, x: 220, y: 155 },
       { id: 'h1', element: 'H', radical: 0, x: 220, y: 65 },
-      { id: 'h2', element: 'H', radical: 0, x: 290, y: 190 },
-      { id: 'h3', element: 'H', radical: 0, x: 150, y: 190 },
+      { id: 'h2', element: 'H', radical: 0, x: 298, y: 205 },
+      { id: 'h3', element: 'H', radical: 0, x: 142, y: 205 },
     ],
     bonds: [
       { id: 'b1', from: 'c1', to: 'h1', order: 1, length: 1.076 },
@@ -81,33 +81,33 @@ const SAMPLE_MOLECULE_DOCS: Record<string, any>[] = [
     ],
   },
   {
-    name: '溴化氢',
+    name: 'Hydrogen Bromide',
     formula: 'HBr',
     geometry: 'diatomic',
     hybridization: 'none',
     bondLengths: { 'Br-H': 1.414 },
     bondAngles: {},
-    description: '由氢原子与溴原子结合形成的极性双原子共价分子。',
+    description: 'Polar covalent diatomic molecule formed by hydrogen and bromine.',
     nodes: [
-      { id: 'h1', element: 'H', radical: 0, x: 165, y: 145 },
-      { id: 'br1', element: 'Br', radical: 0, x: 275, y: 145 },
+      { id: 'h1', element: 'H', radical: 0, x: 165, y: 155 },
+      { id: 'br1', element: 'Br', radical: 0, x: 275, y: 155 },
     ],
     bonds: [{ id: 'b1', from: 'h1', to: 'br1', order: 1, length: 1.414 }],
   },
   {
-    name: '一溴甲烷',
+    name: 'Bromomethane',
     formula: 'CH3Br',
     geometry: 'tetrahedral',
     hybridization: 'sp3',
     bondLengths: { 'C-H': 1.09, 'C-Br': 1.939 },
     bondAngles: { 'H-C-H': 111.37, 'H-C-Br': 107.5 },
-    description: '四面体构型卤代烷烃分子。',
+    description: 'Tetrahedral haloalkane molecule.',
     nodes: [
-      { id: 'c1', element: 'C', radical: 0, x: 220, y: 145 },
-      { id: 'br1', element: 'Br', radical: 0, x: 305, y: 145 },
+      { id: 'c1', element: 'C', radical: 0, x: 220, y: 155 },
+      { id: 'br1', element: 'Br', radical: 0, x: 310, y: 155 },
       { id: 'h1', element: 'H', radical: 0, x: 220, y: 65 },
-      { id: 'h2', element: 'H', radical: 0, x: 220, y: 225 },
-      { id: 'h3', element: 'H', radical: 0, x: 140, y: 145 },
+      { id: 'h2', element: 'H', radical: 0, x: 220, y: 245 },
+      { id: 'h3', element: 'H', radical: 0, x: 130, y: 155 },
     ],
     bonds: [
       { id: 'b1', from: 'c1', to: 'br1', order: 1, length: 1.939 },
@@ -117,22 +117,22 @@ const SAMPLE_MOLECULE_DOCS: Record<string, any>[] = [
     ],
   },
   {
-    name: '乙烷',
+    name: 'Ethane',
     formula: 'CH3CH3',
     geometry: 'tetrahedral',
     hybridization: 'sp3',
     bondLengths: { 'C-C': 1.54, 'C-H': 1.09 },
     bondAngles: { 'H-C-H': 109.5, 'H-C-C': 109.5 },
-    description: '两个甲基自由基通过 C—C 单键结合生成的双中心烷烃分子。',
+    description: 'Two-center alkane formed by the combination of two methyl radicals.',
     nodes: [
-      { id: 'c1', element: 'C', radical: 0, x: 170, y: 145 },
-      { id: 'c2', element: 'C', radical: 0, x: 270, y: 145 },
-      { id: 'h1', element: 'H', radical: 0, x: 170, y: 70 },
-      { id: 'h2', element: 'H', radical: 0, x: 100, y: 145 },
-      { id: 'h3', element: 'H', radical: 0, x: 170, y: 220 },
-      { id: 'h4', element: 'H', radical: 0, x: 270, y: 70 },
-      { id: 'h5', element: 'H', radical: 0, x: 340, y: 145 },
-      { id: 'h6', element: 'H', radical: 0, x: 270, y: 220 },
+      { id: 'c1', element: 'C', radical: 0, x: 170, y: 155 },
+      { id: 'c2', element: 'C', radical: 0, x: 270, y: 155 },
+      { id: 'h1', element: 'H', radical: 0, x: 170, y: 75 },
+      { id: 'h2', element: 'H', radical: 0, x: 95, y: 155 },
+      { id: 'h3', element: 'H', radical: 0, x: 170, y: 235 },
+      { id: 'h4', element: 'H', radical: 0, x: 270, y: 75 },
+      { id: 'h5', element: 'H', radical: 0, x: 345, y: 155 },
+      { id: 'h6', element: 'H', radical: 0, x: 270, y: 235 },
     ],
     bonds: [
       { id: 'b1', from: 'c1', to: 'c2', order: 1, length: 1.54 },
@@ -173,25 +173,25 @@ function buildInitialSampleState(): {
   const stages: FreeStageDef[] = [
     {
       id: `stage_${nextStageSeq++}`,
-      name: '阶段 1：双原子均裂',
+      name: 'Stage 1: Homolytic Cleavage',
       reactants: [findId('Br2')],
       products: [findId('Br·'), findId('Br·')],
     },
     {
       id: `stage_${nextStageSeq++}`,
-      name: '阶段 2：夺氢反应',
+      name: 'Stage 2: Hydrogen Abstraction',
       reactants: [findId('CH4'), findId('Br·')],
       products: [findId('CH3·'), findId('HBr')],
     },
     {
       id: `stage_${nextStageSeq++}`,
-      name: '阶段 3：自由基成键',
+      name: 'Stage 3: Radical Substitution',
       reactants: [findId('CH3·'), findId('Br2')],
       products: [findId('CH3Br'), findId('Br·')],
     },
     {
       id: `stage_${nextStageSeq++}`,
-      name: '阶段 4：甲基结合生成乙烷',
+      name: 'Stage 4: Methyl Combination',
       reactants: [findId('CH3·'), findId('CH3·')],
       products: [findId('CH3CH3')],
     },
@@ -291,6 +291,13 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
   setAppMode: (appMode) => {
     get().pause();
     useChemStore.getState().pause();
+    // Always start from Step 1 ('gate') when entering any workbench
+    if (appMode === 'guided') {
+      useChemStore.getState().setScreen('gate');
+    } else if (appMode === 'free') {
+      set({ appMode, screen: 'gate', previewMolId: null, builderOpen: false });
+      return;
+    }
     set({ appMode });
   },
 
@@ -349,7 +356,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       compiledStages: compileFreeStages(nextMolecules, nextStages),
     });
     if (removed) {
-      useChemStore.getState().showToast(`已删除分子「${removed.mol.name} (${removed.mol.formula})」`);
+      useChemStore.getState().showToast(`Deleted "${removed.mol.name} (${removed.mol.formula})"`);
     }
   },
 
@@ -366,7 +373,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       selectedPoolMolId: null,
       compiledStages: [],
     });
-    useChemStore.getState().showToast('已清空全部分子卡片。');
+    useChemStore.getState().showToast('Cleared all chemical substances.');
   },
 
   loadSampleMolecules: () => {
@@ -377,7 +384,9 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       activeStageTab: 0,
       compiledStages: compileFreeStages(sample.molecules, sample.stages),
     });
-    useChemStore.getState().showToast(`已载入 ${sample.molecules.length} 种示例分子与 4 个反应阶段！`);
+    useChemStore
+      .getState()
+      .showToast(`Loaded ${sample.molecules.length} sample substances and 4 reaction stages!`);
   },
 
   processUploadedFiles: async (files, targetId = null) => {
@@ -396,7 +405,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
         failedCount++;
         useChemStore
           .getState()
-          .showToast(`${file.name} 解析失败：${err.message || 'JSON 格式有误'}`);
+          .showToast(`${file.name} failed to parse: ${err.message || 'Invalid JSON'}`);
       }
     }
     if (addedCount > 0 && failedCount === 0) {
@@ -404,8 +413,8 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
         .getState()
         .showToast(
           targetId
-            ? '已更新分子配置并重新生成 3D 结构！'
-            : `成功导入 ${addedCount} 个分子结构！`
+            ? 'Updated molecular structure and regenerated 3D model!'
+            : `Successfully imported ${addedCount} chemical substance(s)!`
         );
     }
   },
@@ -417,7 +426,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
     const { stages } = get();
     const newStage: FreeStageDef = {
       id: `stage_${Date.now()}_${nextStageSeq++}`,
-      name: name?.trim() || `阶段 ${stages.length + 1}`,
+      name: name?.trim() || `Stage ${stages.length + 1}`,
       reactants: [],
       products: [],
     };
@@ -426,13 +435,13 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       stages: nextStages,
       activeStageTab: nextStages.length - 1,
     });
-    useChemStore.getState().showToast(`已新增「${newStage.name}」`);
+    useChemStore.getState().showToast(`Added "${newStage.name}"`);
   },
 
   removeStage: (stageId) => {
     const { stages, activeStageTab } = get();
     if (stages.length <= 1) {
-      useChemStore.getState().showToast('至少需要保留 1 个反应阶段。');
+      useChemStore.getState().showToast('At least 1 reaction stage must be kept.');
       return;
     }
     const idx = stages.findIndex((s) => s.id === stageId);
@@ -444,7 +453,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       activeStageTab: nextTab,
     });
     if (removed) {
-      useChemStore.getState().showToast(`已删除阶段「${removed.name}」`);
+      useChemStore.getState().showToast(`Deleted "${removed.name}"`);
     }
   },
 
@@ -478,7 +487,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       idx === activeStageTab ? { ...s, reactants: [], products: [] } : s
     );
     set({ stages: nextStages });
-    useChemStore.getState().showToast(`已清空「${cur.name}」的反应物与生成物。`);
+    useChemStore.getState().showToast(`Cleared reactants and products in "${cur.name}".`);
   },
 
   enterPipeline: () => {

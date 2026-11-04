@@ -277,7 +277,7 @@ export const FreeMoleculePreviewModal: React.FC = () => {
         >
           <div className="dialog-header">
             <div>
-              <span className="small-label">分子三维结构预览 · {mol.geometry}</span>
+              <span className="small-label">3D MOLECULAR STRUCTURE PREVIEW · {mol.geometry}</span>
               <Dialog.Title asChild>
                 <h2>
                   {mol.name} · {mol.formula}
@@ -286,7 +286,7 @@ export const FreeMoleculePreviewModal: React.FC = () => {
             </div>
             <div className="mol-preview-header-actions">
               <Dialog.Close asChild>
-                <button className="icon-button" aria-label="关闭预览">
+                <button className="icon-button" aria-label="Close Preview">
                   <X size={18} />
                 </button>
               </Dialog.Close>
@@ -299,15 +299,17 @@ export const FreeMoleculePreviewModal: React.FC = () => {
               ref={viewportRef}
               tabIndex={0}
               role="img"
-              aria-label="分子三维球棍模型；拖动旋转，滚轮缩放"
+              aria-label="3D Ball-and-Stick Model; drag to rotate, scroll to zoom"
             />
             <div className="mol-preview-tools">
               <button
                 type="button"
-                className="quiet-button"
+                className="stage-icon-btn"
+                title="Reset camera view"
+                aria-label="Reset camera view"
                 onClick={() => resetFnRef.current?.()}
               >
-                复位视角 <RotateCcw size={13} style={{ display: 'inline', marginLeft: 4 }} />
+                <RotateCcw size={16} />
               </button>
             </div>
             <div className="stage-legend mol-preview-legend">
@@ -325,39 +327,39 @@ export const FreeMoleculePreviewModal: React.FC = () => {
               ))}
               {mol.radicals && mol.radicals.length > 0 && (
                 <span className="radical-legend">
-                  <b>·</b> 未成对电子
+                  <b>·</b> Unpaired Electron
                 </span>
               )}
             </div>
-            <div className="stage-hint">拖动旋转 · 滚轮缩放</div>
+            <div className="stage-hint">Drag to rotate · Scroll to zoom</div>
           </div>
 
           <div className="mol-preview-info">
             <div className="mol-spec-grid">
               <div className="mol-spec-item">
-                <span className="mol-spec-label">空间构型</span>
+                <span className="mol-spec-label">Spatial Geometry</span>
                 <strong className="mol-spec-value">{mol.geometry || '-'}</strong>
               </div>
               <div className="mol-spec-item">
-                <span className="mol-spec-label">中心原子杂化</span>
+                <span className="mol-spec-label">Central Hybridization</span>
                 <strong className="mol-spec-value mono">
                   {mol.hybridization && mol.hybridization !== 'none'
                     ? mol.hybridization
-                    : '无'}
+                    : 'None'}
                 </strong>
               </div>
               <div className="mol-spec-item">
-                <span className="mol-spec-label">原子总数 / 成键数</span>
+                <span className="mol-spec-label">Atoms / Covalent Bonds</span>
                 <strong className="mol-spec-value mono">
-                  {mol.atoms.length} 原子 · {mol.bonds.length} 共价键
+                  {mol.atoms.length} Atoms · {mol.bonds.length} Bonds
                 </strong>
               </div>
               <div className="mol-spec-item">
-                <span className="mol-spec-label">未成对电子</span>
+                <span className="mol-spec-label">Unpaired Electrons</span>
                 <strong className="mol-spec-value">
                   {mol.radicals && mol.radicals.length > 0
-                    ? `${mol.radicals.length} 个（自由基微粒）`
-                    : '0（稳定微粒）'}
+                    ? `${mol.radicals.length} (Radical Species)`
+                    : '0 (Closed-Shell)'}
                 </strong>
               </div>
               {Array.isArray(mol.measurements) &&

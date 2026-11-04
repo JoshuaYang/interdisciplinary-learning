@@ -107,33 +107,33 @@ export interface FreeSampledFrame {
 }
 
 export const GEOMETRY_OPTIONS: { value: string; label: string; defaultAngle: number }[] = [
-  { value: 'atomic', label: '单原子 (Atomic)', defaultAngle: 0 },
-  { value: 'diatomic', label: '双原子分子 (Diatomic)', defaultAngle: 180 },
-  { value: 'linear', label: '直线形 (Linear · 180°)', defaultAngle: 180 },
-  { value: 'bent', label: '折线形 / V形 (Bent · 104.5°)', defaultAngle: 104.5 },
-  { value: 'trigonalPlanar', label: '平面三角形 (Trigonal Planar · 120°)', defaultAngle: 120 },
-  { value: 'trigonalPyramidal', label: '三角锥形 (Trigonal Pyramidal · 107°)', defaultAngle: 107 },
-  { value: 'regularTetrahedral', label: '正四面体 (Regular Tetrahedral · 109.47°)', defaultAngle: 109.471 },
-  { value: 'tetrahedral', label: '四面体 (Tetrahedral)', defaultAngle: 109.5 },
-  { value: 'squarePlanar', label: '平面正方形 (Square Planar · 90°)', defaultAngle: 90 },
-  { value: 'trigonalBipyramidal', label: '三角双锥 (Trigonal Bipyramidal)', defaultAngle: 120 },
-  { value: 'octahedral', label: '正八面体 (Octahedral · 90°)', defaultAngle: 90 },
+  { value: 'atomic', label: 'Atomic (Single Atom)', defaultAngle: 0 },
+  { value: 'diatomic', label: 'Diatomic', defaultAngle: 180 },
+  { value: 'linear', label: 'Linear (180°)', defaultAngle: 180 },
+  { value: 'bent', label: 'Bent / Angular (104.5°)', defaultAngle: 104.5 },
+  { value: 'trigonalPlanar', label: 'Trigonal Planar (120°)', defaultAngle: 120 },
+  { value: 'trigonalPyramidal', label: 'Trigonal Pyramidal (107°)', defaultAngle: 107 },
+  { value: 'regularTetrahedral', label: 'Regular Tetrahedral (109.47°)', defaultAngle: 109.471 },
+  { value: 'tetrahedral', label: 'Tetrahedral', defaultAngle: 109.5 },
+  { value: 'squarePlanar', label: 'Square Planar (90°)', defaultAngle: 90 },
+  { value: 'trigonalBipyramidal', label: 'Trigonal Bipyramidal', defaultAngle: 120 },
+  { value: 'octahedral', label: 'Octahedral (90°)', defaultAngle: 90 },
 ];
 
 export const GEOMETRY_LABEL_MAP: Record<string, string> = {
-  atomic: '单原子',
-  diatomic: '双原子分子',
-  linear: '直线形',
-  bent: '折线形',
-  angular: '折线形',
-  trigonalPlanar: '平面三角形',
-  trigonalPyramidal: '三角锥形',
-  regularTetrahedral: '正四面体',
-  tetrahedral: '四面体',
-  squarePlanar: '平面正方形',
-  trigonalBipyramidal: '三角双锥',
-  octahedral: '正八面体',
-  multiCenter: '多中心立体构型',
+  atomic: 'Atomic',
+  diatomic: 'Diatomic',
+  linear: 'Linear',
+  bent: 'Bent',
+  angular: 'Bent',
+  trigonalPlanar: 'Trigonal Planar',
+  trigonalPyramidal: 'Trigonal Pyramidal',
+  regularTetrahedral: 'Regular Tetrahedral',
+  tetrahedral: 'Tetrahedral',
+  squarePlanar: 'Square Planar',
+  trigonalBipyramidal: 'Trigonal Bipyramidal',
+  octahedral: 'Octahedral',
+  multiCenter: 'Multi-Center 3D',
 };
 
 export const HYBRIDIZATION_OPTIONS = ['none', 'sp', 'sp2', 'sp3', 'sp3d', 'sp3d2'];
@@ -178,40 +178,40 @@ const STANDARD_BOND_LENGTHS: Record<string, number> = {
   'S-F:1': 1.56,
 };
 
-/** Common molecule names by formula */
+/** Common molecule names by formula (English) */
 const COMMON_MOLECULE_NAMES: Record<string, { name: string; description: string }> = {
-  CH4: { name: '甲烷', description: '正四面体饱和烷烃分子，C 原子采取 sp3 杂化。' },
-  'CH3·': { name: '甲基自由基', description: '平面三角形自由基微粒，中心 C 含 1 个未成对电子。' },
-  CH3Br: { name: '一溴甲烷', description: '四面体卤代烃分子，由溴原子取代甲烷中的一个氢形成。' },
-  CH2Br2: { name: '二溴甲烷', description: '四面体二卤代烷烃分子。' },
-  CHBr3: { name: '三溴甲烷', description: '四面体三卤代烷烃分子。' },
-  CBr4: { name: '四溴化碳', description: '正四面体全卤代甲烷分子。' },
-  CH3Cl: { name: '一氯甲烷', description: '四面体卤代烃分子。' },
-  'Br·': { name: '溴自由基', description: '高活性卤素自由基，含 1 个未成对电子。' },
-  Br2: { name: '溴单质', description: '红棕色双原子卤素分子，光照或受热易发生均裂。' },
-  HBr: { name: '溴化氢', description: '极性共价双原子分子。' },
-  'Cl·': { name: '氯自由基', description: '高活性氯原子自由基，含 1 个未成对电子。' },
-  Cl2: { name: '氯气', description: '黄绿色双原子单质分子。' },
-  HCl: { name: '氯化氢', description: '极性共价双原子分子。' },
-  H2: { name: '氢气', description: '最简单的双原子非极性共价分子。' },
-  'H·': { name: '氢自由基', description: '含 1 个未成对电子的氢原子微粒。' },
-  O2: { name: '氧气', description: '双原子单质分子。' },
-  N2: { name: '氮气', description: '含氮氮三键的双原子分子。' },
-  H2O: { name: '水', description: '折线形极性分子，O 原子采取 sp3 杂化。' },
-  'OH·': { name: '羟基自由基', description: '含 1 个未成对电子的活性自由基。' },
-  H2O2: { name: '过氧化氢', description: '含过氧键的双中心共价分子。' },
-  NH3: { name: '氨气', description: '三角锥形极性分子，N 原子采取 sp3 杂化。' },
-  CO2: { name: '二氧化碳', description: '直线形共价分子，C 原子采取 sp 杂化。' },
-  C2H6: { name: '乙烷', description: '由两个甲基通过 C-C 单键连接而成的饱和烷烃。' },
-  CH3CH3: { name: '乙烷', description: '由两个甲基通过 C-C 单键连接而成的饱和烷烃。' },
-  C2H4: { name: '乙烯', description: '含碳碳双键的平面型不饱和烃。' },
-  C2H2: { name: '乙炔', description: '含碳碳三键的直线形不饱和烃。' },
-  CH4O: { name: '甲醇', description: '最简单的饱和一元醇。' },
-  CH3OH: { name: '甲醇', description: '最简单的饱和一元醇。' },
-  BF3: { name: '三氟化硼', description: '平面三角形缺电子分子，B 原子采取 sp2 杂化。' },
-  PCl3: { name: '三氯化磷', description: '三角锥形共价分子。' },
-  PCl5: { name: '五氯化磷', description: '三角双锥形共价分子。' },
-  SF6: { name: '六氟化硫', description: '正八面体共价分子。' },
+  CH4: { name: 'Methane', description: 'Regular tetrahedral saturated alkane with sp3 hybridized carbon.' },
+  'CH3·': { name: 'Methyl Radical', description: 'Trigonal planar carbon radical with 1 unpaired electron.' },
+  CH3Br: { name: 'Bromomethane', description: 'Tetrahedral haloalkane formed by bromine substitution.' },
+  CH2Br2: { name: 'Dibromomethane', description: 'Tetrahedral dihaloalkane molecule.' },
+  CHBr3: { name: 'Tribromomethane', description: 'Tetrahedral trihaloalkane molecule.' },
+  CBr4: { name: 'Tetrabromomethane', description: 'Regular tetrahedral perhalogenated methane.' },
+  CH3Cl: { name: 'Chloromethane', description: 'Tetrahedral haloalkane molecule.' },
+  'Br·': { name: 'Bromine Radical', description: 'Reactive halogen radical with 1 unpaired electron.' },
+  Br2: { name: 'Bromine', description: 'Diatomic halogen molecule susceptible to homolytic cleavage.' },
+  HBr: { name: 'Hydrogen Bromide', description: 'Polar covalent diatomic molecule.' },
+  'Cl·': { name: 'Chlorine Radical', description: 'Reactive chlorine atom radical with 1 unpaired electron.' },
+  Cl2: { name: 'Chlorine', description: 'Diatomic halogen gas molecule.' },
+  HCl: { name: 'Hydrogen Chloride', description: 'Polar covalent diatomic molecule.' },
+  H2: { name: 'Hydrogen', description: 'Nonpolar covalent diatomic molecule.' },
+  'H·': { name: 'Hydrogen Radical', description: 'Atomic hydrogen radical with 1 unpaired electron.' },
+  O2: { name: 'Oxygen', description: 'Diatomic oxygen molecule.' },
+  N2: { name: 'Nitrogen', description: 'Diatomic molecule with a nitrogen-nitrogen triple bond.' },
+  H2O: { name: 'Water', description: 'Bent polar covalent molecule with sp3 hybridized oxygen.' },
+  'OH·': { name: 'Hydroxyl Radical', description: 'Highly reactive radical with 1 unpaired electron.' },
+  H2O2: { name: 'Hydrogen Peroxide', description: 'Two-center covalent molecule containing an O—O single bond.' },
+  NH3: { name: 'Ammonia', description: 'Trigonal pyramidal polar molecule with sp3 hybridized nitrogen.' },
+  CO2: { name: 'Carbon Dioxide', description: 'Linear covalent molecule with sp hybridized carbon.' },
+  C2H6: { name: 'Ethane', description: 'Two-carbon saturated alkane connected by a C—C single bond.' },
+  CH3CH3: { name: 'Ethane', description: 'Two-carbon saturated alkane connected by a C—C single bond.' },
+  C2H4: { name: 'Ethylene', description: 'Planar unsaturated hydrocarbon containing a C=C double bond.' },
+  C2H2: { name: 'Acetylene', description: 'Linear unsaturated hydrocarbon containing a C≡C triple bond.' },
+  CH4O: { name: 'Methanol', description: 'Simplest saturated monohydric alcohol.' },
+  CH3OH: { name: 'Methanol', description: 'Simplest saturated monohydric alcohol.' },
+  BF3: { name: 'Boron Trifluoride', description: 'Trigonal planar electron-deficient molecule with sp2 boron.' },
+  PCl3: { name: 'Phosphorus Trichloride', description: 'Trigonal pyramidal covalent molecule.' },
+  PCl5: { name: 'Phosphorus Pentachloride', description: 'Trigonal bipyramidal covalent molecule.' },
+  SF6: { name: 'Sulfur Hexafluoride', description: 'Octahedral covalent molecule.' },
 };
 
 export function formatFormulaHtml(formula: string): string {
@@ -390,8 +390,8 @@ export function inferFormulaAndName(
     const elName = elMeta ? elMeta.name : nodes[0].element;
     return {
       formula,
-      name: totalRadicals > 0 ? `${elName}自由基` : `${elName}原子`,
-      description: `由单个 ${elName} (${nodes[0].element}) 原子构成的微粒。`,
+      name: totalRadicals > 0 ? `${elName} Radical` : `${elName} Atom`,
+      description: `Monoatomic species consisting of a single ${elName} (${nodes[0].element}) atom.`,
     };
   }
 
@@ -400,15 +400,15 @@ export function inferFormulaAndName(
     const elName = elMeta ? elMeta.name : nodes[0].element;
     return {
       formula,
-      name: `${elName}单质`,
-      description: `由两个 ${elName} 原子通过共价键结合形成的双原子单质分子。`,
+      name: `${elName}`,
+      description: `Diatomic molecule formed by two ${elName} atoms.`,
     };
   }
 
   return {
     formula,
-    name: `${formula.replace(/·$/, '')} ${totalRadicals > 0 ? '自由基' : '分子'}`,
-    description: `包含 ${nodes.length} 个原子与 ${bonds.length} 条共价键的化学微粒。`,
+    name: `${formula.replace(/·$/, '')} ${totalRadicals > 0 ? 'Radical' : 'Molecule'}`,
+    description: `Chemical species containing ${nodes.length} atoms and ${bonds.length} covalent bonds.`,
   };
 }
 
@@ -1022,7 +1022,7 @@ export function buildUniversalMolecule(doc: any): MoleculeModel {
     const a1 = atoms.find((a) => a.id === b.atoms[0]);
     const a2 = atoms.find((a) => a.id === b.atoms[1]);
     if (!a1 || !a2) continue;
-    const label = `${getCanonicalBondKey(a1.element, a2.element).replace('-', '—')} 键长`;
+    const label = `${getCanonicalBondKey(a1.element, a2.element).replace('-', '—')} Length`;
     if (seenBondLabels.has(label)) continue;
     seenBondLabels.add(label);
     const dist = core.length(core.sub(a1.position, a2.position));
@@ -1043,7 +1043,7 @@ export function buildUniversalMolecule(doc: any): MoleculeModel {
         const a1 = nodeMap.get(nbs[i].neighborId)!;
         const a2 = nodeMap.get(nbs[j].neighborId)!;
         const pair = [a1.element, a2.element].sort();
-        const label = `${pair[0]}—${n.element}—${pair[1]} 键角`;
+        const label = `${pair[0]}—${n.element}—${pair[1]} Angle`;
         if (seenAngleLabels.has(label)) continue;
         seenAngleLabels.add(label);
         const tempMol = { atoms } as MoleculeModel;
@@ -1065,7 +1065,7 @@ export function buildUniversalMolecule(doc: any): MoleculeModel {
   let rawGeo = doc.geometry || multiCenters[0]?.geometry || (nodes.length === 1 ? 'atomic' : 'diatomic');
   const geoLabel =
     multiCenters.length > 1 && !doc.geometry
-      ? `${GEOMETRY_LABEL_MAP[rawGeo] || rawGeo} (多中心)`
+      ? `${GEOMETRY_LABEL_MAP[rawGeo] || rawGeo} (Multi-Center)`
       : GEOMETRY_LABEL_MAP[rawGeo] || rawGeo;
 
   const hyb =
@@ -1074,7 +1074,7 @@ export function buildUniversalMolecule(doc: any): MoleculeModel {
     (multiCenters.length > 0 ? 'sp3' : 'none');
 
   return {
-    name: topo.name || '未命名分子',
+    name: topo.name || 'Unnamed Molecule',
     formula: topo.formula || 'Custom',
     geometry: geoLabel,
     description: topo.description || '',
@@ -1402,12 +1402,12 @@ export function compileFreeStages(
         .filter(Boolean),
     }));
 
-    const lhs = rItems.length ? rItems.map((m) => m.mol.formula).join(' + ') : '（未放置反应物）';
-    const rhs = pItems.length ? pItems.map((m) => m.mol.formula).join(' + ') : '（未放置生成物）';
+    const lhs = rItems.length ? rItems.map((m) => m.mol.formula).join(' + ') : '(No Reactants)';
+    const rhs = pItems.length ? pItems.map((m) => m.mol.formula).join(' + ') : '(No Products)';
 
     return {
       stageId: stage.id,
-      name: stage.name || `阶段 ${sIdx + 1}`,
+      name: stage.name || `Stage ${sIdx + 1}`,
       equationText: `${lhs} ➔ ${rhs}`,
       reactantMols: rItems.map((m) => ({
         id: m.id,

@@ -1,12 +1,13 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as Tooltip from '@radix-ui/react-tooltip';
 import { motion } from 'motion/react';
 import {
+  Archive,
   ArrowRight,
   Box,
-  Download,
   Edit3,
   Info,
+  MoreHorizontal,
   Plus,
   Sparkles,
   Trash2,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useFreeChemStore } from '../../store/useFreeChemStore';
 import { useChemStore } from '../../store/useChemStore';
+import { createZipBlob } from '../../engine/zipExporter';
 import { FreeMoleculePreviewModal } from './FreeMoleculePreviewModal';
 import { MoleculeBuilderModal } from './MoleculeBuilderModal';
 
@@ -29,27 +31,55 @@ export const FreeGateScreen: React.FC = () => {
   const showToast = useChemStore((s) => s.showToast);
 
   const batchInputRef = useRef<HTMLInputElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const [screenDragover, setScreenDragover] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
 
-  const handleDownloadCardJson = (doc: Record<string, any>, formula: string) => {
-    const blob = new Blob([JSON.stringify(doc, null, 2)], {
-      type: 'application/json;charset=utf-8',
+  // Close dropdown menu when clicking outside
+  useEffect(() => {
+    if (!moreMenuOpen) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMoreMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleOutside);
+    return () => window.removeEventListener('mousedown', handleOutside);
+  }, [moreMenuOpen]);
+
+  const handleExportAllZip = () => {
+    setMoreMenuOpen(false);
+    if (molecules.length === 0) {
+      showToast('No chemical substances available to export.');
+      return;
+    }
+    const entries = molecules.map((item, idx) => {
+      const num = String(idx + 1).padStart(2, '0');
+      const safeFormula = (item.mol.formula || `molecule_${num}`).replace(
+        /[^a-zA-Z0-9._-]/g,
+        ''
+      );
+      return {
+        fileName: `${num}-${safeFormula || 'substance'}.json`,
+        content: JSON.stringify(item.doc, null, 2) + '\n',
+      };
     });
-    const url = URL.createObjectURL(blob);
+    const zipBlob = createZipBlob(entries);
+    const url = URL.createObjectURL(zipBlob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${formula || 'molecule'}.json`;
+    a.download = `chemical-substances-${molecules.length}.zip`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast(`已下载 ${formula || 'molecule'}.json`);
+    showToast(`Exported ${molecules.length} substances as a ZIP archive!`);
   };
 
   return (
     <Tooltip.Provider delayDuration={140}>
       <section
         id="free-gate-screen"
-        className={`gate-screen ${screenDragover ? 'dragover' : ''}`}
-        aria-label="自定义分子结构构建与管理"
+        className={`gate-screen has-fixed-bottom-bar ${screenDragover ? 'dragover' : ''}`}
+        aria-label="Custom Molecular Structure Library"
         onDragOver={(e) => {
           e.preventDefault();
           setScreenDragover(true);
@@ -66,49 +96,101 @@ export const FreeGateScreen: React.FC = () => {
         <div className="gate-container">
           <div className="gate-header">
             <div>
-              <h2>分子结构库</h2>
+              <h2>Chemical Substance Library</h2>
               <p className="free-gate-subtitle">
-                通过元素周期表交互式构建任意化学物质，或直接导入/导出分子 JSON 文件
+                Build custom molecules interactively from the periodic table, or batch import/export JSON configurations
               </p>
             </div>
-            <div className="gate-actions">
+
+            {/* Clean, non-bloated action toolbar: primary CTA + icon buttons for upload & library menu */}
+            <div className="gate-actions-toolbar">
               <button
                 type="button"
                 id="free-open-builder-btn"
-                className="primary-button top-action-btn"
+                className="toolbar-btn-primary"
                 onClick={() => openBuilder(null)}
               >
-                <Plus size={16} />
-                <span>交互式构建分子</span>
+                <Plus size={17} />
+                <span>Add Chemical Substance</span>
               </button>
+
               <button
                 type="button"
-                className="text-button batch-upload-btn top-action-btn"
+                className="toolbar-icon-btn"
+                title="Upload JSON files"
+                aria-label="Upload JSON files"
                 onClick={() => batchInputRef.current?.click()}
               >
-                <Upload size={16} />
-                <span>上传文件</span>
+                <Upload size={18} />
               </button>
-              <button
-                type="button"
-                className="text-button top-action-btn"
-                onClick={loadSampleMolecules}
-                title="载入示例反应微粒库"
-              >
-                <Sparkles size={15} />
-                <span>载入示例</span>
-              </button>
-              {molecules.length > 0 && (
+
+              <div className="toolbar-dropdown-wrap" ref={menuRef}>
                 <button
                   type="button"
-                  className="text-button top-action-btn"
-                  onClick={clearAllMolecules}
-                  title="清空当前全部分子"
+                  className={`toolbar-icon-btn ${moreMenuOpen ? 'active' : ''}`}
+                  title="Library actions (Export ZIP / Load Samples / Clear)"
+                  aria-label="Library actions"
+                  aria-expanded={moreMenuOpen}
+                  onClick={() => setMoreMenuOpen((v) => !v)}
                 >
-                  <Trash2 size={15} />
-                  <span>清空</span>
+                  <MoreHorizontal size={18} />
                 </button>
-              )}
+
+                {moreMenuOpen && (
+                  <div className="toolbar-dropdown-menu" role="menu">
+                    <button
+                      type="button"
+                      className="toolbar-dropdown-item"
+                      role="menuitem"
+                      onClick={handleExportAllZip}
+                    >
+                      <Archive size={16} />
+                      <div className="dropdown-item-text">
+                        <strong>Export All as ZIP</strong>
+                        <small>Download all {molecules.length} JSON files (.zip)</small>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      className="toolbar-dropdown-item"
+                      role="menuitem"
+                      onClick={() => {
+                        setMoreMenuOpen(false);
+                        loadSampleMolecules();
+                      }}
+                    >
+                      <Sparkles size={16} />
+                      <div className="dropdown-item-text">
+                        <strong>Load Sample Library</strong>
+                        <small>Restore default 7 molecules & 4 stages</small>
+                      </div>
+                    </button>
+
+                    {molecules.length > 0 && (
+                      <>
+                        <div className="toolbar-dropdown-divider" />
+                        <button
+                          type="button"
+                          className="toolbar-dropdown-item danger"
+                          role="menuitem"
+                          onClick={() => {
+                            setMoreMenuOpen(false);
+                            clearAllMolecules();
+                          }}
+                        >
+                          <Trash2 size={16} />
+                          <div className="dropdown-item-text">
+                            <strong>Clear All Substances</strong>
+                            <small>Remove all cards from the library</small>
+                          </div>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <input
                 ref={batchInputRef}
                 type="file"
@@ -125,7 +207,7 @@ export const FreeGateScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* 分子卡片网格（无任何核验门禁，无“已通过”标签，支持随时新增、编辑、导出、删除） */}
+          {/* Molecule Card Grid (no individual export, no "Passed" badge) */}
           <div className="gate-grid" id="free-gate-card-grid">
             {molecules.map((item, idx) => {
               const { mol, doc } = item;
@@ -142,7 +224,7 @@ export const FreeGateScreen: React.FC = () => {
                   className="gate-card free-mol-card"
                   data-id={item.id}
                 >
-                  {/* 第 1 行：编号 + 参数速览 + 导出 + 删除（无“已通过”标签） */}
+                  {/* Row 1: Number + Icon-only Specs Quick View + Icon-only Delete */}
                   <div className="gate-card-top">
                     <span className="gate-card-num mono">NO.{numStr}</span>
                     <div className="gate-card-top-right">
@@ -150,12 +232,12 @@ export const FreeGateScreen: React.FC = () => {
                         <Tooltip.Trigger asChild>
                           <button
                             type="button"
-                            className="gate-hover-info-trigger"
-                            aria-label="悬停查看分子结构参数"
+                            className="card-mini-icon-btn"
+                            title="Quick Specifications"
+                            aria-label="Quick Specifications"
                             onClick={() => setPreviewMolId(item.id)}
                           >
-                            <Info size={13} />
-                            <span>参数速览</span>
+                            <Info size={15} />
                           </button>
                         </Tooltip.Trigger>
                         <Tooltip.Portal>
@@ -176,33 +258,33 @@ export const FreeGateScreen: React.FC = () => {
                             </div>
                             <div className="mol-hover-rows">
                               <div className="mol-hover-row">
-                                <span>空间构型</span>
+                                <span>Geometry</span>
                                 <strong>{mol.geometry || '-'}</strong>
                               </div>
                               <div className="mol-hover-row">
-                                <span>中心杂化</span>
+                                <span>Hybridization</span>
                                 <strong className="mono">
                                   {mol.hybridization && mol.hybridization !== 'none'
                                     ? mol.hybridization
-                                    : '无'}
+                                    : 'None'}
                                 </strong>
                               </div>
                               {bondLengths.map(([k, v]) => (
                                 <div key={k} className="mol-hover-row">
-                                  <span>键长 ({k})</span>
+                                  <span>Bond ({k})</span>
                                   <strong className="mono">{String(v)} Å</strong>
                                 </div>
                               ))}
                               {bondAngles.map(([k, v]) => (
                                 <div key={k} className="mol-hover-row">
-                                  <span>键角 ({k})</span>
+                                  <span>Angle ({k})</span>
                                   <strong className="mono">{String(v)}°</strong>
                                 </div>
                               ))}
                               {mol.radicals && mol.radicals.length > 0 && (
                                 <div className="mol-hover-row">
-                                  <span>未成对电子</span>
-                                  <strong>{mol.radicals.length} 个 (自由基)</strong>
+                                  <span>Unpaired e⁻</span>
+                                  <strong>{mol.radicals.length} (Radical)</strong>
                                 </div>
                               )}
                             </div>
@@ -216,24 +298,17 @@ export const FreeGateScreen: React.FC = () => {
 
                       <button
                         type="button"
-                        className="card-mini-icon-btn"
-                        title="导出该分子 JSON"
-                        onClick={() => handleDownloadCardJson(doc, mol.formula)}
-                      >
-                        <Download size={13} />
-                      </button>
-                      <button
-                        type="button"
                         className="card-mini-icon-btn danger"
-                        title="删除该分子"
+                        title="Delete substance"
+                        aria-label="Delete substance"
                         onClick={() => deleteMolecule(item.id)}
                       >
-                        <Trash2 size={13} />
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </div>
 
-                  {/* 第 2 行：大字化学式 + 中文名 + 构型胶囊 */}
+                  {/* Row 2: Formula + Name + Geometry Pill */}
                   <div className="gate-card-center">
                     <div
                       className="gate-formula"
@@ -249,30 +324,32 @@ export const FreeGateScreen: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* 第 3 行：编辑结构 + 3D 结构与详情 */}
+                  {/* Row 3: Concise Edit & 3D View Buttons */}
                   <div className="gate-card-actions">
                     <button
                       type="button"
                       className="gate-action-btn secondary"
+                      title="Edit molecular structure"
                       onClick={() => openBuilder(item.id)}
                     >
-                      <Edit3 size={14} />
-                      <span>编辑结构</span>
+                      <Edit3 size={15} />
+                      <span>Edit</span>
                     </button>
                     <button
                       type="button"
                       className="gate-action-btn primary"
+                      title="Inspect 3D model and specifications"
                       onClick={() => setPreviewMolId(item.id)}
                     >
                       <Box size={15} />
-                      <span>3D 结构与详情</span>
+                      <span>3D View</span>
                     </button>
                   </div>
                 </motion.div>
               );
             })}
 
-            {/* 网格末尾新增卡片入口 */}
+            {/* Add Chemical Substance Card (unified wording with top button) */}
             <button
               type="button"
               className="gate-card add-mol-card"
@@ -280,19 +357,21 @@ export const FreeGateScreen: React.FC = () => {
             >
               <div className="add-mol-card-inner">
                 <span className="add-mol-icon">
-                  <Plus size={24} />
+                  <Plus size={26} />
                 </span>
-                <strong>新增化学物质</strong>
-                <span>从元素周期表选元素连键构建</span>
+                <strong>Add Chemical Substance</strong>
+                <span>Select elements from periodic table & connect bonds</span>
               </div>
             </button>
           </div>
+        </div>
 
-          {/* 底部控制栏（无校验锁，随时可进入下一步） */}
-          <div className="gate-footer">
+        {/* Fixed Full-Width Bottom Step Bar */}
+        <div className="fixed-bottom-bar">
+          <div className="fixed-bottom-bar-inner">
             <div className="gate-progress-info">
               <span>
-                当前已构建 <strong className="mono">{molecules.length}</strong> 种化学微粒
+                <strong className="mono">{molecules.length}</strong> chemical substance(s) in library
               </span>
             </div>
             <button
@@ -301,7 +380,7 @@ export const FreeGateScreen: React.FC = () => {
               className="primary-button enter-stage-btn"
               onClick={enterPipeline}
             >
-              <span>下一步：编排反应阶段</span>
+              <span>Next</span>
               <ArrowRight size={18} />
             </button>
           </div>

@@ -14,12 +14,12 @@ export interface SlotDef {
 }
 
 export const REQUIRED_SLOTS: SlotDef[] = [
-  { id: 'CH4', num: '01', name: '甲烷', formula: 'CH4', formulaHtml: 'CH<sub>4</sub>' },
-  { id: 'CH3', num: '02', name: '甲基自由基', formula: 'CH3·', formulaHtml: 'CH<sub>3</sub>·' },
-  { id: 'CH3Br', num: '03', name: '一溴甲烷', formula: 'CH3Br', formulaHtml: 'CH<sub>3</sub>Br' },
-  { id: 'Br2', num: '04', name: '溴单质', formula: 'Br2', formulaHtml: 'Br<sub>2</sub>' },
-  { id: 'HBr', num: '05', name: '溴化氢', formula: 'HBr', formulaHtml: 'HBr' },
-  { id: 'Br', num: '06', name: '溴自由基', formula: 'Br·', formulaHtml: 'Br·' },
+  { id: 'CH4', num: '01', name: 'Methane', formula: 'CH4', formulaHtml: 'CH<sub>4</sub>' },
+  { id: 'CH3', num: '02', name: 'Methyl Radical', formula: 'CH3·', formulaHtml: 'CH<sub>3</sub>·' },
+  { id: 'CH3Br', num: '03', name: 'Bromomethane', formula: 'CH3Br', formulaHtml: 'CH<sub>3</sub>Br' },
+  { id: 'Br2', num: '04', name: 'Bromine', formula: 'Br2', formulaHtml: 'Br<sub>2</sub>' },
+  { id: 'HBr', num: '05', name: 'Hydrogen Bromide', formula: 'HBr', formulaHtml: 'HBr' },
+  { id: 'Br', num: '06', name: 'Bromine Radical', formula: 'Br·', formulaHtml: 'Br·' },
 ];
 
 export const POOL_MOLECULES: SlotDef[] = [
@@ -27,7 +27,7 @@ export const POOL_MOLECULES: SlotDef[] = [
   {
     id: 'CH3CH3',
     num: '07',
-    name: '乙烷',
+    name: 'Ethane',
     formula: 'CH3CH3',
     formulaHtml: 'CH<sub>3</sub>CH<sub>3</sub>',
   },
@@ -191,7 +191,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
 
   config: null,
   states: [],
-  sourceName: '预置标准配置',
+  sourceName: 'Default Configuration',
   index: 0,
   progress: 1,
   playing: false,
@@ -257,7 +257,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       const act = REQUIRED_SLOTS.find((s) => s.id === id);
       const expName = exp ? `${exp.name} (${exp.formula})` : expectedId;
       const actName = act ? `${act.name} (${act.formula})` : id;
-      const msg = `分子不匹配：当前为 ${expName}，上传的文件为 ${actName}。`;
+      const msg = `Molecule mismatch: expected ${expName}, but uploaded ${actName}.`;
       set({
         slotState: {
           ...get().slotState,
@@ -269,12 +269,12 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
 
     const targetId = expectedId || id;
     if (!REQUIRED_SLOTS.some((s) => s.id === targetId)) {
-      throw new Error(`不认识的分子标识 ${targetId}`);
+      throw new Error(`Unrecognized molecule ID: ${targetId}`);
     }
 
     try {
       const template = (baseData.catalog as any)[targetId];
-      if (!template) throw new Error(`缺少 ${targetId} 的参考模板。`);
+      if (!template) throw new Error(`Missing reference template for ${targetId}.`);
       const mol = files.structure(doc, template);
       const warnings: string[] = [];
       if (Array.isArray(template.measurements)) {
@@ -282,9 +282,9 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
           const n = core.measure(mol, q.atoms);
           if (Number.isFinite(n) && Math.abs(n - q.value) > q.tolerance) {
             warnings.push(
-              `${q.label}：当前测量值为 ${n.toFixed(q.atoms.length === 2 ? 3 : 2)}${
+              `${q.label}: measured ${n.toFixed(q.atoms.length === 2 ? 3 : 2)}${
                 q.atoms.length === 2 ? ' Å' : '°'
-              }，偏离实验/理论参考范围，请核对。`
+              }, deviates from reference value.`
             );
           }
         });
@@ -332,13 +332,13 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
                   status: 'error',
                   doc: null,
                   mol: null,
-                  error: `文件格式有误：${je.message}`,
+                  error: `Invalid JSON format: ${je.message}`,
                   warnings: [],
                 },
               },
             });
           } else {
-            get().showToast(`${file.name}：文件格式有误，请检查语法。`);
+            get().showToast(`${file.name}: Invalid JSON syntax.`);
           }
           anyFailed++;
           continue;
@@ -348,12 +348,13 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
         else anyFailed++;
       } catch (e: any) {
         anyFailed++;
-        get().showToast(`${file.name}：${e.message}`);
+        get().showToast(`${file.name}: ${e.message}`);
       }
     }
-    if (anyPassed > 0 && anyFailed === 0) get().showToast(`成功通过 ${anyPassed} 个分子核验！`);
+    if (anyPassed > 0 && anyFailed === 0)
+      get().showToast(`Successfully verified ${anyPassed} molecule(s)!`);
     else if (anyPassed > 0 && anyFailed > 0)
-      get().showToast(`${anyPassed} 个通过核验，${anyFailed} 个存在错误。`);
+      get().showToast(`${anyPassed} verified, ${anyFailed} failed verification.`);
   },
 
   loadPreset: (silent = false) => {
@@ -364,7 +365,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
         get().verifySingleDoc(doc);
       } catch {}
     });
-    if (!silent) get().showToast('已载入全部 6 种分子的预置标准配置！');
+    if (!silent) get().showToast('Loaded all 6 preset molecular configurations!');
   },
 
   loadDefault: async () => {
@@ -377,7 +378,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     try {
       async function read(path: string) {
         const r = await fetch(path, { cache: 'no-store' });
-        if (!r.ok) throw new Error(`${path}（HTTP ${r.status}）`);
+        if (!r.ok) throw new Error(`${path} (HTTP ${r.status})`);
         return await r.json();
       }
       const project = await read('教师配置/项目.json');
@@ -396,7 +397,6 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       set({ baseData: { project, catalog, steps, students } });
       get().loadPreset(true);
     } catch {
-      // Fallback to embedded default bundle
       set({ baseData: CHEM_DEFAULT_FILES });
       get().loadPreset(true);
     }
@@ -441,7 +441,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       pipelineVerified: false,
       pipelineFeedback: null,
     });
-    get().showToast('已清空所有反应微粒。');
+    get().showToast('Cleared all reaction species.');
   },
 
   autofillPipeline: () => {
@@ -449,17 +449,17 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       pipelineData: createInitialPipelineData(),
       pipelineFeedback: null,
     });
-    get().showToast('已一键预填标准化学反应微粒！');
+    get().showToast('Auto-filled standard reaction pathway!');
   },
 
   enterPipelineFromGate: () => {
     const validCount = Object.values(get().slotState).filter((s) => s.status === 'valid').length;
     if (validCount !== 6) {
-      get().showToast(`当前仅通过 ${validCount} / 6，请先完成全部分子核验。`);
+      get().showToast(`Only ${validCount} / 6 verified. Please complete all molecule verifications first.`);
       return false;
     }
     set({ screen: 'pipeline' });
-    get().showToast('已载入分子积木，请拼装微观反应序列！');
+    get().showToast('Loaded molecular building blocks. Assemble the reaction pathway!');
     return true;
   },
 
@@ -489,7 +489,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
         steps: baseData.steps,
         students,
       });
-      const ok = get().installConfig(assembled, '学生核验配置');
+      const ok = get().installConfig(assembled, 'Verified Student Config');
       if (!ok) return false;
       set({
         pipelineVerified: true,
@@ -497,10 +497,10 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
         screen: 'stage',
       });
       get().triggerResetView();
-      get().showToast('🎉 反应序列拼装正确！已激活三维反应工作台，请观察原子级断键成键！');
+      get().showToast('Reaction pathway verified! Entering 3D Mechanism Workbench.');
       return true;
     } catch (e: any) {
-      get().showToast('组装失败：' + e.message);
+      get().showToast('Assembly failed: ' + e.message);
       return false;
     }
   },
@@ -519,7 +519,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     try {
       result = core.validate(data);
     } catch (e: any) {
-      result = { errors: ['配置结构无法读取，请检查字段类型。' + e.message], warnings: [] };
+      result = { errors: ['Invalid configuration structure: ' + e.message], warnings: [] };
     }
     if (result.errors.length || !result.states) {
       set({
@@ -532,7 +532,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       return false;
     }
     if (typeof document !== 'undefined') {
-      document.title = data.title + ' · 反应可视化';
+      document.title = '3D Interactive Chemical Reaction Workbench';
     }
     set({
       playing: false,
@@ -559,7 +559,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     if (fileList.length > 6 || fileList.some((f) => f.size > 1024 * 1024)) {
       set({
         validationReport: {
-          errors: ['每次请选择 1—6 个分子文件，每个文件不超过 1 MB。'],
+          errors: ['Please select 1–6 molecule files, each under 1 MB.'],
           warnings: [],
           accepted: false,
         },
@@ -572,7 +572,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
           try {
             return { name: file.name, data: JSON.parse(await file.text()) };
           } catch (je: any) {
-            throw new Error(`${file.name}：JSON 读取失败（${je.message}）`);
+            throw new Error(`${file.name}: Failed to parse JSON (${je.message})`);
           }
         })
       );
@@ -585,13 +585,13 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
             accepted: false,
           },
         });
-      } else if (get().installConfig(result.config, '已导入：' + result.changed.join('、'))) {
+      } else if (get().installConfig(result.config, 'Imported: ' + result.changed.join(', '))) {
         docs.forEach((d) => {
           try {
             get().verifySingleDoc(d.data);
           } catch {}
         });
-        get().showToast('已更新 ' + result.changed.join('、') + '，其余分子保留当前配置。');
+        get().showToast('Updated ' + result.changed.join(', ') + '.');
       }
     } catch (err: any) {
       set({
@@ -614,15 +614,15 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       steps: baseData.steps,
       students,
     });
-    get().installConfig(assembled, '分文件配置');
-    get().showToast('已恢复为默认配置。');
+    get().installConfig(assembled, 'Default Config');
+    get().showToast('Restored default configuration.');
   },
 
   go: (i: number, animate = false) => {
     const { config, unlockedMaxStep, solvedSteps } = get();
     if (!config || i < 0 || i > 6) return;
     if (i > unlockedMaxStep + 1) {
-      get().showToast(`🔒 第 ${i + 1} 步尚未解锁，请先完成前序步骤推演。`);
+      get().showToast(`Step ${i + 1} is locked. Complete previous step deductions first.`);
       return;
     }
     const isSolved = solvedSteps.includes(i);
@@ -646,7 +646,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     const isCurrentSolved = solvedSteps.includes(index);
 
     if (!isCurrentSolved) {
-      get().showToast('🔒 请先完成本步反应推演并检验，即可解锁动画播放。');
+      get().showToast('Complete and verify the deduction for this step to unlock animation playback.');
       return;
     }
     if (playing) {
@@ -722,9 +722,9 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     });
     get().go(stepIdx, true);
     if (nextSolved.length === 7) {
-      get().showToast('🎉 恭喜！已完成全部 7 步反应机理推演，全流程连续播放已解锁！');
+      get().showToast('Congratulations! All 7 reaction mechanism steps completed. Continuous playback unlocked!');
     } else {
-      get().showToast(`第 ${stepIdx + 1} 步推演通过！已解锁下一步。`);
+      get().showToast(`Step ${stepIdx + 1} verified! Next step unlocked.`);
     }
   },
 }));

@@ -1,6 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { CheckCircle2, ChevronDown, Lock, RotateCcw, Sparkles } from 'lucide-react';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  Lock,
+  RotateCcw,
+  Sparkles,
+} from 'lucide-react';
 import { useChemStore } from '../../store/useChemStore';
 import * as core from '../../engine/core';
 import * as deduction from '../../engine/deduction';
@@ -19,8 +30,6 @@ export function getStepInstances(
   prog: number
 ): StepInstance[] {
   if (!config) return [];
-  // 化学反应发生步骤：index 1 (均裂), index 3 (夺氢), index 5 (成键)
-  // 反应发生并完成断键成键前 (prog < 0.6)，三维模型处于反应前初始状态，标签应对应起始微粒
   if ([1, 3, 5].includes(stepIdx) && prog < 0.6) {
     if (stepIdx === 1) {
       return [
@@ -37,7 +46,7 @@ export function getStepInstances(
           position: [3, -2.4, -0.5],
           rotation: [0, -53.130102, 0],
           atomMap: { c: 'C', h1: 'H1', h2: 'H2', h3: 'H3', h4: 'H4' },
-          caption: 'CH₄ · 尚未反应',
+          caption: 'CH₄ · Unreacted',
         },
         {
           molecule: 'Br2',
@@ -45,7 +54,7 @@ export function getStepInstances(
           position: [-2.7, -2.4, -0.5],
           rotation: [0, 0, 0],
           atomMap: { br1: 'BrD', br2: 'BrC' },
-          caption: '另一分子 Br₂',
+          caption: 'Spectator Br₂',
         },
       ];
     }
@@ -75,7 +84,6 @@ export const StageScreen: React.FC = () => {
   const setProgress = useChemStore((s) => s.setProgress);
   const setSpeed = useChemStore((s) => s.setSpeed);
   const toggleContext = useChemStore((s) => s.toggleContext);
-  const setSelection = useChemStore((s) => s.setSelection);
   const returnToPipeline = useChemStore((s) => s.returnToPipeline);
   const markStepSolved = useChemStore((s) => s.markStepSolved);
 
@@ -116,7 +124,6 @@ export const StageScreen: React.FC = () => {
     zoomRef.current = 1;
   }, [resetCameraTrigger]);
 
-  // Expose current sampled state for window.chemLab diagnostics
   useEffect(() => {
     if (config && states.length) {
       currentSampleRef.current = core.sample(config, states, index, progress);
@@ -140,7 +147,7 @@ export const StageScreen: React.FC = () => {
         preserveDrawingBuffer: false,
       });
     } catch (e: any) {
-      setLoadError('无法初始化 WebGL 三维渲染器：' + e.message);
+      setLoadError('Failed to initialize WebGL 3D renderer: ' + e.message);
       return;
     }
 
@@ -400,7 +407,6 @@ export const StageScreen: React.FC = () => {
     ro.observe(stageEl);
     resize();
 
-    // Pointer & Wheel handlers
     const pointers = new Map<number, { x: number; y: number }>();
     let gesture: { distance: number; zoom: number } | null = null;
     let dragDistance = 0;
@@ -480,7 +486,6 @@ export const StageScreen: React.FC = () => {
     vp.addEventListener('pointercancel', onPointerUp);
     vp.addEventListener('wheel', onWheel, { passive: false });
 
-    // 60fps Animation loop using transient store reads
     let rafId = 0;
     let lastTime = performance.now();
     let hold = 0;
@@ -565,7 +570,7 @@ export const StageScreen: React.FC = () => {
     if (!selPhase || !selEq || !selBreak || !selForm) {
       setDeductionFeedback({
         type: 'error',
-        text: '请完整选择全部 4 项推演内容后再进行核验。',
+        text: 'Please select all 4 deduction items before verifying.',
       });
       return;
     }
@@ -578,47 +583,39 @@ export const StageScreen: React.FC = () => {
     if (!res.ok) {
       setDeductionFeedback({
         type: 'error',
-        text: res.hint || '推演有误，请重新思考。',
+        text: res.hint || 'Deduction incorrect, please review.',
       });
       return;
     }
     setDeductionFeedback({
       type: 'success',
-      text: '🎉 推演正确！正在呈现三维分子动态变化…',
+      text: 'Correct! Playing 3D molecular mechanism animation…',
     });
     markStepSolved(index);
   };
 
   let playIcon = '↻';
-  let playText = '重播本步';
+  let playText = 'Replay Step';
   if (playing) {
     playIcon = 'Ⅱ';
-    playText = '暂停';
+    playText = 'Pause';
   } else if (progress < 1) {
     playIcon = '▶';
-    playText = '继续播放';
+    playText = 'Resume';
   } else if (allSolved) {
     playIcon = '▶';
-    playText = index === 6 ? '从头播放' : '连续播放';
+    playText = index === 6 ? 'Play from Start' : 'Continuous Play';
   }
 
   return (
-    <div className="app-layout" id="main-stage">
-      {/* 左侧步骤导航 */}
-      <aside className="sidebar" aria-label="反应步骤">
-        <div className="sidebar-heading">
-          <span>反应过程</span>
-          <button
-            id="stage-return-pipeline-btn"
-            type="button"
-            className="text-button sidebar-return-btn"
-            title="返回反应链路组装"
-            onClick={returnToPipeline}
-          >
-            ‹ 返回组装
-          </button>
-        </div>
-        <nav id="steps" aria-label="选择展示步骤">
+    <div className="stage-screen-shell">
+      <div className="app-layout has-fixed-bottom-bar-stage" id="main-stage">
+        {/* Left Sidebar: Reaction Steps */}
+        <aside className="sidebar" aria-label="Reaction Steps">
+          <div className="sidebar-heading">
+            <span>Mechanism Steps</span>
+          </div>
+        <nav id="steps" aria-label="Select Reaction Step">
           {config.steps.map((s, i) => {
             const solved = solvedSteps.includes(i);
             const locked = i > unlockedMaxStep + 1;
@@ -631,7 +628,7 @@ export const StageScreen: React.FC = () => {
                   locked ? 'locked' : ''
                 } ${currentTask ? 'current-task' : ''}`}
                 data-index={i}
-                aria-label={`第 ${i + 1} 步：${s.title}`}
+                aria-label={`Step ${i + 1}: ${s.title}`}
                 aria-current={i === index ? 'step' : undefined}
                 onClick={() => go(i, false)}
               >
@@ -647,7 +644,7 @@ export const StageScreen: React.FC = () => {
         </nav>
       </aside>
 
-      {/* 中央三维舞台与播放控制栏 */}
+      {/* Center 3D Stage & Playback Transport */}
       <main className="workspace">
         <section className="step-heading" aria-live="polite" aria-atomic="true">
           <h2 id="step-title">{currentStep.title}</h2>
@@ -658,35 +655,37 @@ export const StageScreen: React.FC = () => {
           className="stage"
           id="stage"
           ref={stageRef}
-          aria-label="可旋转的三维反应模型"
+          aria-label="Interactive 3D Reaction Model"
         >
           <div
             id="viewport"
             ref={viewportRef}
             tabIndex={0}
             role="img"
-            aria-label={`第 ${index + 1} 步：${currentStep.description} 拖动旋转，滚轮缩放。`}
+            aria-label={`Step ${index + 1}: ${currentStep.description}. Drag to rotate, scroll to zoom.`}
           />
           <div id="labels" ref={labelsRef} aria-hidden="true" />
           <div className="stage-tools">
             <button
               id="context-toggle"
               type="button"
-              className="quiet-button"
+              className="stage-icon-btn"
               aria-pressed={showContext}
-              title="切换背景旁观微粒显示"
+              title={showContext ? 'Hide spectator species' : 'Show spectator species'}
+              aria-label="Toggle spectator species"
               onClick={toggleContext}
             >
-              旁观粒子: {showContext ? '开' : '关'}
+              {showContext ? <Eye size={16} /> : <EyeOff size={16} />}
             </button>
             <button
               id="reset-view"
               type="button"
-              className="quiet-button"
-              title="恢复模型的默认观察方向"
+              className="stage-icon-btn"
+              title="Reset camera view"
+              aria-label="Reset camera view"
               onClick={triggerResetView}
             >
-              复位视角 <span aria-hidden="true">⤾</span>
+              <RotateCcw size={16} />
             </button>
           </div>
 
@@ -702,35 +701,35 @@ export const StageScreen: React.FC = () => {
               Br
             </span>
             <span className="radical-legend">
-              <b>·</b> 未成对电子
+              <b>·</b> Unpaired Electron
             </span>
           </div>
 
           <div id="light-cue" ref={lightCueRef} hidden={index !== 1}>
             <span>hν</span>
-            <small>光照</small>
+            <small>UV Light</small>
           </div>
 
           <div className="stage-hint" id="stage-hint">
-            拖动旋转 · 滚轮缩放
+            Drag to rotate · Scroll to zoom
           </div>
 
           {selectedAtom && (
             <div id="atom-detail">
               <strong>
-                {selectedAtom.element} · 原子 {selection}
+                {selectedAtom.element} · Atom {selection}
               </strong>
               <br />
               <span>
-                场景坐标 ({selectedAtom.position.map((n) => n.toFixed(3)).join(', ')}) Å
+                Coordinates ({selectedAtom.position.map((n) => n.toFixed(3)).join(', ')}) Å
               </span>
               <br />
               <span>
                 {selectedAtom.radical > 0.95
-                  ? '含一个未成对电子'
+                  ? 'Contains an unpaired electron'
                   : progress < 1
-                  ? '反应过渡中'
-                  : '无自由基标记'}
+                  ? 'In transition'
+                  : 'Closed-shell state'}
               </span>
             </div>
           )}
@@ -741,129 +740,14 @@ export const StageScreen: React.FC = () => {
             </div>
           )}
         </section>
-
-        <footer className="playback">
-          <div className="transport">
-            <button
-              id="stage-footer-back-btn"
-              type="button"
-              className="text-button footer-back-btn stage-back-btn"
-              title="返回第二步组装反应链路"
-              onClick={returnToPipeline}
-            >
-              ‹ 组装链路
-            </button>
-            <button
-              id="prev"
-              type="button"
-              className="icon-button transport-side"
-              aria-label="上一步"
-              title="上一步（←）"
-              disabled={index === 0}
-              onClick={() => go(index - 1, false)}
-            >
-              ‹
-            </button>
-            <button
-              id="play"
-              type="button"
-              className="primary-button"
-              disabled={!isCurrentSolved}
-              aria-label={playText}
-              onClick={play}
-            >
-              <span id="play-icon" aria-hidden="true">
-                {playIcon}
-              </span>
-              <span id="play-text">{playText}</span>
-            </button>
-            <button
-              id="next"
-              type="button"
-              className="icon-button transport-side"
-              aria-label="下一步"
-              title="下一步（→）"
-              disabled={index >= 6 || index > unlockedMaxStep}
-              onClick={() => go(index + 1, solvedSteps.includes(index + 1))}
-            >
-              ›
-            </button>
-            <button
-              id="replay"
-              type="button"
-              className="text-button replay-button"
-              title="从当前步骤的起点重播"
-              disabled={!isCurrentSolved || index === 0}
-              onClick={() => go(index, true)}
-            >
-              ↻ <span>重播本步</span>
-            </button>
-          </div>
-
-          <div className="scrub-row">
-            <span id="animation-status">
-              {playing
-                ? progress === 1
-                  ? '观察停留'
-                  : '正在演示'
-                : progress < 1
-                ? '已暂停'
-                : index === 6
-                ? '演示完成'
-                : '准备就绪'}
-            </span>
-            <input
-              id="progress"
-              type="range"
-              min="0"
-              max="1000"
-              value={Math.round(progress * 1000)}
-              disabled={!isCurrentSolved || index === 0}
-              aria-label="当前步骤动画进度"
-              onChange={(e) => setProgress(Number(e.target.value) / 1000, true)}
-            />
-            <span id="progress-label" className="mono">
-              {Math.round(progress * 100)}%
-            </span>
-          </div>
-
-          <div className="play-options">
-            <label className="speed-label">
-              <span>速度</span>
-              <div className="select-wrapper speed-select-wrapper">
-                <select
-                  id="speed"
-                  className="speed-select"
-                  aria-label="动画速度"
-                  value={String(speed)}
-                  onChange={(e) => setSpeed(Number(e.target.value))}
-                >
-                  <option value="0.5">0.5×</option>
-                  <option value="1">1×</option>
-                  <option value="1.5">1.5×</option>
-                  <option value="2">2×</option>
-                </select>
-                <ChevronDown size={14} className="select-chevron" />
-              </div>
-            </label>
-            <button
-              id="restart"
-              type="button"
-              className="text-button"
-              onClick={restart}
-            >
-              重新开始
-            </button>
-          </div>
-        </footer>
       </main>
 
-      {/* 右侧机理推演面板 */}
-      <aside className="panel-sidebar" id="panel-sidebar" aria-label="反应机理推演">
+      {/* Right Sidebar: Mechanism Deduction Panel */}
+      <aside className="panel-sidebar" id="panel-sidebar" aria-label="Reaction Mechanism Deduction">
         <div className="panel-header">
           <div className="panel-title-wrap">
             <span className="small-label">STEP ANALYSIS</span>
-            <h3>反应推演与机理</h3>
+            <h3>Mechanism Deduction</h3>
           </div>
           <span
             id="deduction-status"
@@ -876,12 +760,12 @@ export const StageScreen: React.FC = () => {
             }`}
           >
             {index === 0
-              ? '✓ 初始观察'
+              ? '✓ Observation'
               : isCurrentSolved
-              ? '✓ 推演已通过'
+              ? '✓ Verified'
               : index <= unlockedMaxStep + 1
-              ? '待推演'
-              : '🔒 未解锁'}
+              ? 'Pending'
+              : '🔒 Locked'}
           </span>
         </div>
 
@@ -889,7 +773,7 @@ export const StageScreen: React.FC = () => {
           {showMeasurements && (
             <div id="measurement-strip">
               {progress < 1 ? (
-                <span>反应过渡中 · 在步骤结束后查看结构的键长与键角</span>
+                <span>In transition · View bond lengths & angles after step completes</span>
               ) : (
                 (() => {
                   const unique = [
@@ -903,7 +787,7 @@ export const StageScreen: React.FC = () => {
                     .map((id) => config.molecules[id])
                     .filter((m) => m && m.measurements.length > 0);
                   if (!items.length) {
-                    return <span>单原子自由基没有分子内键长或键角。</span>;
+                    return <span>Monatomic radicals have no intramolecular bond lengths or angles.</span>;
                   }
                   return items.map((m) => {
                     const q = m.measurements.map((x) => {
@@ -921,7 +805,7 @@ export const StageScreen: React.FC = () => {
                           {m.formula} · {m.geometry}
                         </strong>
                         {q.join(' / ')}
-                        {warn ? ' · 请核对' : ''}
+                        {warn ? ' · Check values' : ''}
                       </span>
                     );
                   });
@@ -930,7 +814,7 @@ export const StageScreen: React.FC = () => {
             </div>
           )}
 
-          {/* 步骤反应推演交互卡片 */}
+          {/* Step Mechanism Deduction Card */}
           {stepData && (
             <div id="deduction-card" className="deduction-card">
               {deductionFeedback && (
@@ -945,17 +829,17 @@ export const StageScreen: React.FC = () => {
               <div className="deduction-body" id="deduction-body">
                 {index === 0 ? (
                   <div className="deduction-summary-box">
-                    <div className="summary-box-title">初始观察</div>
+                    <div className="summary-box-title">Initial Observation</div>
                     <p className="summary-box-text">{stepData.summary}</p>
                     <div className="summary-box-hint">
-                      观察完毕后，请点击左侧导航栏 <strong>02 光照激发</strong> 开始本步微观反应机理推演。
+                      After observing the initial molecules, click <strong>02</strong> on the left sidebar to begin deducing the reaction mechanism.
                     </div>
                   </div>
                 ) : isCurrentSolved ? (
                   <div className="deduction-summary-box solved-box">
                     <div className="summary-box-title">
-                      <CheckCircle2 size={15} />
-                      <span>本步推演结论</span>
+                      <CheckCircle2 size={16} />
+                      <span>Step Conclusion</span>
                     </div>
                     <p className="summary-box-text">{stepData.summary}</p>
                   </div>
@@ -964,7 +848,7 @@ export const StageScreen: React.FC = () => {
                     <div className="deduction-field">
                       <label className="deduction-label" htmlFor="deduce-phase">
                         <span className="deduction-q-num">01</span>
-                        <span>本步属于自由基取代的哪个阶段？</span>
+                        <span>Which reaction stage does this step belong to?</span>
                       </label>
                       <div className="select-wrapper">
                         <select
@@ -973,7 +857,7 @@ export const StageScreen: React.FC = () => {
                           value={selPhase}
                           onChange={(e) => setSelPhase(e.target.value)}
                         >
-                          <option value="">请选择反应阶段…</option>
+                          <option value="">Select reaction stage…</option>
                           {stepData.phaseOptions?.map((opt) => (
                             <option key={opt} value={opt}>
                               {opt}
@@ -987,7 +871,7 @@ export const StageScreen: React.FC = () => {
                     <div className="deduction-field">
                       <label className="deduction-label" htmlFor="deduce-equation">
                         <span className="deduction-q-num">02</span>
-                        <span>{stepData.fieldLabel || '微粒变化与反应式'}？</span>
+                        <span>{stepData.fieldLabel || 'Reaction Equation'}?</span>
                       </label>
                       <div className="select-wrapper">
                         <select
@@ -996,7 +880,7 @@ export const StageScreen: React.FC = () => {
                           value={selEq}
                           onChange={(e) => setSelEq(e.target.value)}
                         >
-                          <option value="">请选择微粒变化…</option>
+                          <option value="">Select species change…</option>
                           {stepData.equationOptions?.map((opt) => (
                             <option key={opt} value={opt}>
                               {opt}
@@ -1010,7 +894,7 @@ export const StageScreen: React.FC = () => {
                     <div className="deduction-field">
                       <label className="deduction-label" htmlFor="deduce-break">
                         <span className="deduction-q-num">03</span>
-                        <span>本步发生断裂的共价键？</span>
+                        <span>Broken Covalent Bond in this step?</span>
                       </label>
                       <div className="select-wrapper">
                         <select
@@ -1019,7 +903,7 @@ export const StageScreen: React.FC = () => {
                           value={selBreak}
                           onChange={(e) => setSelBreak(e.target.value)}
                         >
-                          <option value="">请选择断裂的化学键…</option>
+                          <option value="">Select broken bond…</option>
                           {stepData.breakBondOptions?.map((opt) => (
                             <option key={opt} value={opt}>
                               {opt}
@@ -1033,7 +917,7 @@ export const StageScreen: React.FC = () => {
                     <div className="deduction-field">
                       <label className="deduction-label" htmlFor="deduce-form">
                         <span className="deduction-q-num">04</span>
-                        <span>本步新生成的共价键？</span>
+                        <span>Formed Covalent Bond in this step?</span>
                       </label>
                       <div className="select-wrapper">
                         <select
@@ -1042,7 +926,7 @@ export const StageScreen: React.FC = () => {
                           value={selForm}
                           onChange={(e) => setSelForm(e.target.value)}
                         >
-                          <option value="">请选择生成的化学键…</option>
+                          <option value="">Select formed bond…</option>
                           {stepData.formBondOptions?.map((opt) => (
                             <option key={opt} value={opt}>
                               {opt}
@@ -1056,42 +940,26 @@ export const StageScreen: React.FC = () => {
                 ) : (
                   <div className="deduction-summary-box locked-box">
                     <div className="summary-box-title">
-                      <Lock size={14} />
-                      <span>尚未解锁</span>
+                      <Lock size={15} />
+                      <span>Locked</span>
                     </div>
                     <p className="summary-box-text">
-                      请先完成第 {unlockedMaxStep + 2} 步的反应推演，遵循化学反应发生的时序逐步探究。
+                      Please complete Step {unlockedMaxStep + 2} deduction first to unlock subsequent steps.
                     </p>
                   </div>
                 )}
               </div>
 
-              {(isCurrentSolved && index > 0) ||
-              (!isCurrentSolved && index > 0 && index <= unlockedMaxStep + 1) ? (
+              {!isCurrentSolved && index > 0 && index <= unlockedMaxStep + 1 ? (
                 <div className="deduction-action">
                   <button
                     id="deduction-submit-btn"
                     type="button"
                     className="primary-button deduction-btn"
-                    onClick={() => {
-                      if (isCurrentSolved) {
-                        go(index, true);
-                      } else {
-                        handleDeductionSubmit();
-                      }
-                    }}
+                    onClick={handleDeductionSubmit}
                   >
-                    {isCurrentSolved ? (
-                      <>
-                        <RotateCcw size={15} />
-                        <span>再次播放本步 3D 动画</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles size={15} />
-                        <span>检验反应推演</span>
-                      </>
-                    )}
+                    <Sparkles size={16} />
+                    <span>Verify Deduction</span>
                   </button>
                 </div>
               ) : null}
@@ -1104,6 +972,123 @@ export const StageScreen: React.FC = () => {
           </div>
         </section>
       </aside>
+      </div>
+
+      {/* Unified Full-Width Fixed Bottom Bar (Matches Step 1 & Step 2 height & layout) */}
+      <footer className="fixed-bottom-bar stage-fixed-footer" aria-label="Step Playback & Navigation">
+        <div className="fixed-bottom-bar-inner stage-bottom-bar-inner">
+          <div className="fixed-bottom-left">
+            <button
+              id="stage-footer-back-btn"
+              type="button"
+              className="toolbar-btn-outline"
+              title="Return to Step 2 Pathway Assembly"
+              onClick={returnToPipeline}
+            >
+              <ArrowLeft size={17} />
+              <span>Previous</span>
+            </button>
+          </div>
+
+          <div className="stage-bottom-center">
+            <div className="transport">
+              <button
+                id="prev"
+                type="button"
+                className="icon-button transport-side"
+                aria-label="Previous Step"
+                title="Previous Step (←)"
+                disabled={index === 0}
+                onClick={() => go(index - 1, false)}
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                id="play"
+                type="button"
+                className="primary-button stage-play-btn"
+                disabled={!isCurrentSolved}
+                aria-label={playText}
+                onClick={play}
+              >
+                <span id="play-icon" aria-hidden="true">
+                  {playIcon}
+                </span>
+                <span id="play-text">{playText}</span>
+              </button>
+              <button
+                id="next"
+                type="button"
+                className="icon-button transport-side"
+                aria-label="Next Step"
+                title="Next Step (→)"
+                disabled={index >= 6 || index > unlockedMaxStep}
+                onClick={() => go(index + 1, solvedSteps.includes(index + 1))}
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+
+            <div className="scrub-row">
+              <span id="animation-status">
+                {playing
+                  ? progress === 1
+                    ? 'Holding'
+                    : 'Playing'
+                  : progress < 1
+                  ? 'Paused'
+                  : index === 6
+                  ? 'Completed'
+                  : 'Ready'}
+              </span>
+              <input
+                id="progress"
+                type="range"
+                min="0"
+                max="1000"
+                value={Math.round(progress * 1000)}
+                disabled={!isCurrentSolved || index === 0}
+                aria-label="Step Animation Progress"
+                onChange={(e) => setProgress(Number(e.target.value) / 1000, true)}
+              />
+              <span id="progress-label" className="mono">
+                {Math.round(progress * 100)}%
+              </span>
+            </div>
+          </div>
+
+          <div className="fixed-bottom-right play-options">
+            <label className="speed-label">
+              <span>Speed</span>
+              <div className="select-wrapper speed-select-wrapper">
+                <select
+                  id="speed"
+                  className="speed-select"
+                  aria-label="Animation Speed"
+                  value={String(speed)}
+                  onChange={(e) => setSpeed(Number(e.target.value))}
+                >
+                  <option value="0.5">0.5×</option>
+                  <option value="1">1×</option>
+                  <option value="1.5">1.5×</option>
+                  <option value="2">2×</option>
+                </select>
+                <ChevronDown size={14} className="select-chevron" />
+              </div>
+            </label>
+            <button
+              id="restart"
+              type="button"
+              className="icon-button"
+              title="Restart all steps"
+              aria-label="Restart all steps"
+              onClick={restart}
+            >
+              <RotateCcw size={16} />
+            </button>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

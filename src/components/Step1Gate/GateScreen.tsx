@@ -35,8 +35,8 @@ export const GateScreen: React.FC = () => {
     <Tooltip.Provider delayDuration={140}>
       <section
         id="gate-screen"
-        className={`gate-screen ${screenDragover ? 'dragover' : ''}`}
-        aria-label="分子配置文件核验"
+        className={`gate-screen has-fixed-bottom-bar ${screenDragover ? 'dragover' : ''}`}
+        aria-label="Molecule Configuration Verification"
         onDragOver={(e) => {
           e.preventDefault();
           setScreenDragover(true);
@@ -52,16 +52,20 @@ export const GateScreen: React.FC = () => {
       >
         <div className="gate-container">
           <div className="gate-header">
-            <h2>上传分子配置</h2>
-            <div className="gate-actions">
+            <div>
+              <span className="small-label">STEP 1 / 3 · MOLECULE VERIFICATION</span>
+              <h2>Upload & Verify Molecular Configurations</h2>
+            </div>
+            <div className="gate-actions-toolbar">
               <button
                 id="gate-choose-files"
                 type="button"
-                className="text-button batch-upload-btn top-action-btn"
+                className="toolbar-icon-btn"
+                title="Upload JSON configuration files"
+                aria-label="Upload JSON configuration files"
                 onClick={() => batchInputRef.current?.click()}
               >
-                <Upload size={16} />
-                <span>上传文件</span>
+                <Upload size={18} />
               </button>
               <input
                 ref={batchInputRef}
@@ -80,7 +84,7 @@ export const GateScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* 6 分子配置核验卡片网格（无冗余 Tag 堆砌，支持 Hover 参数速览 + 3D 详情弹窗） */}
+          {/* 6 Molecule Verification Cards */}
           <div className="gate-grid" id="gate-card-grid">
             {REQUIRED_SLOTS.map((slot, idx) => {
               const state = slotState[slot.id] || {
@@ -138,7 +142,7 @@ export const GateScreen: React.FC = () => {
                     }}
                   />
 
-                  {/* 第 1 行：编号 + 状态与 Hover 参数浮层触发器 */}
+                  {/* Row 1: Number + Status & Hover Specs Trigger */}
                   <div className="gate-card-top">
                     <span className="gate-card-num mono">NO.{slot.num}</span>
                     <div className="gate-card-top-right">
@@ -147,12 +151,12 @@ export const GateScreen: React.FC = () => {
                           <Tooltip.Trigger asChild>
                             <button
                               type="button"
-                              className="gate-hover-info-trigger"
-                              aria-label="悬停查看分子结构参数"
+                              className="card-mini-icon-btn"
+                              title="Quick Specifications"
+                              aria-label="Hover to view molecular parameters"
                               onClick={() => setPreviewSlotId(slot.id)}
                             >
-                              <Info size={13} />
-                              <span>参数速览</span>
+                              <Info size={15} />
                             </button>
                           </Tooltip.Trigger>
                           <Tooltip.Portal>
@@ -163,7 +167,7 @@ export const GateScreen: React.FC = () => {
                               sideOffset={8}
                             >
                               <div className="mol-hover-head">
-                                <strong>{mol?.name || slot.name}</strong>
+                                <strong>{slot.name}</strong>
                                 <span
                                   className="mol-hover-formula"
                                   dangerouslySetInnerHTML={{
@@ -173,33 +177,33 @@ export const GateScreen: React.FC = () => {
                               </div>
                               <div className="mol-hover-rows">
                                 <div className="mol-hover-row">
-                                  <span>空间构型</span>
+                                  <span>Geometry</span>
                                   <strong>{mol?.geometry || '-'}</strong>
                                 </div>
                                 <div className="mol-hover-row">
-                                  <span>中心杂化</span>
+                                  <span>Hybridization</span>
                                   <strong className="mono">
                                     {doc.hybridization && doc.hybridization !== 'none'
                                       ? doc.hybridization
-                                      : '无'}
+                                      : 'None'}
                                   </strong>
                                 </div>
                                 {bondLengths.map(([k, v]) => (
                                   <div key={k} className="mol-hover-row">
-                                    <span>键长 ({k})</span>
+                                    <span>Bond Length ({k})</span>
                                     <strong className="mono">{String(v)} Å</strong>
                                   </div>
                                 ))}
                                 {bondAngles.map(([k, v]) => (
                                   <div key={k} className="mol-hover-row">
-                                    <span>键角 ({k})</span>
+                                    <span>Bond Angle ({k})</span>
                                     <strong className="mono">{String(v)}°</strong>
                                   </div>
                                 ))}
                                 {mol?.radicals && mol.radicals.length > 0 && (
                                   <div className="mol-hover-row">
-                                    <span>未成对电子</span>
-                                    <strong>{mol.radicals.length} 个 (自由基)</strong>
+                                    <span>Unpaired Electrons</span>
+                                    <strong>{mol.radicals.length} (Radical)</strong>
                                   </div>
                                 )}
                               </div>
@@ -218,24 +222,24 @@ export const GateScreen: React.FC = () => {
                         {isValid ? (
                           <>
                             <CheckCircle2 size={14} />
-                            <span>已通过</span>
+                            <span>Verified</span>
                           </>
                         ) : isError ? (
                           <>
                             <AlertCircle size={14} />
-                            <span>未通过</span>
+                            <span>Invalid</span>
                           </>
                         ) : (
                           <>
                             <CircleDashed size={14} />
-                            <span>待上传</span>
+                            <span>Pending</span>
                           </>
                         )}
                       </span>
                     </div>
                   </div>
 
-                  {/* 第 2 行：清爽大字化学式 + 中文名 + 构型 */}
+                  {/* Row 2: Formula + Name + Geometry */}
                   <div className="gate-card-center">
                     <div
                       className="gate-formula"
@@ -244,19 +248,19 @@ export const GateScreen: React.FC = () => {
                       }}
                     />
                     <div className="gate-meta-row">
-                      <span className="gate-name">{mol?.name || slot.name}</span>
+                      <span className="gate-name">{slot.name}</span>
                       {isValid && mol?.geometry && (
                         <span className="gate-geometry-pill">{mol.geometry}</span>
                       )}
                     </div>
                     {isError && (
                       <div className="gate-error-text">
-                        {state.error || '配置文件校验未通过'}
+                        {state.error || 'Configuration verification failed'}
                       </div>
                     )}
                   </div>
 
-                  {/* 第 3 行：底部双按钮操作栏 */}
+                  {/* Row 3: Action Buttons */}
                   <div className="gate-card-actions">
                     {isValid ? (
                       <>
@@ -265,16 +269,16 @@ export const GateScreen: React.FC = () => {
                           className="gate-action-btn secondary"
                           onClick={() => triggerSingleUpload(slot.id)}
                         >
-                          <RefreshCw size={14} />
-                          <span>重新上传</span>
+                          <RefreshCw size={15} />
+                          <span>Re-upload</span>
                         </button>
                         <button
                           type="button"
                           className="gate-action-btn primary"
                           onClick={() => setPreviewSlotId(slot.id)}
                         >
-                          <Box size={15} />
-                          <span>3D 结构与详情</span>
+                          <Box size={16} />
+                          <span>3D View</span>
                         </button>
                       </>
                     ) : (
@@ -283,8 +287,8 @@ export const GateScreen: React.FC = () => {
                         className="gate-action-btn upload-full"
                         onClick={() => triggerSingleUpload(slot.id)}
                       >
-                        <Upload size={15} />
-                        <span>{isError ? '重新选择文件上传' : '上传配置文件'}</span>
+                        <Upload size={16} />
+                        <span>{isError ? 'Re-select' : 'Upload JSON'}</span>
                       </button>
                     )}
                   </div>
@@ -292,9 +296,11 @@ export const GateScreen: React.FC = () => {
               );
             })}
           </div>
+        </div>
 
-          {/* 底部控制栏 */}
-          <div className="gate-footer">
+        {/* Fixed Full-Width Bottom Step Bar */}
+        <div className="fixed-bottom-bar">
+          <div className="fixed-bottom-bar-inner">
             <div className="gate-progress-info">
               <div className="gate-progress-track">
                 <div
@@ -304,7 +310,7 @@ export const GateScreen: React.FC = () => {
                 />
               </div>
               <span id="gate-progress-text">
-                已通过 <strong className="mono">{validCount}</strong> / 6
+                Verified <strong className="mono">{validCount}</strong> / 6
               </span>
             </div>
             <button
@@ -315,14 +321,14 @@ export const GateScreen: React.FC = () => {
               onClick={enterPipelineFromGate}
             >
               <span id="enter-btn-text">
-                {validCount === 6 ? '下一步：组装反应链路' : `组装反应链路 (${validCount}/6)`}
+                {validCount === 6 ? 'Next' : `Next (${validCount}/6)`}
               </span>
               <ArrowRight size={18} />
             </button>
           </div>
         </div>
 
-        {/* 单分子 3D 结构与完整参数详情弹窗 */}
+        {/* 3D Structure Preview Modal */}
         <MoleculePreviewModal />
       </section>
     </Tooltip.Provider>

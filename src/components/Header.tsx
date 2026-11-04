@@ -26,10 +26,10 @@ export const Header: React.FC = () => {
 
   const badgeText =
     screen === 'gate'
-      ? '第 1 步：分子核验'
+      ? 'Step 1: Molecule Verification'
       : screen === 'pipeline'
-      ? '第 2 步：反应链路拼装'
-      : '第 3 步：三维机理推演';
+      ? 'Step 2: Pathway Assembly'
+      : 'Step 3: 3D Mechanism Deduction';
 
   const handleGoGate = () => {
     if (screen !== 'gate') setScreen('gate');
@@ -38,7 +38,7 @@ export const Header: React.FC = () => {
   const handleGoPipeline = () => {
     if (screen === 'pipeline') return;
     if (!step1Done) {
-      showToast(`🔒 请先完成第 1 步全部 6 种分子配置核验（当前 ${validMolCount}/6）。`);
+      showToast(`Please verify all 6 required molecular structures first (${validMolCount}/6 completed).`);
       return;
     }
     if (screen === 'gate') {
@@ -51,11 +51,11 @@ export const Header: React.FC = () => {
   const handleGoStage = () => {
     if (screen === 'stage') return;
     if (!step1Done) {
-      showToast('🔒 请先完成第 1 步分子结构核验。');
+      showToast('Please complete Step 1: Molecule Verification first.');
       return;
     }
     if (!step2Done) {
-      showToast('🔒 请先在第 2 步完成反应链路拼装并点击验证通过。');
+      showToast('Please assemble and verify the reaction pathway in Step 2 first.');
       return;
     }
     submitPipelineAndEnterStage();
@@ -66,27 +66,27 @@ export const Header: React.FC = () => {
       <div className="identity">
         <button
           type="button"
-          className="mode-back-btn"
-          title="返回实验台模式选择首页"
+          className="header-back-arrow"
+          aria-label="Back to Home"
+          title="Back to Home"
           onClick={() => setAppMode('home')}
         >
-          <ArrowLeft size={16} />
-          <span>切换模式</span>
+          <ArrowLeft size={22} strokeWidth={2.2} />
         </button>
         <span className="mark" aria-hidden="true">
           <Atom size={22} strokeWidth={2} />
         </span>
         <div>
           <div className="identity-title-row">
-            <h1 id="project-title">{config?.title || '甲烷的自由基取代'}</h1>
+            <h1 id="project-title">{config?.title || 'Radical Substitution of Methane'}</h1>
           </div>
           <p>
-            化学 × 信息技术 <span>/</span> 微观反应机理交互实验台
+            Guided Workbench <span>/</span> 3D Reaction Mechanism Explorer
           </p>
         </div>
       </div>
 
-      <nav className="header-stepper" aria-label="实验流程步骤">
+      <nav className="header-stepper header-stepper-right" aria-label="Experiment Steps">
         <button
           type="button"
           className={`stepper-item ${screen === 'gate' ? 'active' : ''} ${
@@ -95,12 +95,12 @@ export const Header: React.FC = () => {
           onClick={handleGoGate}
         >
           <span className="stepper-num">
-            {step1Done && screen !== 'gate' ? <Check size={12} strokeWidth={3} /> : '1'}
+            {step1Done && screen !== 'gate' ? <Check size={13} strokeWidth={3} /> : '1'}
           </span>
-          <span className="stepper-label">分子结构核验</span>
+          <span className="stepper-label">Verify Molecules</span>
         </button>
 
-        <ChevronRight size={14} className="stepper-sep" />
+        <ChevronRight size={15} className="stepper-sep" />
 
         <button
           type="button"
@@ -108,22 +108,22 @@ export const Header: React.FC = () => {
             step2Done && screen !== 'pipeline' ? 'done' : ''
           } ${!step1Done ? 'locked' : ''}`}
           aria-disabled={!step1Done}
-          title={!step1Done ? '请先完成第 1 步全部分子配置核验' : '前往第 2 步：反应链路拼装'}
+          title={!step1Done ? 'Verify all 6 molecules in Step 1 first' : 'Go to Step 2: Pathway Assembly'}
           onClick={handleGoPipeline}
         >
           <span className="stepper-num">
             {!step1Done ? (
-              <Lock size={11} strokeWidth={2.5} />
+              <Lock size={12} strokeWidth={2.5} />
             ) : step2Done && screen !== 'pipeline' ? (
-              <Check size={12} strokeWidth={3} />
+              <Check size={13} strokeWidth={3} />
             ) : (
               '2'
             )}
           </span>
-          <span className="stepper-label">反应链路拼装</span>
+          <span className="stepper-label">Assemble Pathway</span>
         </button>
 
-        <ChevronRight size={14} className="stepper-sep" />
+        <ChevronRight size={15} className="stepper-sep" />
 
         <button
           type="button"
@@ -133,15 +133,15 @@ export const Header: React.FC = () => {
           aria-disabled={!step2Done}
           title={
             !step2Done
-              ? '请先完成前两步核验与反应链路装配'
-              : '前往第 3 步：三维机理推演'
+              ? 'Complete Step 1 and Step 2 verification first'
+              : 'Go to Step 3: 3D Mechanism Deduction'
           }
           onClick={handleGoStage}
         >
           <span className="stepper-num">
-            {!step2Done && screen !== 'stage' ? <Lock size={11} strokeWidth={2.5} /> : '3'}
+            {!step2Done && screen !== 'stage' ? <Lock size={12} strokeWidth={2.5} /> : '3'}
           </span>
-          <span className="stepper-label">三维机理推演</span>
+          <span className="stepper-label">3D Mechanism</span>
         </button>
       </nav>
 

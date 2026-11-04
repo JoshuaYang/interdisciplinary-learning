@@ -11,7 +11,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { motion, AnimatePresence } from 'motion/react';
-import { AlertTriangle, ArrowLeft, ArrowRight, Package, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Package, RotateCcw, X } from 'lucide-react';
 import {
   useChemStore,
   POOL_MOLECULES,
@@ -120,7 +120,9 @@ const DropZone: React.FC<DropZoneProps> = ({
       <div className="dropzone-header">
         <span className="dropzone-title">{titleText}</span>
         <span className="dropzone-count">
-          {particles.length ? `共 ${particles.length} 个微粒` : '空'}
+          {particles.length
+            ? `${particles.length} species`
+            : 'Empty'}
         </span>
       </div>
 
@@ -135,7 +137,7 @@ const DropZone: React.FC<DropZoneProps> = ({
               className="dropzone-empty-prompt"
             >
               <span className="dropzone-empty-icon">＋</span>
-              <span>从上方微粒池拖入或点击放入</span>
+              <span>Drag from the species pool above or click to place</span>
             </motion.div>
           ) : (
             particles.map((molId, itemIdx) => {
@@ -144,10 +146,10 @@ const DropZone: React.FC<DropZoneProps> = ({
                 <motion.div
                   key={`${molId}-${itemIdx}`}
                   layout
-                  initial={{ scale: 0.75, opacity: 0 }}
+                  initial={{ scale: 0.82, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.65, opacity: 0 }}
-                  transition={{ type: 'spring', stiffness: 480, damping: 28 }}
+                  exit={{ scale: 0.7, opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                   className="dropzone-particle-item"
                 >
                   <span
@@ -160,13 +162,13 @@ const DropZone: React.FC<DropZoneProps> = ({
                   <button
                     type="button"
                     className="particle-remove-btn"
-                    title="移除此微粒"
+                    title="Remove species"
                     onClick={(e) => {
                       e.stopPropagation();
                       removeParticleFromZone(stageId, role, itemIdx, reactionIndex);
                     }}
                   >
-                    <X size={13} />
+                    <X size={14} />
                   </button>
                 </motion.div>
               );
@@ -223,7 +225,11 @@ export const PipelineScreen: React.FC = () => {
     : null;
 
   return (
-    <section id="pipeline-screen" className="pipeline-screen" aria-label="微观反应链路装配">
+    <section
+      id="pipeline-screen"
+      className="pipeline-screen has-fixed-bottom-bar"
+      aria-label="Reaction Pathway Assembly"
+    >
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
@@ -233,35 +239,36 @@ export const PipelineScreen: React.FC = () => {
           <div className="pipeline-header">
             <div>
               <span className="small-label">STEP 2 / 3 · REACTION ASSEMBLY</span>
-              <h2>拼装微观反应链路</h2>
+              <h2>Assemble Reaction Pathway</h2>
               <p className="pipeline-subtitle">
-                从上方微粒池中拖拽分子（或点击放入），拼装链引发、链增长与链终止阶段的初始物料与生成物。
+                Drag species from the pool above (or click to place) to assemble chain initiation, propagation, and termination stages.
               </p>
             </div>
             <div className="pipeline-header-actions">
               <button
                 id="pipeline-reset-btn"
                 type="button"
-                className="text-button top-action-btn"
+                className="toolbar-icon-btn"
+                title="Clear all stages"
+                aria-label="Clear all stages"
                 onClick={resetPipeline}
               >
-                <Trash2 size={16} />
-                <span>清空微粒</span>
+                <RotateCcw size={17} />
               </button>
             </div>
           </div>
 
-          {/* 顶部可用微粒积木池 */}
+          {/* Available Species Pool */}
           <div className="molecule-pool-card">
             <div className="pool-title">
               <span>
                 <Package
-                  size={17}
-                  style={{ display: 'inline', verticalAlign: '-3px', marginRight: 6 }}
+                  size={18}
+                  style={{ display: 'inline', verticalAlign: '-3px', marginRight: 7 }}
                 />
-                可用微粒积木池
+                Available Species Pool
               </span>
-              <small>可拖拽或点击微粒放入下方反应区域，自由基带有 · 标记</small>
+              <small>Drag or click species into the reaction zones below (radicals are marked with ·)</small>
             </div>
             <div className="molecule-chips" id="molecule-chips">
               {POOL_MOLECULES.map((slot) => (
@@ -275,7 +282,7 @@ export const PipelineScreen: React.FC = () => {
                     } else {
                       setSelectedPoolMol(slot.id);
                       showToast(
-                        `已选取 ${slot.name} (${slot.formula})，点击下方「反应前物料」或「反应后产物」区域即可放入。`
+                        `Selected ${slot.name} (${slot.formula}). Click "Reactants" or "Products" below to place it.`
                       );
                     }
                   }}
@@ -284,43 +291,45 @@ export const PipelineScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* 反应阶段 Tab 切换导航 */}
-          <div className="pipeline-tabs-nav" id="pipeline-tabs-nav" role="tablist">
-            {PIPELINE_STEPS.map((step, idx) => {
-              const stageObj =
-                pipelineData[step.id] ||
-                (step.isMultiReaction ? { reactions: [] } : { reactants: [], products: [] });
-              let badgeContent = String(idx + 1);
-              let statusClass = '';
+          {/* Stage Selector Bar */}
+          <div className="stage-bar-header">
+            <div className="stage-pills-track" id="pipeline-tabs-nav" role="tablist">
+              {PIPELINE_STEPS.map((step, idx) => {
+                const stageObj =
+                  pipelineData[step.id] ||
+                  (step.isMultiReaction ? { reactions: [] } : { reactants: [], products: [] });
+                let badgeContent = String(idx + 1);
+                let statusClass = '';
 
-              if (pipelineVerified) {
-                const check = verifyStage(step.id, stageObj);
-                if (check.ok) {
-                  statusClass = 'is-valid';
-                  badgeContent = '✓';
-                } else {
-                  statusClass = 'is-invalid';
-                  badgeContent = '!';
+                if (pipelineVerified) {
+                  const check = verifyStage(step.id, stageObj);
+                  if (check.ok) {
+                    statusClass = 'is-valid';
+                    badgeContent = '✓';
+                  } else {
+                    statusClass = 'is-invalid';
+                    badgeContent = '!';
+                  }
                 }
-              }
 
-              return (
-                <button
-                  key={step.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={idx === activePipelineTab}
-                  className={`pipeline-tab-btn ${statusClass}`}
-                  onClick={() => setActivePipelineTab(idx)}
-                >
-                  <span className="tab-badge">{badgeContent}</span>
-                  <span>{step.phaseName}</span>
-                </button>
-              );
-            })}
+                return (
+                  <button
+                    key={step.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={idx === activePipelineTab}
+                    className={`stage-pill-tab ${idx === activePipelineTab ? 'active' : ''} ${statusClass}`}
+                    onClick={() => setActivePipelineTab(idx)}
+                  >
+                    <span className="tab-badge">{badgeContent}</span>
+                    <span>{step.phaseName}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* 当前选中阶段的装配工作区 */}
+          {/* Active Stage Workspace */}
           <div className="pipeline-active-stage" id="pipeline-active-stage">
             <motion.div
               key={currentStep.id}
@@ -333,7 +342,7 @@ export const PipelineScreen: React.FC = () => {
                 <div className="track-header-left">
                   <span className="track-summary">{currentStep.summary}</span>
                 </div>
-                <span className="track-condition-pill">反应条件：{currentStep.condition}</span>
+                <span className="track-condition-pill">Condition: {currentStep.condition}</span>
               </div>
 
               {currentStep.isMultiReaction ? (
@@ -345,17 +354,17 @@ export const PipelineScreen: React.FC = () => {
                     };
                     return (
                       <div key={rIdx} className="track-multi-row">
-                        <div className="track-multi-row-badge">反应 {rIdx + 1}</div>
+                        <div className="track-multi-row-badge">Path {rIdx + 1}</div>
                         <div className="track-flow track-flow-compact">
                           <DropZone
                             stageId={currentStep.id}
                             role="reactants"
-                            titleText={`反应 ${rIdx + 1} · 反应前自由基`}
+                            titleText={`Path ${rIdx + 1} · Reactant Radicals`}
                             reactionIndex={rIdx}
                             particles={row.reactants || []}
                           />
                           <div className="track-arrow-zone">
-                            <span className="track-condition-tag">成键</span>
+                            <span className="track-condition-tag">Coupling</span>
                             <span className="track-arrow" aria-hidden="true">
                               ➔
                             </span>
@@ -363,7 +372,7 @@ export const PipelineScreen: React.FC = () => {
                           <DropZone
                             stageId={currentStep.id}
                             role="products"
-                            titleText={`反应 ${rIdx + 1} · 生成物`}
+                            titleText={`Path ${rIdx + 1} · Products`}
                             reactionIndex={rIdx}
                             particles={row.products || []}
                           />
@@ -377,7 +386,7 @@ export const PipelineScreen: React.FC = () => {
                   <DropZone
                     stageId={currentStep.id}
                     role="reactants"
-                    titleText="反应前物料（点击或拖入微粒）"
+                    titleText="Reactants (Click or Drag Species)"
                     particles={pipelineData[currentStep.id]?.reactants || []}
                   />
                   <div className="track-arrow-zone">
@@ -389,7 +398,7 @@ export const PipelineScreen: React.FC = () => {
                   <DropZone
                     stageId={currentStep.id}
                     role="products"
-                    titleText="反应后产物（点击或拖入微粒）"
+                    titleText="Products (Click or Drag Species)"
                     particles={pipelineData[currentStep.id]?.products || []}
                   />
                 </div>
@@ -397,7 +406,7 @@ export const PipelineScreen: React.FC = () => {
             </motion.div>
           </div>
 
-          {/* 验证消息提示卡片 */}
+          {/* Validation Feedback Card */}
           {pipelineFeedback && !pipelineFeedback.ok && (
             <motion.div
               id="pipeline-feedback"
@@ -409,40 +418,43 @@ export const PipelineScreen: React.FC = () => {
                 <AlertTriangle size={22} />
               </span>
               <div className="pipeline-feedback-content">
-                <span className="pipeline-feedback-title">装配检验未通过 · 请反思并调整</span>
+                <span className="pipeline-feedback-title">Pathway Verification Failed · Please Review</span>
                 <span className="pipeline-feedback-text">{pipelineFeedback.hint}</span>
               </div>
             </motion.div>
           )}
+        </div>
 
-          {/* 底部操作与流转栏 */}
-          <div className="pipeline-footer">
-            <div className="pipeline-footer-left">
+        {/* Fixed Full-Width Bottom Step Bar */}
+        <div className="fixed-bottom-bar">
+          <div className="fixed-bottom-bar-inner">
+            <div className="fixed-bottom-left">
               <button
                 id="pipeline-return-gate-btn"
                 type="button"
-                className="text-button footer-back-btn"
+                className="toolbar-btn-outline"
                 onClick={returnToGateFromPipeline}
               >
-                <ArrowLeft size={16} />
-                <span>上一步：配置核验</span>
+                <ArrowLeft size={17} />
+                <span>Previous</span>
               </button>
             </div>
-            <div className="pipeline-footer-right">
+            <div className="fixed-bottom-right">
               <button
                 id="pipeline-submit-btn"
                 type="button"
                 className="primary-button enter-stage-btn"
                 onClick={submitPipelineAndEnterStage}
               >
-                <span>下一步：验证并进入三维演示</span>
+                <span>Next</span>
                 <ArrowRight size={18} />
               </button>
             </div>
           </div>
         </div>
 
-        <DragOverlay>
+        {/* Disable dropAnimation so the dragged chip does NOT fly back to the pool on release */}
+        <DragOverlay dropAnimation={null}>
           {activeDragSlot ? (
             <div
               className="mol-chip selected-for-place"

@@ -52,12 +52,12 @@ const specs: Record<string, any> = {
 };
 
 export const geometryLabels: Record<string, string> = {
-  regularTetrahedral: '正四面体',
-  tetrahedral: '四面体',
-  trigonalPlanar: '平面三角形',
-  diatomic: '双原子分子',
-  linear: '直线形',
-  atomic: '单原子',
+  regularTetrahedral: 'Regular Tetrahedral',
+  tetrahedral: 'Tetrahedral',
+  trigonalPlanar: 'Trigonal Planar',
+  diatomic: 'Diatomic',
+  linear: 'Linear',
+  atomic: 'Monatomic',
 };
 
 const sameElements = (a: unknown, b: string[]): boolean =>
@@ -312,12 +312,12 @@ export function extractStudents(
   config: ChemConfig
 ): { id: string; fileName: string; doc: Record<string, any> }[] {
   const items: { id: string; label: string }[] = [
-    { id: 'CH4', label: '01-甲烷-CH4.json' },
-    { id: 'CH3', label: '02-甲基自由基-CH3.json' },
-    { id: 'CH3Br', label: '03-一溴甲烷-CH3Br.json' },
-    { id: 'Br2', label: '04-溴单质-Br2.json' },
-    { id: 'HBr', label: '05-溴化氢-HBr.json' },
-    { id: 'Br', label: '06-溴自由基-Br.json' },
+    { id: 'CH4', label: '01-Methane-CH4.json' },
+    { id: 'CH3', label: '02-MethylRadical-CH3.json' },
+    { id: 'CH3Br', label: '03-Bromomethane-CH3Br.json' },
+    { id: 'Br2', label: '04-Bromine-Br2.json' },
+    { id: 'HBr', label: '05-HydrogenBromide-HBr.json' },
+    { id: 'Br', label: '06-BromineRadical-Br.json' },
   ];
   return items.map((item) => ({
     id: item.id,

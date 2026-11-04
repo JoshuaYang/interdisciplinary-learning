@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
   Atom,
   ChevronDown,
-  Download,
+  ChevronUp,
   Grid,
   Link2,
   Move,
@@ -13,6 +13,8 @@ import {
   Sparkles,
   Trash2,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import {
   CATEGORY_LABELS,
@@ -43,6 +45,59 @@ import { useChemStore } from '../../store/useChemStore';
 
 const COMMON_SYMBOLS = ['C', 'H', 'Br', 'Cl', 'O', 'N', 'F', 'I', 'S', 'P', 'B', 'Si'];
 
+/**
+ * Convert screen (clientX, clientY) into exact SVG viewBox coordinates using the inverse Screen CTM.
+ * Eliminates any jump/offset caused by preserveAspectRatio letterboxing or zoom/pan viewBox transforms.
+ */
+function clientToSvgPoint(
+  svg: SVGSVGElement,
+  clientX: number,
+  clientY: number
+): { x: number; y: number } {
+  const ctm = svg.getScreenCTM();
+  if (ctm) {
+    const pt = svg.createSVGPoint();
+    pt.x = clientX;
+    pt.y = clientY;
+    const transformed = pt.matrixTransform(ctm.inverse());
+    return { x: transformed.x, y: transformed.y };
+  }
+  const rect = svg.getBoundingClientRect();
+  return {
+    x: ((clientX - rect.left) / Math.max(1, rect.width)) * 500,
+    y: ((clientY - rect.top) / Math.max(1, rect.height)) * 320,
+  };
+}
+
+/**
+ * Check whether all nodes in the topology graph form a single connected component.
+ */
+function isTopologyConnected(nodes: TopologyNode[], bonds: TopologyBond[]): boolean {
+  if (nodes.length <= 1) return nodes.length === 1;
+  if (bonds.length === 0) return false;
+  const adj = new Map<string, string[]>();
+  for (const n of nodes) adj.set(n.id, []);
+  for (const b of bonds) {
+    if (adj.has(b.from) && adj.has(b.to) && b.from !== b.to) {
+      adj.get(b.from)!.push(b.to);
+      adj.get(b.to)!.push(b.from);
+    }
+  }
+  const visited = new Set<string>();
+  const queue = [nodes[0].id];
+  visited.add(nodes[0].id);
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    for (const nb of adj.get(cur) || []) {
+      if (!visited.has(nb)) {
+        visited.add(nb);
+        queue.push(nb);
+      }
+    }
+  }
+  return visited.size === nodes.length;
+}
+
 export const MoleculeBuilderModal: React.FC = () => {
   const builderOpen = useFreeChemStore((s) => s.builderOpen);
   const editingMolId = useFreeChemStore((s) => s.editingMolId);
@@ -66,7 +121,14 @@ export const MoleculeBuilderModal: React.FC = () => {
   const [showFullPeriodicTable, setShowFullPeriodicTable] = useState<boolean>(true);
   const [categoryFilter, setCategoryFilter] = useState<ElementCategory | 'all'>('all');
 
-  // Form parameter state (starts empty for new molecules until user fills or clicks "一键填入默认值")
+  // 2D Topology Zoom & Pan state
+  const [topoZoom, setTopoZoom] = useState<number>(1);
+  const [topoPan, setTopoPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  // 3D Preview Zoom state (for UI indicator)
+  const [preview3DZoomPct, setPreview3DZoomPct] = useState<number>(100);
+
+  // Form parameter state
   const [name, setName] = useState<string>('');
   const [formula, setFormula] = useState<string>('');
   const [description, setDescription] = useState<string>('');
@@ -76,28 +138,71 @@ export const MoleculeBuilderModal: React.FC = () => {
   const [bondAnglesInput, setBondAnglesInput] = useState<Record<string, string>>({});
 
   // Dragging state on 2D SVG canvas
+  const svgWrapRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  const dragOffsetRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+  const [isPanning2D, setIsPanning2D] = useState<boolean>(false);
+  const panStartRef = useRef<{ clientX: number; clientY: number; panX: number; panY: number }>({
+    clientX: 0,
+    clientY: 0,
+    panX: 0,
+    panY: 0,
+  });
   const [dragLinkFromId, setDragLinkFromId] = useState<string | null>(null);
   const [dragLinkCursor, setDragLinkCursor] = useState<{ x: number; y: number } | null>(null);
   const dragMovedRef = useRef<boolean>(false);
 
+  const resetEmptyBuilder = useCallback(() => {
+    setNodes([]);
+    setBonds([]);
+    setSelectedNodeId(null);
+    setSelectedBondId(null);
+    setName('');
+    setFormula('');
+    setDescription('');
+    setGeometry('');
+    setHybridization('');
+    setBondLengthsInput({});
+    setBondAnglesInput({});
+    setTopoZoom(1);
+    setTopoPan({ x: 0, y: 0 });
+  }, []);
+
   // Initialize state when modal opens
   useEffect(() => {
     if (!builderOpen) return;
+    setTopoZoom(1);
+    setTopoPan({ x: 0, y: 0 });
     if (editingItem) {
       try {
         const topo = normalizeDocToTopology(editingItem.doc);
-        // Ensure 2D coordinates exist for all nodes
-        const laidOut = topo.nodes.map((n, idx) => {
+        // Center existing 2D coordinates nicely around (250, 160)
+        const rawNodes = topo.nodes.map((n, idx) => {
           if (typeof n.x === 'number' && typeof n.y === 'number') return n;
           const angle = (idx * 2 * Math.PI) / Math.max(1, topo.nodes.length);
           return {
             ...n,
-            x: idx === 0 ? 220 : Math.round(220 + 88 * Math.cos(angle)),
-            y: idx === 0 ? 150 : Math.round(150 + 88 * Math.sin(angle)),
+            x: idx === 0 ? 250 : Math.round(250 + 92 * Math.cos(angle)),
+            y: idx === 0 ? 160 : Math.round(160 + 92 * Math.sin(angle)),
           };
         });
+        let avgX = 0;
+        let avgY = 0;
+        rawNodes.forEach((n) => {
+          avgX += n.x ?? 250;
+          avgY += n.y ?? 160;
+        });
+        avgX /= Math.max(1, rawNodes.length);
+        avgY /= Math.max(1, rawNodes.length);
+        const shiftX = Math.round(250 - avgX);
+        const shiftY = Math.round(160 - avgY);
+        const laidOut = rawNodes.map((n) => ({
+          ...n,
+          x: (n.x ?? 250) + shiftX,
+          y: (n.y ?? 160) + shiftY,
+        }));
+
         setNodes(laidOut);
         setBonds(topo.bonds);
         setName(editingItem.doc.name || editingItem.mol.name || '');
@@ -140,21 +245,22 @@ export const MoleculeBuilderModal: React.FC = () => {
     } else {
       resetEmptyBuilder();
     }
-  }, [builderOpen, editingItem]);
+  }, [builderOpen, editingItem, resetEmptyBuilder]);
 
-  const resetEmptyBuilder = () => {
-    setNodes([]);
-    setBonds([]);
-    setSelectedNodeId(null);
-    setSelectedBondId(null);
-    setName('');
-    setFormula('');
-    setDescription('');
-    setGeometry('');
-    setHybridization('');
-    setBondLengthsInput({});
-    setBondAnglesInput({});
-  };
+  // 2D Canvas wheel zoom listener
+  useEffect(() => {
+    const wrap = svgWrapRef.current;
+    if (!wrap || !builderOpen) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setTopoZoom((prev) =>
+        Math.max(0.5, Math.min(2.5, Number((prev * Math.exp(-e.deltaY * 0.0012)).toFixed(3))))
+      );
+    };
+    wrap.addEventListener('wheel', onWheel, { passive: false });
+    return () => wrap.removeEventListener('wheel', onWheel);
+  }, [builderOpen]);
 
   // Compute unique bond types & angle keys present in current topology
   const activeBondKeys = useMemo(() => {
@@ -205,16 +311,16 @@ export const MoleculeBuilderModal: React.FC = () => {
     const sameCount = nodes.filter((n) => n.element === symbol).length;
     const newId = `${symbol.toLowerCase()}${sameCount + 1}_${Date.now().toString(36).slice(-2)}`;
 
-    let x = customPos?.x ?? 220;
-    let y = customPos?.y ?? 150;
+    let x = customPos?.x ?? 250;
+    let y = customPos?.y ?? 160;
     if (!customPos && nodes.length > 0) {
       const anchor = nodes.find((n) => n.id === selectedNodeId) || nodes[nodes.length - 1];
       const existingNbs = bonds.filter(
         (b) => b.from === anchor.id || b.to === anchor.id
       ).length;
       const angle = (existingNbs * Math.PI) / 2 - Math.PI / 2 + (nodes.length % 3) * 0.25;
-      x = Math.max(44, Math.min(410, Math.round((anchor.x ?? 220) + 78 * Math.cos(angle))));
-      y = Math.max(44, Math.min(256, Math.round((anchor.y ?? 150) + 78 * Math.sin(angle))));
+      x = Math.round((anchor.x ?? 250) + 84 * Math.cos(angle));
+      y = Math.round((anchor.y ?? 160) + 84 * Math.sin(angle));
     }
 
     const newNode: TopologyNode = {
@@ -226,9 +332,8 @@ export const MoleculeBuilderModal: React.FC = () => {
     };
 
     const nextNodes = [...nodes, newNode];
-    let nextBonds = [...bonds];
+    const nextBonds = [...bonds];
 
-    // If a node is currently selected, automatically connect the newly added atom to it for smooth building!
     if (selectedNodeId && nodes.some((n) => n.id === selectedNodeId)) {
       nextBonds.push({
         id: `b_${selectedNodeId}_${newId}`,
@@ -252,11 +357,14 @@ export const MoleculeBuilderModal: React.FC = () => {
       (b) => (b.from === idA && b.to === idB) || (b.from === idB && b.to === idA)
     );
     if (existing) {
-      // Cycle bond order 1 -> 2 -> 3 -> 1
       const nextOrder = ((existing.order % 3) + 1) as 1 | 2 | 3;
       setBonds(bonds.map((b) => (b.id === existing.id ? { ...b, order: nextOrder } : b)));
       setSelectedBondId(existing.id);
-      showToast(`已将化学键切换为 ${nextOrder === 1 ? '单键' : nextOrder === 2 ? '双键' : '三键'}`);
+      showToast(
+        `Switched covalent bond to ${
+          nextOrder === 1 ? 'Single Bond' : nextOrder === 2 ? 'Double Bond' : 'Triple Bond'
+        }`
+      );
     } else {
       const newBond: TopologyBond = {
         id: `b_${idA}_${idB}_${Date.now().toString(36).slice(-2)}`,
@@ -281,7 +389,7 @@ export const MoleculeBuilderModal: React.FC = () => {
       .reduce((sum, b) => sum + b.order, 0);
     const needed = Math.max(0, maxValence - currentBondOrderSum - target.radical);
     if (needed <= 0) {
-      showToast(`${target.element} 当前成键数与未成对电子已达饱和（${maxValence} 价）。`);
+      showToast(`${target.element} has reached its standard valence (${maxValence}).`);
       return;
     }
 
@@ -291,13 +399,14 @@ export const MoleculeBuilderModal: React.FC = () => {
 
     for (let i = 0; i < needed; i++) {
       const hId = `h${baseCount + i + 1}_${Date.now().toString(36).slice(-2)}`;
-      const angle = ((currentBondOrderSum + i) * 2 * Math.PI) / Math.max(3, maxValence) - Math.PI / 2;
+      const angle =
+        ((currentBondOrderSum + i) * 2 * Math.PI) / Math.max(3, maxValence) - Math.PI / 2;
       newNodes.push({
         id: hId,
         element: 'H',
         radical: 0,
-        x: Math.max(36, Math.min(420, Math.round((target.x ?? 220) + 74 * Math.cos(angle)))),
-        y: Math.max(36, Math.min(264, Math.round((target.y ?? 150) + 74 * Math.sin(angle)))),
+        x: Math.round((target.x ?? 250) + 82 * Math.cos(angle)),
+        y: Math.round((target.y ?? 160) + 82 * Math.sin(angle)),
       });
       newBonds.push({
         id: `b_${target.id}_${hId}`,
@@ -308,7 +417,7 @@ export const MoleculeBuilderModal: React.FC = () => {
     }
     setNodes(newNodes);
     setBonds(newBonds);
-    showToast(`已为 ${target.element} 自动补齐 ${needed} 个氢原子 (H)！`);
+    showToast(`Added ${needed} H atom${needed > 1 ? 's' : ''} to ${target.element}.`);
   };
 
   // Toggle radical on selected node
@@ -321,13 +430,36 @@ export const MoleculeBuilderModal: React.FC = () => {
     );
   };
 
-  // Delete selected node or bond
+  // Delete selected node (and any terminal H atoms exclusively attached to it)
   const deleteSelectedNode = () => {
     if (!selectedNodeId) return;
-    const nextNodes = nodes.filter((n) => n.id !== selectedNodeId);
+    const targetNode = nodes.find((n) => n.id === selectedNodeId);
+    const idsToRemove = new Set<string>([selectedNodeId]);
+
+    // If deleting a non-H center atom, also remove terminal H atoms that were ONLY bonded to it
+    if (targetNode && targetNode.element !== 'H') {
+      for (const n of nodes) {
+        if (n.id === selectedNodeId || n.element !== 'H') continue;
+        const nBonds = bonds.filter((b) => b.from === n.id || b.to === n.id);
+        if (
+          nBonds.length === 1 &&
+          (nBonds[0].from === selectedNodeId || nBonds[0].to === selectedNodeId)
+        ) {
+          idsToRemove.add(n.id);
+        }
+      }
+    }
+
+    const nextNodes = nodes.filter((n) => !idsToRemove.has(n.id));
     const nextBonds = bonds.filter(
-      (b) => b.from !== selectedNodeId && b.to !== selectedNodeId
+      (b) => !idsToRemove.has(b.from) && !idsToRemove.has(b.to)
     );
+
+    if (nextNodes.length === 0) {
+      resetEmptyBuilder();
+      return;
+    }
+
     setNodes(nextNodes);
     setBonds(nextBonds);
     setSelectedNodeId(nextNodes[0]?.id || null);
@@ -339,10 +471,10 @@ export const MoleculeBuilderModal: React.FC = () => {
     setSelectedBondId(null);
   };
 
-  // ONE-CLICK RECOMMENDED DEFAULTS ("一键填入推荐默认值")
+  // ONE-CLICK AUTO-FILL
   const handleFillRecommendedDefaults = () => {
     if (nodes.length === 0) {
-      showToast('请先在左侧点选元素添加原子到画布中。');
+      showToast('Please select an element from the periodic table to add atoms first.');
       return;
     }
     const inferred = inferFormulaAndName(nodes, bonds);
@@ -350,7 +482,6 @@ export const MoleculeBuilderModal: React.FC = () => {
     setName(inferred.name);
     setDescription(inferred.description);
 
-    // Compute bond lengths for all active bonds
     const nodeMap = new Map(nodes.map((n) => [n.id, n]));
     const nextLengths: Record<string, string> = {};
     for (const b of bonds) {
@@ -363,7 +494,6 @@ export const MoleculeBuilderModal: React.FC = () => {
     }
     setBondLengthsInput(nextLengths);
 
-    // Find primary center atom (highest degree)
     const adj = new Map<string, string[]>();
     nodes.forEach((n) => adj.set(n.id, []));
     bonds.forEach((b) => {
@@ -389,7 +519,6 @@ export const MoleculeBuilderModal: React.FC = () => {
     setGeometry(recCenter.geometry);
     setHybridization(recCenter.hybridization);
 
-    // Populate all active angle keys
     const nextAngles: Record<string, string> = {};
     for (const [k, v] of Object.entries(recCenter.bondAngles)) {
       nextAngles[k] = String(v);
@@ -401,13 +530,26 @@ export const MoleculeBuilderModal: React.FC = () => {
       }
     }
     setBondAnglesInput(nextAngles);
-    showToast('✨ 已根据分子拓扑自动填入推荐构型、杂化方式、键长与键角！');
+    showToast('Auto-filled recommended parameters!');
   };
+
+  const connectedGraph = useMemo(() => isTopologyConnected(nodes, bonds), [nodes, bonds]);
+
+  // Structural signature that ignores 2D (x, y) coordinates so moving atoms in 2D doesn't rebuild 3D
+  const structuralTopoKey = useMemo(
+    () =>
+      JSON.stringify({
+        n: nodes.map((n) => [n.id, n.element, n.radical]),
+        b: bonds.map((b) => [b.id, b.from, b.to, b.order]),
+      }),
+    [nodes, bonds]
+  );
 
   // Assemble the JSON document from current builder state
   const currentDoc = useMemo(() => {
     if (nodes.length === 0) return null;
-    // Check if required geometric parameters are filled
+    if (!connectedGraph) return null;
+
     const missingBondLengths = activeBondKeys.some((k) => {
       const val = Number(bondLengthsInput[k]);
       return !bondLengthsInput[k] || !Number.isFinite(val) || val <= 0;
@@ -468,6 +610,7 @@ export const MoleculeBuilderModal: React.FC = () => {
   }, [
     nodes,
     bonds,
+    connectedGraph,
     activeBondKeys,
     activeAngleKeys,
     bondLengthsInput,
@@ -479,6 +622,7 @@ export const MoleculeBuilderModal: React.FC = () => {
     description,
   ]);
 
+  // 3D molecule model (recomputes only when structural parameters change, NOT when 2D x/y changes)
   const previewMol = useMemo(() => {
     if (!currentDoc) return null;
     try {
@@ -486,255 +630,374 @@ export const MoleculeBuilderModal: React.FC = () => {
     } catch {
       return null;
     }
-  }, [currentDoc]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    structuralTopoKey,
+    connectedGraph,
+    activeBondKeys,
+    activeAngleKeys,
+    bondLengthsInput,
+    bondAnglesInput,
+    geometry,
+    hybridization,
+    name,
+    formula,
+  ]);
 
-  // 3D Live Preview Renderer inside the builder
-  const previewWrapRef = useRef<HTMLDivElement | null>(null);
-  const previewVpRef = useRef<HTMLDivElement | null>(null);
+  // Callback refs for the 3D stage box & viewport so Radix Portal mount always triggers WebGL init
+  const [previewWrapEl, setPreviewWrapEl] = useState<HTMLDivElement | null>(null);
+  const [previewVpEl, setPreviewVpEl] = useState<HTMLDivElement | null>(null);
 
+  const threeCtxRef = useRef<{
+    renderer: THREE.WebGLRenderer;
+    scene: THREE.Scene;
+    camera: THREE.OrthographicCamera;
+    root: THREE.Group;
+    sphereGeo: THREE.SphereGeometry;
+    cylinderGeo: THREE.CylinderGeometry;
+    meshItems: {
+      mesh: THREE.Mesh;
+      label: THREE.Sprite;
+      dot: THREE.Mesh;
+      radius: number;
+      hasRadical: boolean;
+    }[];
+    rotation: { x: number; y: number };
+    zoom: { value: number };
+    modelRadius: { value: number };
+    draw: () => void;
+    resize: () => void;
+    zoomBy: (factor: number) => void;
+    resetView: () => void;
+  } | null>(null);
+
+  // Effect 1: Initialize persistent WebGL Renderer + Pointer/Wheel interactivity when Portal DOM mounts
   useEffect(() => {
-    if (!builderOpen || !previewMol || !previewVpRef.current || !previewWrapRef.current) return;
-    let disposed = false;
-    let renderer: THREE.WebGLRenderer | null = null;
-    let cleanup: (() => void) | null = null;
+    if (!builderOpen || !previewVpEl || !previewWrapEl) return;
 
-    const timer = requestAnimationFrame(() => {
-      if (disposed || !previewVpRef.current || !previewWrapRef.current) return;
-      const vp = previewVpRef.current;
-      const wrap = previewWrapRef.current;
-      vp.replaceChildren();
+    const vp = previewVpEl;
+    const wrap = previewWrapEl;
+    vp.replaceChildren();
 
+    let renderer: THREE.WebGLRenderer;
+    try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 0.95;
-      vp.appendChild(renderer.domElement);
+    } catch {
+      return;
+    }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.95;
+    vp.appendChild(renderer.domElement);
 
-      const scene = new THREE.Scene();
-      const camera = new THREE.OrthographicCamera(-3, 3, 2, -2, 0.1, 100);
-      camera.position.set(0, 0, 20);
-      camera.lookAt(0, 0, 0);
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-3, 3, 2, -2, 0.1, 100);
+    camera.position.set(0, 0, 20);
+    camera.lookAt(0, 0, 0);
 
-      const root = new THREE.Group();
-      scene.add(root);
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x94a3b8, 0.72));
-      const dirLight = new THREE.DirectionalLight(0xfffdf5, 1.25);
-      dirLight.position.set(-4, 7, 9);
-      scene.add(dirLight);
-      const fillLight = new THREE.DirectionalLight(0xe0f2fe, 0.42);
-      fillLight.position.set(7, -2, 5);
-      scene.add(fillLight);
+    const root = new THREE.Group();
+    scene.add(root);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x94a3b8, 0.72));
+    const dirLight = new THREE.DirectionalLight(0xfffdf5, 1.25);
+    dirLight.position.set(-4, 7, 9);
+    scene.add(dirLight);
+    const fillLight = new THREE.DirectionalLight(0xe0f2fe, 0.42);
+    fillLight.position.set(7, -2, 5);
+    scene.add(fillLight);
 
-      const sphereGeo = new THREE.SphereGeometry(1, 36, 24);
-      const cylinderGeo = new THREE.CylinderGeometry(1, 1, 1, 16);
+    const sphereGeo = new THREE.SphereGeometry(1, 36, 24);
+    const cylinderGeo = new THREE.CylinderGeometry(1, 1, 1, 16);
 
-      const posMap = new Map<string, [number, number, number]>();
-      const elemMap = new Map<string, string>();
-      const meshItems: {
-        mesh: THREE.Mesh;
-        label: THREE.Sprite;
-        dot: THREE.Mesh;
-        radius: number;
-        hasRadical: boolean;
-      }[] = [];
+    const rotation = { x: 0.28, y: 0.48 };
+    const zoom = { value: 1 };
+    const modelRadius = { value: 2.2 };
+    const meshItems: {
+      mesh: THREE.Mesh;
+      label: THREE.Sprite;
+      dot: THREE.Mesh;
+      radius: number;
+      hasRadical: boolean;
+    }[] = [];
 
-      for (const a of previewMol.atoms) {
-        posMap.set(a.id, a.position);
-        elemMap.set(a.id, a.element);
-        const radius = getElementRadius(a.element);
-        const mesh = new THREE.Mesh(
-          sphereGeo,
-          new THREE.MeshStandardMaterial({
-            color: new THREE.Color(getElementColor(a.element)),
-            roughness: 0.36,
-            metalness: 0,
-          })
-        );
-        mesh.scale.setScalar(radius);
-        mesh.position.fromArray(a.position);
+    const draw = () => {
+      root.rotation.set(rotation.x, rotation.y, 0);
+      root.updateMatrixWorld(true);
+      const inv = root.quaternion.clone().invert();
+      const front = new THREE.Vector3(0, 0, 1).applyQuaternion(inv);
+      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(inv);
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(inv);
 
-        const label = new THREE.Sprite(
-          new THREE.SpriteMaterial({
-            map: getElementSpriteTexture(a.element),
-            transparent: true,
-            depthTest: true,
-            depthWrite: false,
-            toneMapped: false,
-          })
-        );
-        label.scale.setScalar(radius * 1.14);
-
-        const hasRadical = a.radical === 1;
-        const dot = new THREE.Mesh(
-          sphereGeo,
-          new THREE.MeshBasicMaterial({ color: RADICAL_COLOR })
-        );
-        dot.scale.setScalar(0.08);
-        dot.visible = hasRadical;
-
-        root.add(mesh, label, dot);
-        meshItems.push({ mesh, label, dot, radius, hasRadical });
+      for (const item of meshItems) {
+        item.label.position
+          .copy(item.mesh.position)
+          .addScaledVector(front, item.radius + 0.02);
+        if (item.hasRadical) {
+          item.dot.position
+            .copy(item.mesh.position)
+            .addScaledVector(right, item.radius * 0.9)
+            .addScaledVector(up, item.radius * 0.9)
+            .addScaledVector(front, 0.05);
+        }
       }
+      root.updateMatrixWorld(true);
+      renderer.render(scene, camera);
+    };
 
-      const axis = new THREE.Vector3(0, 1, 0);
-      for (const b of previewMol.bonds) {
-        const p1 = posMap.get(b.atoms[0]);
-        const p2 = posMap.get(b.atoms[1]);
-        if (!p1 || !p2) continue;
-        const v1 = new THREE.Vector3(...p1);
-        const v2 = new THREE.Vector3(...p2);
-        const dir = v2.clone().sub(v1);
-        const len = dir.length();
+    const resize = () => {
+      const w = Math.max(1, wrap.clientWidth);
+      const h = Math.max(1, wrap.clientHeight);
+      renderer.setSize(w, h);
+      const aspect = w / h;
+      const baseSpan = Math.max(2.1, modelRadius.value * 1.35);
+      const halfH = Math.max(baseSpan, (baseSpan * 1.25) / Math.max(0.5, aspect)) / zoom.value;
+      camera.left = -halfH * aspect;
+      camera.right = halfH * aspect;
+      camera.top = halfH;
+      camera.bottom = -halfH;
+      camera.updateProjectionMatrix();
+      draw();
+    };
+
+    const zoomBy = (factor: number) => {
+      zoom.value = Math.max(0.5, Math.min(2.5, Number((zoom.value * factor).toFixed(3))));
+      setPreview3DZoomPct(Math.round(zoom.value * 100));
+      resize();
+    };
+
+    const resetView = () => {
+      rotation.x = 0.28;
+      rotation.y = 0.48;
+      zoom.value = 1;
+      setPreview3DZoomPct(100);
+      resize();
+    };
+
+    const pointers = new Map<number, { x: number; y: number }>();
+    const onPointerDown = (e: PointerEvent) => {
+      e.stopPropagation();
+      vp.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    };
+    const onPointerMove = (e: PointerEvent) => {
+      const old = pointers.get(e.pointerId);
+      if (!old) return;
+      e.stopPropagation();
+      const dx = e.clientX - old.x;
+      const dy = e.clientY - old.y;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      rotation.y += dx * 0.009;
+      rotation.x = Math.max(-1.45, Math.min(1.45, rotation.x + dy * 0.009));
+      draw();
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      pointers.delete(e.pointerId);
+    };
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      zoom.value = Math.max(0.5, Math.min(2.5, zoom.value * Math.exp(-e.deltaY * 0.0012)));
+      setPreview3DZoomPct(Math.round(zoom.value * 100));
+      resize();
+    };
+
+    vp.addEventListener('pointerdown', onPointerDown);
+    vp.addEventListener('pointermove', onPointerMove);
+    vp.addEventListener('pointerup', onPointerUp);
+    vp.addEventListener('pointercancel', onPointerUp);
+    vp.addEventListener('wheel', onWheel, { passive: false });
+
+    const ro = new ResizeObserver(resize);
+    ro.observe(wrap);
+    resize();
+    const postAnimTimer = window.setTimeout(resize, 180);
+
+    threeCtxRef.current = {
+      renderer,
+      scene,
+      camera,
+      root,
+      sphereGeo,
+      cylinderGeo,
+      meshItems,
+      rotation,
+      zoom,
+      modelRadius,
+      draw,
+      resize,
+      zoomBy,
+      resetView,
+    };
+
+    return () => {
+      window.clearTimeout(postAnimTimer);
+      ro.disconnect();
+      vp.removeEventListener('pointerdown', onPointerDown);
+      vp.removeEventListener('pointermove', onPointerMove);
+      vp.removeEventListener('pointerup', onPointerUp);
+      vp.removeEventListener('pointercancel', onPointerUp);
+      vp.removeEventListener('wheel', onWheel);
+      sphereGeo.dispose();
+      cylinderGeo.dispose();
+      renderer.dispose();
+      vp.replaceChildren();
+      threeCtxRef.current = null;
+    };
+  }, [builderOpen, previewVpEl, previewWrapEl]);
+
+  // Effect 2: Sync 3D meshes whenever `previewMol` changes (clears immediately when `previewMol` is null)
+  useEffect(() => {
+    const ctx = threeCtxRef.current;
+    if (!ctx) return;
+
+    while (ctx.root.children.length > 0) {
+      ctx.root.remove(ctx.root.children[0]);
+    }
+    ctx.meshItems.length = 0;
+
+    if (!previewMol || previewMol.atoms.length === 0) {
+      ctx.draw();
+      return;
+    }
+
+    // Center atoms around [0, 0, 0] and compute bounding radius
+    const atoms = previewMol.atoms;
+    let cx = 0;
+    let cy = 0;
+    let cz = 0;
+    for (const a of atoms) {
+      cx += a.position[0];
+      cy += a.position[1];
+      cz += a.position[2];
+    }
+    cx /= atoms.length;
+    cy /= atoms.length;
+    cz /= atoms.length;
+
+    let maxDist = 1.6;
+    const posMap = new Map<string, [number, number, number]>();
+    const elemMap = new Map<string, string>();
+
+    for (const a of atoms) {
+      const centered: [number, number, number] = [
+        a.position[0] - cx,
+        a.position[1] - cy,
+        a.position[2] - cz,
+      ];
+      posMap.set(a.id, centered);
+      elemMap.set(a.id, a.element);
+      const radius = getElementRadius(a.element);
+      const d = Math.hypot(...centered) + radius;
+      if (d > maxDist) maxDist = d;
+
+      const mesh = new THREE.Mesh(
+        ctx.sphereGeo,
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color(getElementColor(a.element)),
+          roughness: 0.34,
+          metalness: 0.04,
+        })
+      );
+      mesh.scale.setScalar(radius);
+      mesh.position.fromArray(centered);
+
+      const label = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: getElementSpriteTexture(a.element),
+          transparent: true,
+          depthTest: true,
+          depthWrite: false,
+          toneMapped: false,
+        })
+      );
+      label.scale.setScalar(radius * 1.14);
+
+      const hasRadical = a.radical === 1;
+      const dot = new THREE.Mesh(
+        ctx.sphereGeo,
+        new THREE.MeshBasicMaterial({ color: RADICAL_COLOR })
+      );
+      dot.scale.setScalar(0.085);
+      dot.visible = hasRadical;
+
+      ctx.root.add(mesh, label, dot);
+      ctx.meshItems.push({ mesh, label, dot, radius, hasRadical });
+    }
+
+    const axis = new THREE.Vector3(0, 1, 0);
+    for (const b of previewMol.bonds) {
+      const p1 = posMap.get(b.atoms[0]);
+      const p2 = posMap.get(b.atoms[1]);
+      if (!p1 || !p2) continue;
+      const v1 = new THREE.Vector3(...p1);
+      const v2 = new THREE.Vector3(...p2);
+      const dir = v2.clone().sub(v1);
+      const len = dir.length();
+      if (len < 0.001) continue;
+      const unitDir = dir.clone().normalize();
+      const perp = new THREE.Vector3(0, 0, 1).cross(unitDir);
+      if (perp.lengthSq() < 0.01) perp.set(0, 1, 0).cross(unitDir);
+      perp.normalize();
+
+      const order = b.order || 1;
+      const offsets =
+        order === 3 ? [-0.11, 0, 0.11] : order === 2 ? [-0.075, 0.075] : [0];
+      const cylRadius = order === 3 ? 0.038 : order === 2 ? 0.046 : 0.066;
+
+      for (const off of offsets) {
+        const shift = perp.clone().multiplyScalar(off);
         b.atoms.forEach((atomId, idx) => {
           const el = elemMap.get(atomId) || 'C';
           const m = new THREE.Mesh(
-            cylinderGeo,
+            ctx.cylinderGeo,
             new THREE.MeshStandardMaterial({
               color: new THREE.Color(getElementColor(el)),
-              roughness: 0.5,
+              roughness: 0.45,
             })
           );
-          m.position.copy(v1).lerp(v2, idx === 0 ? 0.25 : 0.75);
-          m.quaternion.setFromUnitVectors(axis, dir.clone().normalize());
-          m.scale.set(0.068, len / 2, 0.068);
-          root.add(m);
+          m.position.copy(v1).lerp(v2, idx === 0 ? 0.25 : 0.75).add(shift);
+          m.quaternion.setFromUnitVectors(axis, unitDir);
+          m.scale.set(cylRadius, len / 2, cylRadius);
+          ctx.root.add(m);
         });
       }
-
-      const rotation = { x: 0.25, y: 0.45 };
-      const zoom = { value: 1 };
-
-      const draw = () => {
-        if (!renderer) return;
-        root.rotation.set(rotation.x, rotation.y, 0);
-        root.updateMatrixWorld(true);
-        const inv = root.quaternion.clone().invert();
-        const front = new THREE.Vector3(0, 0, 1).applyQuaternion(inv);
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(inv);
-        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(inv);
-        for (const item of meshItems) {
-          item.label.position
-            .copy(item.mesh.position)
-            .addScaledVector(front, item.radius + 0.02);
-          if (item.hasRadical) {
-            item.dot.position
-              .copy(item.mesh.position)
-              .addScaledVector(right, item.radius * 0.9)
-              .addScaledVector(up, item.radius * 0.9)
-              .addScaledVector(front, 0.05);
-          }
-        }
-        root.updateMatrixWorld(true);
-        renderer.render(scene, camera);
-      };
-
-      const resize = () => {
-        if (!renderer) return;
-        const rect = wrap.getBoundingClientRect();
-        const w = Math.max(1, rect.width);
-        const h = Math.max(1, rect.height);
-        renderer.setSize(w, h);
-        const aspect = w / h;
-        const halfH = Math.max(2.0, 2.8 / aspect) / zoom.value;
-        camera.left = -halfH * aspect;
-        camera.right = halfH * aspect;
-        camera.top = halfH;
-        camera.bottom = -halfH;
-        camera.updateProjectionMatrix();
-        draw();
-      };
-
-      let isDragging = false;
-      let lastPos = { x: 0, y: 0 };
-      const onDown = (e: PointerEvent) => {
-        vp.setPointerCapture(e.pointerId);
-        isDragging = true;
-        lastPos = { x: e.clientX, y: e.clientY };
-      };
-      const onMove = (e: PointerEvent) => {
-        if (!isDragging) return;
-        rotation.y += (e.clientX - lastPos.x) * 0.009;
-        rotation.x = Math.max(-1.4, Math.min(1.4, rotation.x + (e.clientY - lastPos.y) * 0.009));
-        lastPos = { x: e.clientX, y: e.clientY };
-        draw();
-      };
-      const onUp = () => {
-        isDragging = false;
-      };
-      const onWheel = (e: WheelEvent) => {
-        e.preventDefault();
-        zoom.value = Math.max(0.6, Math.min(2.2, zoom.value * Math.exp(-e.deltaY * 0.001)));
-        resize();
-      };
-
-      vp.addEventListener('pointerdown', onDown);
-      vp.addEventListener('pointermove', onMove);
-      vp.addEventListener('pointerup', onUp);
-      vp.addEventListener('wheel', onWheel, { passive: false });
-
-      const ro = new ResizeObserver(resize);
-      ro.observe(wrap);
-      resize();
-
-      cleanup = () => {
-        ro.disconnect();
-        vp.removeEventListener('pointerdown', onDown);
-        vp.removeEventListener('pointermove', onMove);
-        vp.removeEventListener('pointerup', onUp);
-        vp.removeEventListener('wheel', onWheel);
-        sphereGeo.dispose();
-        cylinderGeo.dispose();
-        renderer?.dispose();
-      };
-    });
-
-    return () => {
-      disposed = true;
-      cancelAnimationFrame(timer);
-      cleanup?.();
-    };
-  }, [builderOpen, previewMol]);
-
-  // Export JSON file
-  const handleExportJson = () => {
-    if (!currentDoc) {
-      showToast('请先完成参数配置（或点击「一键填入推荐默认值」）后再导出 JSON。');
-      return;
     }
-    const blob = new Blob([JSON.stringify(currentDoc, null, 2)], {
-      type: 'application/json;charset=utf-8',
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${currentDoc.formula || 'molecule'}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast(`已导出配置文件 ${currentDoc.formula || 'molecule'}.json`);
-  };
+
+    ctx.modelRadius.value = maxDist;
+    ctx.resize();
+  }, [previewMol, previewVpEl]);
 
   // Save to store
   const handleSaveMolecule = () => {
     if (nodes.length === 0) {
-      showToast('请先在画布中添加至少 1 个元素原子。');
+      showToast('Please add at least 1 atom to the canvas.');
+      return;
+    }
+    if (!connectedGraph) {
+      showToast('Please connect all atoms on the canvas with covalent bonds.');
       return;
     }
     if (!currentDoc) {
-      showToast('请填写右侧的键长、空间构型与键角参数，或点击「一键填入推荐默认值」。');
+      showToast('Please complete the parameters or click "Auto-Fill" in the top right.');
       return;
     }
     const saved = saveMoleculeDoc(currentDoc, editingMolId);
     showToast(
       editingMolId
-        ? `已更新分子「${saved.mol.name} (${saved.mol.formula})」`
-        : `已创建分子「${saved.mol.name} (${saved.mol.formula})」`
+        ? `Updated "${saved.mol.name} (${saved.mol.formula})"`
+        : `Added "${saved.mol.name} (${saved.mol.formula})"`
     );
     closeBuilder();
   };
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId) || null;
   const selectedBond = bonds.find((b) => b.id === selectedBondId) || null;
+
+  // Compute dynamic 2D viewBox from topoZoom & topoPan
+  const vbW = 500 / topoZoom;
+  const vbH = 320 / topoZoom;
+  const vbX = 250 - vbW / 2 + topoPan.x;
+  const vbY = 160 - vbH / 2 + topoPan.y;
 
   return (
     <Dialog.Root open={builderOpen} onOpenChange={(open) => !open && closeBuilder()}>
@@ -744,46 +1007,47 @@ export const MoleculeBuilderModal: React.FC = () => {
           className="radix-dialog-content dialog-surface mol-builder-dialog"
           aria-describedby={undefined}
         >
-          {/* 顶部栏 */}
+          {/* Top Header: Title on left, Auto-Fill + Close on right (no Export JSON) */}
           <div className="dialog-header mol-builder-header">
             <div>
-              <span className="small-label">INTERACTIVE MOLECULE BUILDER · 分子结构构建工作台</span>
+              <span className="small-label">INTERACTIVE MOLECULE BUILDER</span>
               <Dialog.Title asChild>
-                <h2>{editingMolId ? '编辑分子结构与参数' : '交互式构建新分子'}</h2>
+                <h2>{editingMolId ? 'Edit Chemical Substance' : 'Add Chemical Substance'}</h2>
               </Dialog.Title>
             </div>
             <div className="mol-builder-header-actions">
               <button
                 type="button"
-                className="text-button top-action-btn"
-                onClick={handleExportJson}
-                title="将当前分子配置导出为 JSON 文件"
+                id="builder-autofill-defaults-btn"
+                className="autofill-defaults-btn"
+                onClick={handleFillRecommendedDefaults}
+                title="Auto-fill recommended VSEPR geometry, hybridization, bond lengths, and angles"
               >
-                <Download size={15} />
-                <span>导出 JSON</span>
+                <Sparkles size={16} />
+                <span>Auto-Fill</span>
               </button>
               <Dialog.Close asChild>
-                <button className="icon-button" aria-label="关闭构建器">
-                  <X size={18} />
+                <button className="icon-button" aria-label="Close Builder" title="Close">
+                  <X size={20} />
                 </button>
               </Dialog.Close>
             </div>
           </div>
 
           <div className="mol-builder-body">
-            {/* 第 1 部分：元素周期表选择面板 */}
+            {/* Section 1: Periodic Table Selector */}
             <div className="builder-periodic-section">
               <div className="builder-section-bar">
                 <div className="builder-section-title">
-                  <Atom size={16} />
-                  <strong>1. 点击周期表元素添加原子</strong>
+                  <Atom size={18} />
+                  <strong>1. Select Elements from Periodic Table</strong>
                   <span className="builder-hint-pill">
-                    选中画布中的原子再点元素，将自动成键连接
+                    Clicking an element while an atom is selected automatically forms a bond
                   </span>
                 </div>
                 <div className="builder-periodic-controls">
                   <div className="quick-elements-row">
-                    <span className="quick-label">高频：</span>
+                    <span className="quick-label">Common:</span>
                     {COMMON_SYMBOLS.map((sym) => {
                       const el = ELEMENT_MAP[sym];
                       return (
@@ -792,25 +1056,34 @@ export const MoleculeBuilderModal: React.FC = () => {
                           type="button"
                           className={`quick-el-btn ${activeElement === sym ? 'active' : ''}`}
                           onClick={() => addAtomNode(sym)}
-                          title={`点击向画布添加 ${el?.name || sym} (${sym})`}
+                          title={`Add ${el?.name || sym} (${sym})`}
                         >
                           <i
                             className="quick-el-dot"
                             style={{ background: getElementColorHex(sym) }}
                           />
                           <strong>{sym}</strong>
-                          <small>{el?.name}</small>
                         </button>
                       );
                     })}
                   </div>
                   <button
                     type="button"
-                    className="quiet-button ptable-toggle-btn"
+                    className="icon-button"
                     onClick={() => setShowFullPeriodicTable((v) => !v)}
+                    title={
+                      showFullPeriodicTable
+                        ? 'Collapse Periodic Table'
+                        : 'Expand Full Periodic Table (118)'
+                    }
+                    aria-label="Toggle Periodic Table"
                   >
-                    <Grid size={13} />
-                    <span>{showFullPeriodicTable ? '收起全周期表' : '展开全周期表 (118 元素)'}</span>
+                    <Grid size={16} />
+                    {showFullPeriodicTable ? (
+                      <ChevronUp size={14} />
+                    ) : (
+                      <ChevronDown size={14} />
+                    )}
                   </button>
                 </div>
               </div>
@@ -823,7 +1096,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                       className={`ptable-cat-chip ${categoryFilter === 'all' ? 'active' : ''}`}
                       onClick={() => setCategoryFilter('all')}
                     >
-                      全部 (118)
+                      All (118)
                     </button>
                     {(Object.entries(CATEGORY_LABELS) as [ElementCategory, string][]).map(
                       ([cat, label]) => (
@@ -844,7 +1117,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                   </div>
 
                   {/* 18-Column Standard Periodic Table Grid */}
-                  <div className="ptable-grid" role="grid" aria-label="全周期元素周期表">
+                  <div className="ptable-grid" role="grid" aria-label="Full Periodic Table of Elements">
                     {PERIODIC_TABLE.map((el: PeriodicElement) => {
                       const dimmed =
                         categoryFilter !== 'all' && el.category !== categoryFilter;
@@ -858,7 +1131,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                             activeElement === el.symbol ? 'selected' : ''
                           } ${dimmed ? 'dimmed' : ''}`}
                           style={{ gridRow, gridColumn }}
-                          title={`${el.number} ${el.name} (${el.symbol}) · 点击添加至分子画布`}
+                          title={`${el.number} ${el.name} (${el.symbol}) · Click to add atom`}
                           onClick={() => addAtomNode(el.symbol)}
                         >
                           <span className="pt-num">{el.number}</span>
@@ -872,23 +1145,23 @@ export const MoleculeBuilderModal: React.FC = () => {
                       style={{ gridRow: 6, gridColumn: 3 }}
                     >
                       57-71
-                      <small>镧系</small>
+                      <small>Lanthanides</small>
                     </div>
                     <div
                       className="ptable-series-placeholder"
                       style={{ gridRow: 7, gridColumn: 3 }}
                     >
                       89-103
-                      <small>锕系</small>
+                      <small>Actinides</small>
                     </div>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* 第 2 部分：下方左右双栏（左：2D 拓扑连接画布 + 3D 实时预览；右：参数配置面板） */}
+            {/* Section 2: Two-column workspace (Left: 2D Topology + Live 3D Preview; Right: Parameters Form) */}
             <div className="builder-main-columns">
-              {/* 左栏：2D 拓扑画布与 3D 实时预览 */}
+              {/* Left Column: 2D Topology Canvas + Live 3D Preview (both support zoom!) */}
               <div className="builder-visual-col">
                 <div className="builder-canvas-card">
                   <div className="builder-canvas-toolbar">
@@ -897,51 +1170,52 @@ export const MoleculeBuilderModal: React.FC = () => {
                         type="button"
                         className={`canvas-tool-btn ${canvasTool === 'connect' ? 'active' : ''}`}
                         onClick={() => setCanvasTool('connect')}
-                        title="从一个原子拖拽到另一个原子即可连键（也可直接拖动原子调整位置）"
+                        title="Bond / Select mode: Drag between atoms to connect"
                       >
-                        <Link2 size={14} />
-                        <span>连键 / 选择</span>
+                        <Link2 size={15} />
+                        <span>Bond</span>
                       </button>
                       <button
                         type="button"
                         className={`canvas-tool-btn ${canvasTool === 'move' ? 'active' : ''}`}
                         onClick={() => setCanvasTool('move')}
-                        title="仅拖动调整原子在 2D 画布上的位置"
+                        title="Move mode: Drag atoms to rearrange 2D layout"
                       >
-                        <Move size={14} />
-                        <span>移动排布</span>
+                        <Move size={15} />
+                        <span>Move</span>
                       </button>
                     </div>
 
                     {selectedNode && (
                       <div className="canvas-node-actions">
                         <span className="selected-node-badge">
-                          已选: <strong>{selectedNode.element}</strong> ({selectedNode.id})
+                          <strong>{selectedNode.element}</strong> ({selectedNode.id})
                         </span>
                         <button
                           type="button"
                           className="canvas-mini-btn"
                           onClick={autoFillHydrogensForSelected}
-                          title="按标准价态为当前选中原子一键补齐氢原子"
+                          title="Auto-fill Hydrogen atoms based on standard valence"
                         >
-                          <Plus size={12} />
-                          <span>一键补氢</span>
+                          <Plus size={14} />
+                          <span>H</span>
                         </button>
                         <button
                           type="button"
                           className={`canvas-mini-btn ${selectedNode.radical ? 'is-radical' : ''}`}
                           onClick={toggleSelectedNodeRadical}
-                          title="切换未成对电子（自由基 · 标记）"
+                          title="Toggle unpaired electron (radical dot)"
                         >
-                          <span>· 自由基: {selectedNode.radical ? '有' : '无'}</span>
+                          <span>· {selectedNode.radical ? 'Radical' : 'No Radical'}</span>
                         </button>
                         <button
                           type="button"
                           className="canvas-mini-btn danger"
                           onClick={deleteSelectedNode}
-                          title="删除当前选中的原子"
+                          title="Delete selected atom"
+                          aria-label="Delete selected atom"
                         >
-                          <Trash2 size={12} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     )}
@@ -949,7 +1223,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                     {selectedBond && !selectedNode && (
                       <div className="canvas-node-actions">
                         <span className="selected-node-badge">
-                          已选化学键 ({selectedBond.order} 键)
+                          Order {selectedBond.order}
                         </span>
                         <button
                           type="button"
@@ -957,16 +1231,18 @@ export const MoleculeBuilderModal: React.FC = () => {
                           onClick={() =>
                             connectOrToggleBond(selectedBond.from, selectedBond.to)
                           }
+                          title="Cycle Single / Double / Triple Bond"
                         >
-                          切换单/双/三键
+                          <span>1 / 2 / 3</span>
                         </button>
                         <button
                           type="button"
                           className="canvas-mini-btn danger"
                           onClick={deleteSelectedBond}
+                          title="Delete selected bond"
+                          aria-label="Delete selected bond"
                         >
-                          <Trash2 size={12} />
-                          <span>断开此键</span>
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     )}
@@ -974,67 +1250,94 @@ export const MoleculeBuilderModal: React.FC = () => {
                     {nodes.length > 0 && (
                       <button
                         type="button"
-                        className="canvas-mini-btn quiet"
+                        className="canvas-mini-btn danger"
                         onClick={resetEmptyBuilder}
-                        title="清空画布重新搭建"
+                        title="Clear entire structure"
+                        aria-label="Clear entire structure"
                       >
-                        <RotateCcw size={12} />
-                        <span>清空</span>
+                        <RotateCcw size={14} />
                       </button>
                     )}
                   </div>
 
-                  {/* 2D 交互式拓扑画布 */}
-                  <div className="topology-canvas-wrap">
+                  {/* 2D Interactive Topology Canvas with Wheel + Button Zoom & Pan */}
+                  <div className="topology-canvas-wrap" ref={svgWrapRef}>
                     <svg
                       ref={svgRef}
                       className="topology-svg"
-                      viewBox="0 0 440 280"
+                      viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
+                      onPointerDown={(e) => {
+                        if (e.target === svgRef.current || (e.target as Element).tagName === 'rect') {
+                          setSelectedBondId(null);
+                          setIsPanning2D(true);
+                          panStartRef.current = {
+                            clientX: e.clientX,
+                            clientY: e.clientY,
+                            panX: topoPan.x,
+                            panY: topoPan.y,
+                          };
+                        }
+                      }}
                       onPointerMove={(e) => {
                         if (!svgRef.current) return;
-                        const rect = svgRef.current.getBoundingClientRect();
-                        const x = ((e.clientX - rect.left) / rect.width) * 440;
-                        const y = ((e.clientY - rect.top) / rect.height) * 280;
                         if (draggingNodeId) {
+                          const pt = clientToSvgPoint(svgRef.current, e.clientX, e.clientY);
                           dragMovedRef.current = true;
+                          const nextX = Math.round(pt.x + dragOffsetRef.current.dx);
+                          const nextY = Math.round(pt.y + dragOffsetRef.current.dy);
                           setNodes((prev) =>
                             prev.map((n) =>
                               n.id === draggingNodeId
-                                ? {
-                                    ...n,
-                                    x: Math.max(28, Math.min(412, Math.round(x))),
-                                    y: Math.max(28, Math.min(252, Math.round(y))),
-                                  }
+                                ? { ...n, x: nextX, y: nextY }
                                 : n
                             )
                           );
                         } else if (dragLinkFromId) {
-                          setDragLinkCursor({ x, y });
+                          const pt = clientToSvgPoint(svgRef.current, e.clientX, e.clientY);
+                          setDragLinkCursor(pt);
+                        } else if (isPanning2D) {
+                          const rect = svgRef.current.getBoundingClientRect();
+                          const scaleX = vbW / Math.max(1, rect.width);
+                          const scaleY = vbH / Math.max(1, rect.height);
+                          const dx = (e.clientX - panStartRef.current.clientX) * scaleX;
+                          const dy = (e.clientY - panStartRef.current.clientY) * scaleY;
+                          setTopoPan({
+                            x: Math.round(panStartRef.current.panX - dx),
+                            y: Math.round(panStartRef.current.panY - dy),
+                          });
                         }
                       }}
                       onPointerUp={() => {
                         setDraggingNodeId(null);
                         setDragLinkFromId(null);
                         setDragLinkCursor(null);
+                        setIsPanning2D(false);
                       }}
-                      onClick={(e) => {
-                        if (e.target === svgRef.current) {
-                          setSelectedBondId(null);
-                        }
+                      onPointerCancel={() => {
+                        setDraggingNodeId(null);
+                        setDragLinkFromId(null);
+                        setDragLinkCursor(null);
+                        setIsPanning2D(false);
                       }}
                     >
                       {/* Grid background */}
                       <defs>
                         <pattern
                           id="builder-grid"
-                          width="22"
-                          height="22"
+                          width="24"
+                          height="24"
                           patternUnits="userSpaceOnUse"
                         >
-                          <circle cx="2" cy="2" r="1" fill="#cbd5e1" opacity="0.65" />
+                          <circle cx="2" cy="2" r="1.2" fill="#cbd5e1" opacity="0.7" />
                         </pattern>
                       </defs>
-                      <rect width="440" height="280" fill="url(#builder-grid)" />
+                      <rect
+                        x={vbX - 500}
+                        y={vbY - 500}
+                        width={vbW + 1000}
+                        height={vbH + 1000}
+                        fill="url(#builder-grid)"
+                      />
 
                       {/* Temporary drag-to-connect line */}
                       {dragLinkFromId &&
@@ -1044,13 +1347,13 @@ export const MoleculeBuilderModal: React.FC = () => {
                           if (!src) return null;
                           return (
                             <line
-                              x1={src.x ?? 220}
-                              y1={src.y ?? 140}
+                              x1={src.x ?? 250}
+                              y1={src.y ?? 160}
                               x2={dragLinkCursor.x}
                               y2={dragLinkCursor.y}
                               stroke="#2563eb"
-                              strokeWidth="2.5"
-                              strokeDasharray="5 4"
+                              strokeWidth="3"
+                              strokeDasharray="6 4"
                             />
                           );
                         })()}
@@ -1060,17 +1363,17 @@ export const MoleculeBuilderModal: React.FC = () => {
                         const n1 = nodes.find((n) => n.id === b.from);
                         const n2 = nodes.find((n) => n.id === b.to);
                         if (!n1 || !n2) return null;
-                        const x1 = n1.x ?? 220;
-                        const y1 = n1.y ?? 140;
-                        const x2 = n2.x ?? 220;
-                        const y2 = n2.y ?? 140;
+                        const x1 = n1.x ?? 250;
+                        const y1 = n1.y ?? 160;
+                        const x2 = n2.x ?? 250;
+                        const y2 = n2.y ?? 160;
                         const mx = (x1 + x2) / 2;
                         const my = (y1 + y2) / 2;
                         const dx = x2 - x1;
                         const dy = y2 - y1;
                         const len = Math.hypot(dx, dy) || 1;
-                        const nx = (-dy / len) * 4.2;
-                        const ny = (dx / len) * 4.2;
+                        const nx = (-dy / len) * 4.8;
+                        const ny = (dx / len) * 4.8;
                         const canonKey = getCanonicalBondKey(n1.element, n2.element);
                         const lenVal = bondLengthsInput[canonKey];
                         const isSelected = selectedBondId === b.id;
@@ -1085,14 +1388,13 @@ export const MoleculeBuilderModal: React.FC = () => {
                               setSelectedNodeId(null);
                             }}
                           >
-                            {/* Wide invisible hit target */}
                             <line
                               x1={x1}
                               y1={y1}
                               x2={x2}
                               y2={y2}
                               stroke="transparent"
-                              strokeWidth="14"
+                              strokeWidth="16"
                             />
                             {b.order === 1 && (
                               <line
@@ -1101,7 +1403,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                                 x2={x2}
                                 y2={y2}
                                 stroke={isSelected ? '#2563eb' : '#64748b'}
-                                strokeWidth={isSelected ? '4' : '3'}
+                                strokeWidth={isSelected ? '4.5' : '3.5'}
                               />
                             )}
                             {b.order === 2 && (
@@ -1112,7 +1414,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                                   x2={x2 + nx}
                                   y2={y2 + ny}
                                   stroke={isSelected ? '#2563eb' : '#64748b'}
-                                  strokeWidth="2.6"
+                                  strokeWidth="3"
                                 />
                                 <line
                                   x1={x1 - nx}
@@ -1120,7 +1422,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                                   x2={x2 - nx}
                                   y2={y2 - ny}
                                   stroke={isSelected ? '#2563eb' : '#64748b'}
-                                  strokeWidth="2.6"
+                                  strokeWidth="3"
                                 />
                               </>
                             )}
@@ -1132,7 +1434,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                                   x2={x2}
                                   y2={y2}
                                   stroke={isSelected ? '#2563eb' : '#64748b'}
-                                  strokeWidth="2.4"
+                                  strokeWidth="2.8"
                                 />
                                 <line
                                   x1={x1 + nx * 1.4}
@@ -1140,7 +1442,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                                   x2={x2 + nx * 1.4}
                                   y2={y2 + ny * 1.4}
                                   stroke={isSelected ? '#2563eb' : '#64748b'}
-                                  strokeWidth="2.2"
+                                  strokeWidth="2.5"
                                 />
                                 <line
                                   x1={x1 - nx * 1.4}
@@ -1148,30 +1450,29 @@ export const MoleculeBuilderModal: React.FC = () => {
                                   x2={x2 - nx * 1.4}
                                   y2={y2 - ny * 1.4}
                                   stroke={isSelected ? '#2563eb' : '#64748b'}
-                                  strokeWidth="2.2"
+                                  strokeWidth="2.5"
                                 />
                               </>
                             )}
-                            {/* Bond length pill on midpoint */}
                             <rect
-                              x={mx - 22}
-                              y={my - 9}
-                              width="44"
-                              height="18"
+                              x={mx - 26}
+                              y={my - 11}
+                              width="52"
+                              height="22"
                               rx="6"
                               fill={lenVal ? '#ffffff' : '#fef3c7'}
                               stroke={isSelected ? '#2563eb' : '#cbd5e1'}
-                              strokeWidth="1"
+                              strokeWidth="1.2"
                             />
                             <text
                               x={mx}
-                              y={my + 3.5}
+                              y={my + 4}
                               textAnchor="middle"
-                              fontSize="9.5"
+                              fontSize="11.5"
                               fontWeight="600"
                               fill={lenVal ? '#334155' : '#b45309'}
                             >
-                              {lenVal ? `${lenVal}Å` : '待填'}
+                              {lenVal ? `${lenVal}Å` : 'Unset'}
                             </text>
                           </g>
                         );
@@ -1179,12 +1480,12 @@ export const MoleculeBuilderModal: React.FC = () => {
 
                       {/* Render Atom Nodes */}
                       {nodes.map((n) => {
-                        const x = n.x ?? 220;
-                        const y = n.y ?? 140;
+                        const x = n.x ?? 250;
+                        const y = n.y ?? 160;
                         const isSelected = selectedNodeId === n.id;
                         const bgHex = getElementColorHex(n.element);
                         const isLight = ['H', 'He', 'Be', 'B', 'Ne'].includes(n.element);
-                        const r = n.element === 'H' ? 17 : 22;
+                        const r = n.element === 'H' ? 20 : 25;
 
                         return (
                           <g
@@ -1195,6 +1496,19 @@ export const MoleculeBuilderModal: React.FC = () => {
                               e.stopPropagation();
                               dragMovedRef.current = false;
                               if (canvasTool === 'move' || e.shiftKey) {
+                                if (svgRef.current) {
+                                  const pt = clientToSvgPoint(
+                                    svgRef.current,
+                                    e.clientX,
+                                    e.clientY
+                                  );
+                                  dragOffsetRef.current = {
+                                    dx: x - pt.x,
+                                    dy: y - pt.y,
+                                  };
+                                } else {
+                                  dragOffsetRef.current = { dx: 0, dy: 0 };
+                                }
                                 setDraggingNodeId(n.id);
                                 setSelectedNodeId(n.id);
                                 setSelectedBondId(null);
@@ -1209,7 +1523,6 @@ export const MoleculeBuilderModal: React.FC = () => {
                                 connectOrToggleBond(dragLinkFromId, n.id);
                                 setSelectedNodeId(n.id);
                               } else if (!dragMovedRef.current) {
-                                // If clicking another node while one is selected in connect mode, allow quick shift-click or direct select
                                 setSelectedNodeId(n.id);
                                 setSelectedBondId(null);
                               }
@@ -1220,23 +1533,23 @@ export const MoleculeBuilderModal: React.FC = () => {
                           >
                             {isSelected && (
                               <circle
-                                r={r + 5}
+                                r={r + 6}
                                 fill="none"
                                 stroke="#2563eb"
-                                strokeWidth="2.5"
-                                strokeDasharray="3 2"
+                                strokeWidth="2.8"
+                                strokeDasharray="4 2.5"
                               />
                             )}
                             <circle
                               r={r}
                               fill={bgHex}
                               stroke={isSelected ? '#2563eb' : '#475569'}
-                              strokeWidth={isSelected ? '2.2' : '1.4'}
+                              strokeWidth={isSelected ? '2.5' : '1.6'}
                             />
                             <text
-                              y="4.5"
+                              y="5"
                               textAnchor="middle"
-                              fontSize={n.element === 'H' ? '12.5' : '14'}
+                              fontSize={n.element === 'H' ? '14' : '16'}
                               fontWeight="700"
                               fill={isLight ? '#1e293b' : '#ffffff'}
                               style={{ pointerEvents: 'none', userSelect: 'none' }}
@@ -1247,10 +1560,10 @@ export const MoleculeBuilderModal: React.FC = () => {
                               <circle
                                 cx={r * 0.75}
                                 cy={-r * 0.75}
-                                r="5"
+                                r="5.5"
                                 fill="#ea580c"
                                 stroke="#ffffff"
-                                strokeWidth="1.5"
+                                strokeWidth="1.6"
                               />
                             )}
                           </g>
@@ -1258,168 +1571,237 @@ export const MoleculeBuilderModal: React.FC = () => {
                       })}
                     </svg>
 
+                    {/* 2D Zoom & Reset Controls */}
+                    <div className="canvas-zoom-bar">
+                      <button
+                        type="button"
+                        className="canvas-zoom-btn"
+                        title="Zoom Out (2D)"
+                        aria-label="Zoom Out 2D"
+                        onClick={() =>
+                          setTopoZoom((z) => Math.max(0.5, Number((z / 1.2).toFixed(2))))
+                        }
+                      >
+                        <ZoomOut size={14} />
+                      </button>
+                      <span className="canvas-zoom-pct mono">{Math.round(topoZoom * 100)}%</span>
+                      <button
+                        type="button"
+                        className="canvas-zoom-btn"
+                        title="Zoom In (2D)"
+                        aria-label="Zoom In 2D"
+                        onClick={() =>
+                          setTopoZoom((z) => Math.min(2.5, Number((z * 1.2).toFixed(2))))
+                        }
+                      >
+                        <ZoomIn size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="canvas-zoom-btn"
+                        title="Reset 2D View"
+                        aria-label="Reset 2D View"
+                        onClick={() => {
+                          setTopoZoom(1);
+                          setTopoPan({ x: 0, y: 0 });
+                        }}
+                      >
+                        <RotateCcw size={13} />
+                      </button>
+                    </div>
+
                     {nodes.length === 0 && (
                       <div className="topology-empty-overlay">
-                        <Atom size={28} />
-                        <strong>画布为空 · 请点击上方元素周期表添加原子</strong>
+                        <Atom size={32} />
+                        <strong>Canvas is empty · Click an element above to add atoms</strong>
                         <span>
-                          添加原子后，从一个原子拖动到另一个原子即可连成共价键，或使用「一键补氢」快速构建分子。
+                          Drag between atoms to form bonds, or scroll to zoom in/out.
                         </span>
                       </div>
                     )}
                   </div>
-                  <div className="topology-footer-tip">
-                    <span>💡 操作提示：从一个原子拖向另一个原子即可连键；点击已有化学键可切换单/双/三键或断开。</span>
-                  </div>
                 </div>
 
-                {/* 实时 3D 球棍预览区 */}
-                <div className="builder-3d-card" ref={previewWrapRef}>
+                {/* Live 3D Ball-and-Stick Preview Card (Interactive Rotate + Wheel/Button Zoom) */}
+                <div className="builder-3d-card">
                   <div className="builder-3d-header">
-                    <span>实时 3D 结构预览</span>
+                    <span>Live 3D Structure Preview</span>
                     {previewMol && (
                       <span className="builder-3d-meta">
                         {previewMol.name} · {previewMol.geometry}
                       </span>
                     )}
                   </div>
-                  {previewMol ? (
+                  <div className="builder-3d-stage-box" ref={setPreviewWrapEl}>
                     <div
-                      ref={previewVpRef}
+                      ref={setPreviewVpEl}
                       className="builder-3d-viewport"
+                      style={{
+                        opacity: previewMol ? 1 : 0,
+                        pointerEvents: previewMol ? 'auto' : 'none',
+                      }}
                       role="img"
-                      aria-label="实时三维分子预览"
+                      aria-label="Interactive 3D Molecular Structure Preview: drag to rotate, scroll to zoom"
                     />
-                  ) : (
-                    <div className="builder-3d-placeholder">
-                      <Sparkles size={22} />
-                      <p>
-                        {nodes.length === 0
-                          ? '添加原子并配置参数后，此处将实时生成 3D 分子结构'
-                          : '请填写右侧的键长、空间构型与键角，或点击右上角「✨ 一键填入推荐默认值」立即生成 3D 模型'}
-                      </p>
-                    </div>
-                  )}
+
+                    {previewMol ? (
+                      <>
+                        <div className="builder-3d-hint">Drag to rotate · Scroll to zoom</div>
+                        <div className="canvas-zoom-bar">
+                          <button
+                            type="button"
+                            className="canvas-zoom-btn"
+                            title="Zoom Out (3D)"
+                            aria-label="Zoom Out 3D"
+                            onClick={() => threeCtxRef.current?.zoomBy(1 / 1.2)}
+                          >
+                            <ZoomOut size={14} />
+                          </button>
+                          <span className="canvas-zoom-pct mono">{preview3DZoomPct}%</span>
+                          <button
+                            type="button"
+                            className="canvas-zoom-btn"
+                            title="Zoom In (3D)"
+                            aria-label="Zoom In 3D"
+                            onClick={() => threeCtxRef.current?.zoomBy(1.2)}
+                          >
+                            <ZoomIn size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="canvas-zoom-btn"
+                            title="Reset 3D View"
+                            aria-label="Reset 3D View"
+                            onClick={() => threeCtxRef.current?.resetView()}
+                          >
+                            <RotateCcw size={13} />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="builder-3d-placeholder">
+                        <Sparkles size={26} />
+                        <p>
+                          {nodes.length === 0
+                            ? 'Add atoms from the periodic table above to build a 3D molecular model.'
+                            : !connectedGraph
+                            ? 'Unconnected atoms detected — connect all atoms on the 2D canvas or delete isolated atoms.'
+                            : 'Complete parameters on the right or click "Auto-Fill" in the top right to generate the 3D model.'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* 右栏：参数配置表单（默认留空 + 一键填入推荐默认值按钮） */}
+              {/* Right Column: Parameters Configuration Form */}
               <div className="builder-params-col">
                 <div className="builder-params-top">
                   <div>
-                    <h3>2. 结构与化学键参数配置</h3>
-                    <p>根据拓扑结构填写参数，或一键填入标准推荐值</p>
+                    <h3>2. Structure & Bond Parameters</h3>
+                    <p>Configure geometric parameters or click Auto-Fill in the top right</p>
                   </div>
-                  <button
-                    type="button"
-                    id="builder-autofill-defaults-btn"
-                    className="autofill-defaults-btn"
-                    onClick={handleFillRecommendedDefaults}
-                  >
-                    <Sparkles size={15} />
-                    <span>一键填入推荐默认值</span>
-                  </button>
                 </div>
 
                 <div className="builder-params-scroll">
-                  {/* 基本标识信息 */}
+                  {/* Basic Identity */}
                   <div className="param-group-card">
-                    <div className="param-group-title">基本标识信息</div>
+                    <div className="param-group-title">Basic Identity</div>
                     <div className="param-grid-2">
                       <label className="param-field">
-                        <span>化学式 (formula)</span>
+                        <span>Chemical Formula (formula)</span>
                         <input
                           type="text"
-                          placeholder="如 CH4、CH3·、CH3CH3"
+                          placeholder="e.g. CH4, CH3·, CH3CH3"
                           value={formula}
                           onChange={(e) => setFormula(e.target.value)}
                         />
                       </label>
                       <label className="param-field">
-                        <span>中文名称 (name)</span>
+                        <span>Substance Name (name)</span>
                         <input
                           type="text"
-                          placeholder="如 甲烷、甲基自由基"
+                          placeholder="e.g. Methane, Methyl Radical"
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                         />
                       </label>
                     </div>
                     <label className="param-field">
-                      <span>微粒描述 (description · 选填)</span>
+                      <span>Description (optional)</span>
                       <input
                         type="text"
-                        placeholder="简要描述该分子或自由基的结构特性…"
+                        placeholder="Brief description of structural or chemical properties…"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                       />
                     </label>
                   </div>
 
-                  {/* 空间构型与杂化 */}
+                  {/* Spatial Geometry & Hybridization */}
                   <div className="param-group-card">
-                    <div className="param-group-title">空间构型与中心杂化</div>
+                    <div className="param-group-title">Spatial Geometry & Hybridization</div>
                     <div className="param-grid-2">
                       <label className="param-field">
-                        <span>空间构型 (geometry) *</span>
+                        <span>Spatial Geometry (geometry) *</span>
                         <div className="select-wrapper">
                           <select
                             value={geometry}
                             onChange={(e) => setGeometry(e.target.value)}
                           >
-                            <option value="">请选择空间构型…</option>
+                            <option value="">Select spatial geometry…</option>
                             {GEOMETRY_OPTIONS.map((opt) => (
                               <option key={opt.value} value={opt.value}>
                                 {opt.label}
                               </option>
                             ))}
                           </select>
-                          <ChevronDown size={15} className="select-chevron" />
+                          <ChevronDown size={16} className="select-chevron" />
                         </div>
                       </label>
 
                       <label className="param-field">
-                        <span>中心杂化方式 (hybridization)</span>
+                        <span>Central Hybridization (hybridization)</span>
                         <div className="select-wrapper">
                           <select
                             value={hybridization}
                             onChange={(e) => setHybridization(e.target.value)}
                           >
-                            <option value="">请选择杂化类型…</option>
+                            <option value="">Select hybridization…</option>
                             {HYBRIDIZATION_OPTIONS.map((h) => (
                               <option key={h} value={h}>
-                                {h === 'none' ? '无 (none)' : h}
+                                {h === 'none' ? 'None (none)' : h}
                               </option>
                             ))}
                           </select>
-                          <ChevronDown size={15} className="select-chevron" />
+                          <ChevronDown size={16} className="select-chevron" />
                         </div>
                       </label>
                     </div>
                   </div>
 
-                  {/* 共价键键长 (Å) */}
+                  {/* Covalent Bond Lengths (Å) */}
                   <div className="param-group-card">
                     <div className="param-group-title">
-                      <span>共价键长 (bondLengths · 单位 Å) *</span>
+                      <span>Covalent Bond Lengths (bondLengths · in Å) *</span>
                     </div>
                     {activeBondKeys.length === 0 ? (
                       <div className="param-empty-hint">
                         {nodes.length <= 1
-                          ? '单原子微粒无分子内共价键，无需填写键长。'
-                          : '请先在左侧画布中将原子连线成键。'}
+                          ? 'Monatomic species have no intramolecular covalent bonds.'
+                          : 'Connect atoms on the left canvas to configure bond lengths.'}
                       </div>
                     ) : (
                       <div className="param-grid-2">
                         {activeBondKeys.map((k) => (
                           <label key={k} className="param-field">
-                            <span className="mono">{k} 键长 (Å)</span>
+                            <span className="mono">{k} Bond Length (Å)</span>
                             <input
                               type="number"
                               step="0.001"
                               min="0.1"
                               max="10"
-                              placeholder="填写键长，如 1.09"
+                              placeholder="e.g. 1.09"
                               value={bondLengthsInput[k] || ''}
                               onChange={(e) =>
                                 setBondLengthsInput((prev) => ({
@@ -1434,26 +1816,26 @@ export const MoleculeBuilderModal: React.FC = () => {
                     )}
                   </div>
 
-                  {/* 键角 (°) */}
+                  {/* Bond Angles (°) */}
                   <div className="param-group-card">
                     <div className="param-group-title">
-                      <span>键角参数 (bondAngles · 单位 °) *</span>
+                      <span>Bond Angles (bondAngles · in °) *</span>
                     </div>
                     {activeAngleKeys.length === 0 ? (
                       <div className="param-empty-hint">
-                        单原子或双原子分子无键角参数，无需填写。
+                        Monatomic or diatomic species do not require bond angle parameters.
                       </div>
                     ) : (
                       <div className="param-grid-2">
                         {activeAngleKeys.map((k) => (
                           <label key={k} className="param-field">
-                            <span className="mono">{k} 键角 (°)</span>
+                            <span className="mono">{k} Bond Angle (°)</span>
                             <input
                               type="number"
                               step="0.01"
                               min="30"
                               max="180"
-                              placeholder="如 109.5 或 120"
+                              placeholder="e.g. 109.5 or 120"
                               value={bondAnglesInput[k] || ''}
                               onChange={(e) =>
                                 setBondAnglesInput((prev) => ({
@@ -1469,14 +1851,14 @@ export const MoleculeBuilderModal: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 底部保存操作栏 */}
+                {/* Footer Save Bar */}
                 <div className="builder-params-footer">
                   <button
                     type="button"
-                    className="text-button"
+                    className="toolbar-btn-outline"
                     onClick={closeBuilder}
                   >
-                    取消
+                    Cancel
                   </button>
                   <button
                     type="button"
@@ -1484,7 +1866,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                     className="primary-button"
                     onClick={handleSaveMolecule}
                   >
-                    <span>{editingMolId ? '保存修改并生成 3D 卡片' : '完成构建并加入分子库'}</span>
+                    <span>Save</span>
                   </button>
                 </div>
               </div>
