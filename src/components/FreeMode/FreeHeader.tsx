@@ -25,11 +25,9 @@ export const FreeHeader: React.FC = () => {
         </span>
         <div>
           <div className="identity-title-row">
-            <h1>Free Chemical Reaction Workbench</h1>
+            <h1>Free Reaction Workbench</h1>
           </div>
-          <p>
-            Custom Molecular Topology <span>/</span> Multi-Stage 3D Reaction Simulation
-          </p>
+          <p>Custom Topology · Reaction Simulation</p>
         </div>
       </div>
 

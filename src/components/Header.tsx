@@ -78,11 +78,9 @@ export const Header: React.FC = () => {
         </span>
         <div>
           <div className="identity-title-row">
-            <h1 id="project-title">{config?.title || 'Radical Substitution of Methane'}</h1>
+            <h1 id="project-title">{config?.title || 'Methane Radical Substitution'}</h1>
           </div>
-          <p>
-            Guided Workbench <span>/</span> 3D Reaction Mechanism Explorer
-          </p>
+          <p>Guided Curriculum · Reaction Dynamics</p>
         </div>
       </div>
 
