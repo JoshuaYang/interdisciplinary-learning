@@ -24,13 +24,15 @@ export const App: React.FC = () => {
   const appMode = useFreeChemStore((s) => s.appMode);
   const freeScreen = useFreeChemStore((s) => s.screen);
 
-  // HTML5 History API Routing (/guided, /free, /)
+  // HTML5 History & Subpath/Hash Adaptive Routing (supports local, custom domain, and GitHub Pages subpath)
   useEffect(() => {
     const handlePopState = () => {
       const pathname = window.location.pathname.toLowerCase();
-      if (pathname === '/guided') {
+      const hash = window.location.hash.toLowerCase();
+
+      if (pathname.endsWith('/guided') || hash === '#/guided' || hash === '#guided') {
         useFreeChemStore.getState().setAppMode('guided');
-      } else if (pathname === '/free') {
+      } else if (pathname.endsWith('/free') || hash === '#/free' || hash === '#free') {
         useFreeChemStore.getState().setAppMode('free');
       } else {
         useFreeChemStore.getState().setAppMode('home');
@@ -38,14 +40,26 @@ export const App: React.FC = () => {
     };
 
     window.addEventListener('popstate', handlePopState);
+    window.addEventListener('hashchange', handlePopState);
     handlePopState();
 
-    return () => window.removeEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handlePopState);
+    };
   }, []);
 
-  // Sync mode changes to History API without full reload
+  // Sync mode changes to History API preserving base subpath
   useEffect(() => {
-    const targetPath = appMode === 'guided' ? '/guided' : appMode === 'free' ? '/free' : '/';
+    const currentPath = window.location.pathname;
+    const baseDir = currentPath.replace(/\/+(guided|free)\/?$/i, '').replace(/\/+$/, '') || '';
+    const targetPath =
+      appMode === 'guided'
+        ? `${baseDir}/guided`
+        : appMode === 'free'
+        ? `${baseDir}/free`
+        : baseDir ? `${baseDir}/` : '/';
+
     if (window.location.pathname !== targetPath) {
       window.history.pushState(null, '', targetPath);
     }
