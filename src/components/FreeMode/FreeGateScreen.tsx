@@ -6,12 +6,12 @@ import {
   ArrowRight,
   Box,
   Edit3,
+  FileDown,
   Info,
   MoreHorizontal,
   Plus,
   Sparkles,
   Trash2,
-  Upload,
 } from 'lucide-react';
 import { useFreeChemStore } from '../../store/useFreeChemStore';
 import { useChemStore } from '../../store/useChemStore';
@@ -102,33 +102,34 @@ export const FreeGateScreen: React.FC = () => {
               </p>
             </div>
 
-            {/* Clean, non-bloated action toolbar: primary CTA + icon buttons for upload & library menu */}
+            {/* Clean, icon-only actions toolbar */}
             <div className="gate-actions-toolbar">
               <button
                 type="button"
                 id="free-open-builder-btn"
-                className="toolbar-btn-primary"
+                className="toolbar-icon-btn primary-icon-btn"
+                title="Add Chemical Substance"
+                aria-label="Add Chemical Substance"
                 onClick={() => openBuilder(null)}
               >
-                <Plus size={17} />
-                <span>Add Chemical Substance</span>
+                <Plus size={20} />
               </button>
 
               <button
                 type="button"
                 className="toolbar-icon-btn"
-                title="Upload JSON files"
-                aria-label="Upload JSON files"
+                title="Import JSON Files"
+                aria-label="Import JSON Files"
                 onClick={() => batchInputRef.current?.click()}
               >
-                <Upload size={18} />
+                <FileDown size={19} />
               </button>
 
               <div className="toolbar-dropdown-wrap" ref={menuRef}>
                 <button
                   type="button"
                   className={`toolbar-icon-btn ${moreMenuOpen ? 'active' : ''}`}
-                  title="Library actions (Export ZIP / Load Samples / Clear)"
+                  title="Library actions"
                   aria-label="Library actions"
                   aria-expanded={moreMenuOpen}
                   onClick={() => setMoreMenuOpen((v) => !v)}
@@ -145,10 +146,7 @@ export const FreeGateScreen: React.FC = () => {
                       onClick={handleExportAllZip}
                     >
                       <Archive size={16} />
-                      <div className="dropdown-item-text">
-                        <strong>Export All as ZIP</strong>
-                        <small>Download all {molecules.length} JSON files (.zip)</small>
-                      </div>
+                      <span>Export All as ZIP</span>
                     </button>
 
                     <button
@@ -161,10 +159,7 @@ export const FreeGateScreen: React.FC = () => {
                       }}
                     >
                       <Sparkles size={16} />
-                      <div className="dropdown-item-text">
-                        <strong>Load Sample Library</strong>
-                        <small>Restore default 7 molecules & 4 stages</small>
-                      </div>
+                      <span>Load Sample Library</span>
                     </button>
 
                     {molecules.length > 0 && (
@@ -180,10 +175,7 @@ export const FreeGateScreen: React.FC = () => {
                           }}
                         >
                           <Trash2 size={16} />
-                          <div className="dropdown-item-text">
-                            <strong>Clear All Substances</strong>
-                            <small>Remove all cards from the library</small>
-                          </div>
+                          <span>Clear All Substances</span>
                         </button>
                       </>
                     )}
@@ -349,7 +341,7 @@ export const FreeGateScreen: React.FC = () => {
               );
             })}
 
-            {/* Add Chemical Substance Card (unified wording with top button) */}
+            {/* Add Chemical Substance Card */}
             <button
               type="button"
               className="gate-card add-mol-card"

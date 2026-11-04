@@ -2653,14 +2653,14 @@ kbd {
  * ============================================================================ */
 .has-fixed-bottom-bar,
 .has-fixed-footer {
-  padding-bottom: 168px !important;
+  padding-bottom: 96px !important;
 }
 
 .gate-container::after,
 .pipeline-container::after {
   content: "";
   display: block;
-  height: 64px;
+  height: 24px;
   flex-shrink: 0;
 }
 
@@ -2853,15 +2853,29 @@ kbd {
   animation: fadeIn 140ms ease-out;
 }
 
+.toolbar-icon-btn.primary-icon-btn {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+}
+
+.toolbar-icon-btn.primary-icon-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
 .toolbar-dropdown-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  padding: 10px 12px;
+  padding: 10px 14px;
   border-radius: 8px;
-  font-size: var(--fs-sm);
-  font-weight: 600;
+  font-size: var(--fs-base);
+  font-weight: 500;
   color: var(--ink-secondary);
   text-align: left;
   cursor: pointer;
@@ -3000,11 +3014,10 @@ kbd {
   max-height: 100svh;
   border-radius: 0;
   border: none;
-  padding: 20px 32px;
+  padding: 20px 32px 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .mol-builder-header {
@@ -3023,8 +3036,10 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  flex: 1 0 auto;
-  padding-bottom: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 0 16px;
 }
 
 .builder-periodic-section {
@@ -3276,19 +3291,18 @@ kbd {
   border-radius: 6px;
 }
 
-/* Builder Main Columns (minmax(0, ...) prevents ResizeObserver width feedback loops) */
+/* Builder Main Columns */
 .builder-main-columns {
   display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
   gap: 20px;
   align-items: stretch;
-  flex: 1 0 auto;
 }
 
 .builder-visual-col {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
   min-width: 0;
 }
 
@@ -3309,35 +3323,13 @@ kbd {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px;
+  min-height: 34px;
 }
 
-.canvas-tool-group {
-  display: inline-flex;
-  background: var(--surface-subtle);
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  padding: 3px;
-  gap: 3px;
-}
-
-.canvas-tool-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 7px;
-  border: none;
-  background: transparent;
-  font-size: var(--fs-sm);
-  font-weight: 600;
-  color: var(--ink-secondary);
-  cursor: pointer;
-}
-
-.canvas-tool-btn.active {
-  background: var(--paper);
-  color: var(--accent);
-  box-shadow: var(--shadow-sm);
+.canvas-header-hint {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  font-weight: 500;
 }
 
 .canvas-node-actions {
@@ -3351,8 +3343,37 @@ kbd {
   font-size: var(--fs-sm);
   color: var(--ink-secondary);
   background: var(--surface-subtle);
+  border: 1px solid var(--line);
   padding: 4px 10px;
   border-radius: 7px;
+  font-weight: 600;
+}
+
+.bond-order-pill-group {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-subtle);
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.bond-order-pill {
+  padding: 3px 9px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.bond-order-pill.active {
+  background: var(--accent);
+  color: #ffffff;
 }
 
 .canvas-mini-btn {
@@ -3380,15 +3401,21 @@ kbd {
   color: #c2410c;
 }
 
-.canvas-mini-btn.danger:hover {
-  border-color: var(--danger);
+.canvas-mini-btn.danger {
+  border-color: var(--danger-border);
   color: var(--danger);
   background: var(--danger-soft);
 }
 
+.canvas-mini-btn.danger:hover {
+  border-color: var(--danger);
+  color: #ffffff;
+  background: var(--danger);
+}
+
 .topology-canvas-wrap {
   position: relative;
-  height: 270px;
+  height: 320px;
   flex-shrink: 0;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -3405,7 +3432,11 @@ kbd {
 }
 
 .topo-node-group {
-  cursor: pointer;
+  cursor: grab;
+}
+
+.topo-node-group:active {
+  cursor: grabbing;
 }
 
 .topo-bond-group {
@@ -3485,10 +3516,10 @@ kbd {
   color: var(--muted);
 }
 
-/* Builder 3D Live Preview Card (Absolute inner viewport prevents width growth) */
+/* Builder 3D Live Preview Card */
 .builder-3d-card {
   position: relative;
-  height: 300px;
+  height: 340px;
   flex-shrink: 0;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -3700,12 +3731,29 @@ kbd {
 }
 
 .builder-params-footer {
+  display: none !important;
+}
+
+/* Fixed Bottom Bar in Molecule Builder Dialog */
+.mol-builder-fixed-footer {
+  flex-shrink: 0;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line-strong);
+  padding: 0 32px;
   display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-  margin-top: auto;
+  align-items: center;
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.05);
+  margin: 0 -32px;
+}
+
+.mol-builder-footer-inner {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 /* ============================================================================

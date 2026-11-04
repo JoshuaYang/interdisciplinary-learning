@@ -23,6 +23,35 @@ export const App: React.FC = () => {
   const appMode = useFreeChemStore((s) => s.appMode);
   const freeScreen = useFreeChemStore((s) => s.screen);
 
+  // URL Hash-based routing synchronization (independent addresses: #/, #/guided, #/free)
+  useEffect(() => {
+    const parseHashRoute = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash.startsWith('#/guided')) {
+        useFreeChemStore.getState().setAppMode('guided');
+      } else if (hash.startsWith('#/free')) {
+        useFreeChemStore.getState().setAppMode('free');
+      } else {
+        useFreeChemStore.getState().setAppMode('home');
+      }
+    };
+
+    // Listen to hash change
+    window.addEventListener('hashchange', parseHashRoute);
+    parseHashRoute();
+
+    return () => window.removeEventListener('hashchange', parseHashRoute);
+  }, []);
+
+  // Sync state changes to browser URL hash
+  useEffect(() => {
+    const targetHash =
+      appMode === 'guided' ? '#/guided' : appMode === 'free' ? '#/free' : '#/';
+    if (window.location.hash !== targetHash) {
+      window.history.replaceState(null, '', targetHash);
+    }
+  }, [appMode]);
+
   useEffect(() => {
     loadDefault();
 

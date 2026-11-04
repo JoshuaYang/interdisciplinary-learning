@@ -6,9 +6,6 @@ import {
   ChevronDown,
   ChevronUp,
   Grid,
-  Link2,
-  Move,
-  Plus,
   RotateCcw,
   Sparkles,
   Trash2,
@@ -16,6 +13,8 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
+import { useFreeChemStore } from '../../store/useFreeChemStore';
+import { useChemStore } from '../../store/useChemStore';
 import {
   CATEGORY_LABELS,
   ELEMENT_MAP,
@@ -40,27 +39,21 @@ import {
   type TopologyBond,
   type TopologyNode,
 } from '../../engine/freeReactionEngine';
-import { useFreeChemStore } from '../../store/useFreeChemStore';
-import { useChemStore } from '../../store/useChemStore';
 
 const COMMON_SYMBOLS = ['C', 'H', 'Br', 'Cl', 'O', 'N', 'F', 'I', 'S', 'P', 'B', 'Si'];
 
 /**
- * Convert screen (clientX, clientY) into exact SVG viewBox coordinates using the inverse Screen CTM.
- * Eliminates any jump/offset caused by preserveAspectRatio letterboxing or zoom/pan viewBox transforms.
+ * Utility to convert screen clientX/clientY to SVG user coordinates
  */
-function clientToSvgPoint(
-  svg: SVGSVGElement,
-  clientX: number,
-  clientY: number
-): { x: number; y: number } {
+function clientToSvgPoint(svg: SVGSVGElement, clientX: number, clientY: number): { x: number; y: number } {
+  const pt = svg.createSVGPoint();
+  pt.x = clientX;
+  pt.y = clientY;
   const ctm = svg.getScreenCTM();
   if (ctm) {
-    const pt = svg.createSVGPoint();
-    pt.x = clientX;
-    pt.y = clientY;
-    const transformed = pt.matrixTransform(ctm.inverse());
-    return { x: transformed.x, y: transformed.y };
+    const inv = ctm.inverse();
+    const res = pt.matrixTransform(inv);
+    return { x: res.x, y: res.y };
   }
   const rect = svg.getBoundingClientRect();
   return {
@@ -70,22 +63,23 @@ function clientToSvgPoint(
 }
 
 /**
- * Check whether all nodes in the topology graph form a single connected component.
+ * Connectivity test: returns true if all nodes belong to one connected component
  */
 function isTopologyConnected(nodes: TopologyNode[], bonds: TopologyBond[]): boolean {
-  if (nodes.length <= 1) return nodes.length === 1;
-  if (bonds.length === 0) return false;
+  if (nodes.length <= 1) return true;
   const adj = new Map<string, string[]>();
-  for (const n of nodes) adj.set(n.id, []);
-  for (const b of bonds) {
-    if (adj.has(b.from) && adj.has(b.to) && b.from !== b.to) {
+  nodes.forEach((n) => adj.set(n.id, []));
+  bonds.forEach((b) => {
+    if (adj.has(b.from) && adj.has(b.to)) {
       adj.get(b.from)!.push(b.to);
       adj.get(b.to)!.push(b.from);
     }
-  }
+  });
+
   const visited = new Set<string>();
   const queue = [nodes[0].id];
   visited.add(nodes[0].id);
+
   while (queue.length > 0) {
     const cur = queue.shift()!;
     for (const nb of adj.get(cur) || []) {
@@ -117,7 +111,6 @@ export const MoleculeBuilderModal: React.FC = () => {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedBondId, setSelectedBondId] = useState<string | null>(null);
   const [activeElement, setActiveElement] = useState<string>('C');
-  const [canvasTool, setCanvasTool] = useState<'connect' | 'move'>('connect');
   const [showFullPeriodicTable, setShowFullPeriodicTable] = useState<boolean>(true);
   const [categoryFilter, setCategoryFilter] = useState<ElementCategory | 'all'>('all');
 
@@ -137,11 +130,17 @@ export const MoleculeBuilderModal: React.FC = () => {
   const [bondLengthsInput, setBondLengthsInput] = useState<Record<string, string>>({});
   const [bondAnglesInput, setBondAnglesInput] = useState<Record<string, string>>({});
 
-  // Dragging state on 2D SVG canvas
+  // Unified Dragging & Linking state on 2D SVG canvas
   const svgWrapRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  const [dragLinkFromId, setDragLinkFromId] = useState<string | null>(null);
+  const [dragLinkCursor, setDragLinkCursor] = useState<{ x: number; y: number } | null>(null);
+  const activePointerDownNodeRef = useRef<TopologyNode | null>(null);
+  const pointerDownPosRef = useRef<{ clientX: number; clientY: number }>({ clientX: 0, clientY: 0 });
+  const isDraggingNodeRef = useRef<boolean>(false);
   const dragOffsetRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
+
+  // Panning background state
   const [isPanning2D, setIsPanning2D] = useState<boolean>(false);
   const panStartRef = useRef<{ clientX: number; clientY: number; panX: number; panY: number }>({
     clientX: 0,
@@ -149,9 +148,6 @@ export const MoleculeBuilderModal: React.FC = () => {
     panX: 0,
     panY: 0,
   });
-  const [dragLinkFromId, setDragLinkFromId] = useState<string | null>(null);
-  const [dragLinkCursor, setDragLinkCursor] = useState<{ x: number; y: number } | null>(null);
-  const dragMovedRef = useRef<boolean>(false);
 
   const resetEmptyBuilder = useCallback(() => {
     setNodes([]);
@@ -169,100 +165,58 @@ export const MoleculeBuilderModal: React.FC = () => {
     setTopoPan({ x: 0, y: 0 });
   }, []);
 
-  // Initialize state when modal opens
+  // Sync internal state when opening modal (new vs editing)
   useEffect(() => {
     if (!builderOpen) return;
-    setTopoZoom(1);
-    setTopoPan({ x: 0, y: 0 });
-    if (editingItem) {
-      try {
-        const topo = normalizeDocToTopology(editingItem.doc);
-        // Center existing 2D coordinates nicely around (250, 160)
-        const rawNodes = topo.nodes.map((n, idx) => {
-          if (typeof n.x === 'number' && typeof n.y === 'number') return n;
-          const angle = (idx * 2 * Math.PI) / Math.max(1, topo.nodes.length);
-          return {
-            ...n,
-            x: idx === 0 ? 250 : Math.round(250 + 92 * Math.cos(angle)),
-            y: idx === 0 ? 160 : Math.round(160 + 92 * Math.sin(angle)),
-          };
-        });
-        let avgX = 0;
-        let avgY = 0;
-        rawNodes.forEach((n) => {
-          avgX += n.x ?? 250;
-          avgY += n.y ?? 160;
-        });
-        avgX /= Math.max(1, rawNodes.length);
-        avgY /= Math.max(1, rawNodes.length);
-        const shiftX = Math.round(250 - avgX);
-        const shiftY = Math.round(160 - avgY);
-        const laidOut = rawNodes.map((n) => ({
-          ...n,
-          x: (n.x ?? 250) + shiftX,
-          y: (n.y ?? 160) + shiftY,
-        }));
+    if (editingItem && editingItem.doc) {
+      const doc = editingItem.doc;
+      const initialNodes: TopologyNode[] = (doc.nodes || []).map((n: any, idx: number) => ({
+        id: n.id || `atom_${idx + 1}`,
+        element: n.element || 'C',
+        radical: n.radical || 0,
+        x: n.x ?? 250 + (idx % 3) * 60,
+        y: n.y ?? 160 + Math.floor(idx / 3) * 60,
+      }));
+      const initialBonds: TopologyBond[] = (doc.bonds || []).map((b: any, idx: number) => ({
+        id: b.id || `bond_${idx + 1}`,
+        from: b.from,
+        to: b.to,
+        order: (b.order || 1) as 1 | 2 | 3,
+      }));
 
-        setNodes(laidOut);
-        setBonds(topo.bonds);
-        setName(editingItem.doc.name || editingItem.mol.name || '');
-        setFormula(editingItem.doc.formula || editingItem.mol.formula || '');
-        setDescription(editingItem.doc.description || editingItem.mol.description || '');
-        setGeometry(editingItem.doc.geometry || laidOut[0]?.geometry || '');
-        setHybridization(editingItem.doc.hybridization || laidOut[0]?.hybridization || '');
+      setNodes(initialNodes);
+      setBonds(initialBonds);
+      setSelectedNodeId(initialNodes[0]?.id || null);
+      setSelectedBondId(null);
+      setName(doc.name || '');
+      setFormula(doc.formula || '');
+      setDescription(doc.description || '');
+      setGeometry(doc.geometry || '');
+      setHybridization(doc.hybridization || '');
 
-        const lengthsMap: Record<string, string> = {};
-        if (editingItem.doc.bondLengths && typeof editingItem.doc.bondLengths === 'object') {
-          for (const [k, v] of Object.entries(editingItem.doc.bondLengths)) {
-            const parts = k.split('-');
-            const canon = parts.length === 2 ? getCanonicalBondKey(parts[0], parts[1]) : k;
-            lengthsMap[canon] = String(v);
-          }
+      const blMap: Record<string, string> = {};
+      if (doc.bondLengths) {
+        for (const [k, v] of Object.entries(doc.bondLengths)) {
+          blMap[k] = String(v);
         }
-        topo.bonds.forEach((b) => {
-          const n1 = laidOut.find((n) => n.id === b.from);
-          const n2 = laidOut.find((n) => n.id === b.to);
-          if (n1 && n2 && typeof b.length === 'number') {
-            const canon = getCanonicalBondKey(n1.element, n2.element);
-            if (!lengthsMap[canon]) lengthsMap[canon] = String(b.length);
-          }
-        });
-        setBondLengthsInput(lengthsMap);
-
-        const anglesMap: Record<string, string> = {};
-        const rawAngles = editingItem.doc.bondAngles || laidOut[0]?.bondAngles;
-        if (rawAngles && typeof rawAngles === 'object') {
-          for (const [k, v] of Object.entries(rawAngles)) {
-            if (typeof v === 'number') anglesMap[k] = String(v);
-          }
-        }
-        setBondAnglesInput(anglesMap);
-        setSelectedNodeId(laidOut[0]?.id || null);
-        setSelectedBondId(null);
-      } catch {
-        resetEmptyBuilder();
       }
+      setBondLengthsInput(blMap);
+
+      const baMap: Record<string, string> = {};
+      if (doc.bondAngles) {
+        for (const [k, v] of Object.entries(doc.bondAngles)) {
+          baMap[k] = String(v);
+        }
+      }
+      setBondAnglesInput(baMap);
+      setTopoZoom(1);
+      setTopoPan({ x: 0, y: 0 });
     } else {
       resetEmptyBuilder();
     }
   }, [builderOpen, editingItem, resetEmptyBuilder]);
 
-  // 2D Canvas wheel zoom listener
-  useEffect(() => {
-    const wrap = svgWrapRef.current;
-    if (!wrap || !builderOpen) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setTopoZoom((prev) =>
-        Math.max(0.5, Math.min(2.5, Number((prev * Math.exp(-e.deltaY * 0.0012)).toFixed(3))))
-      );
-    };
-    wrap.addEventListener('wheel', onWheel, { passive: false });
-    return () => wrap.removeEventListener('wheel', onWheel);
-  }, [builderOpen]);
-
-  // Compute unique bond types & angle keys present in current topology
+  // Active bonds and angle keys
   const activeBondKeys = useMemo(() => {
     const keys = new Set<string>();
     const nodeMap = new Map(nodes.map((n) => [n.id, n]));
@@ -277,8 +231,7 @@ export const MoleculeBuilderModal: React.FC = () => {
   }, [nodes, bonds]);
 
   const activeAngleKeys = useMemo(() => {
-    const keys = new Set<string>();
-    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+    if (nodes.length < 3) return [];
     const adj = new Map<string, string[]>();
     nodes.forEach((n) => adj.set(n.id, []));
     bonds.forEach((b) => {
@@ -288,15 +241,17 @@ export const MoleculeBuilderModal: React.FC = () => {
       }
     });
 
+    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+    const keys = new Set<string>();
     for (const n of nodes) {
-      const nbs = adj.get(n.id) || [];
-      if (nbs.length < 2) continue;
-      for (let i = 0; i < nbs.length; i++) {
-        for (let j = i + 1; j < nbs.length; j++) {
-          const e1 = nodeMap.get(nbs[i])!.element;
-          const e2 = nodeMap.get(nbs[j])!.element;
-          const pair = [e1, e2].sort((a, b) =>
-            a === 'H' ? -1 : b === 'H' ? 1 : a.localeCompare(b)
+      const neighbors = adj.get(n.id) || [];
+      if (neighbors.length < 2) continue;
+      for (let i = 0; i < neighbors.length; i++) {
+        for (let j = i + 1; j < neighbors.length; j++) {
+          const el1 = nodeMap.get(neighbors[i])!.element;
+          const el2 = nodeMap.get(neighbors[j])!.element;
+          const pair = [el1, el2].sort((a, b) =>
+            a.localeCompare(b, undefined, { sensitivity: 'base' })
           );
           keys.add(`${pair[0]}-${n.element}-${pair[1]}`);
         }
@@ -304,6 +259,81 @@ export const MoleculeBuilderModal: React.FC = () => {
     }
     return [...keys];
   }, [nodes, bonds]);
+
+  /**
+   * Helper: Automatically synthesize recommended default parameters into state
+   * so adding atoms or connecting bonds immediately generates 3D coordinates.
+   */
+  const synthesizeDefaultsForNodesAndBonds = (
+    currentNodes: TopologyNode[],
+    currentBonds: TopologyBond[],
+    currentBLMap: Record<string, string>,
+    currentBAMap: Record<string, string>
+  ) => {
+    const nodeMap = new Map(currentNodes.map((n) => [n.id, n]));
+    const updatedBL = { ...currentBLMap };
+    for (const b of currentBonds) {
+      const n1 = nodeMap.get(b.from);
+      const n2 = nodeMap.get(b.to);
+      if (!n1 || !n2) continue;
+      const key = getCanonicalBondKey(n1.element, n2.element);
+      if (!updatedBL[key]) {
+        updatedBL[key] = String(getRecommendedBondLength(n1.element, n2.element, b.order));
+      }
+    }
+
+    const adj = new Map<string, string[]>();
+    currentNodes.forEach((n) => adj.set(n.id, []));
+    currentBonds.forEach((b) => {
+      if (adj.has(b.from) && adj.has(b.to)) {
+        adj.get(b.from)!.push(b.to);
+        adj.get(b.to)!.push(b.from);
+      }
+    });
+
+    const sortedCenters = [...currentNodes].sort(
+      (a, b) => (adj.get(b.id)?.length || 0) - (adj.get(a.id)?.length || 0)
+    );
+    const primaryCenter = sortedCenters[0];
+    let recommendedGeometry = geometry;
+    let recommendedHybridization = hybridization;
+
+    const updatedBA = { ...currentBAMap };
+
+    if (primaryCenter) {
+      const primaryNbEls = (adj.get(primaryCenter.id) || []).map(
+        (id) => nodeMap.get(id)!.element
+      );
+      const rec = recommendCenterConfig(
+        primaryCenter.element,
+        primaryNbEls,
+        primaryCenter.radical
+      );
+      if (!recommendedGeometry) {
+        recommendedGeometry = rec.geometry;
+      }
+      if (!recommendedHybridization) {
+        recommendedHybridization = rec.hybridization;
+      }
+
+      for (const [k, v] of Object.entries(rec.bondAngles)) {
+        if (!updatedBA[k]) {
+          updatedBA[k] = String(v);
+        }
+      }
+    }
+
+    const inferred = inferFormulaAndName(currentNodes, currentBonds);
+    return {
+      name: name || inferred.name,
+      formula: formula || inferred.formula,
+      description: description || inferred.description,
+      geometry: recommendedGeometry || (currentNodes.length === 2 ? 'diatomic' : 'monatomic'),
+      hybridization: recommendedHybridization || 'none',
+      bondLengths: updatedBL,
+      bondAngles: updatedBA,
+    };
+  };
 
   // Add an atom of `symbol` to the 2D topology canvas
   const addAtomNode = (symbol: string, customPos?: { x: number; y: number }) => {
@@ -343,38 +373,65 @@ export const MoleculeBuilderModal: React.FC = () => {
       });
     }
 
+    // Auto-populate recommended defaults so 3D renders immediately!
+    const autoParams = synthesizeDefaultsForNodesAndBonds(
+      nextNodes,
+      nextBonds,
+      bondLengthsInput,
+      bondAnglesInput
+    );
+
     setNodes(nextNodes);
     setBonds(nextBonds);
-    if (!selectedNodeId) {
-      setSelectedNodeId(newId);
-    }
+    setSelectedNodeId(newId);
+    setSelectedBondId(null);
+    setName(autoParams.name);
+    setFormula(autoParams.formula);
+    setDescription(autoParams.description);
+    setGeometry(autoParams.geometry);
+    setHybridization(autoParams.hybridization);
+    setBondLengthsInput(autoParams.bondLengths);
+    setBondAnglesInput(autoParams.bondAngles);
   };
 
-  // Connect or cycle bond between two nodes
-  const connectOrToggleBond = (idA: string, idB: string) => {
+  // Connect or toggle bond order (1, 2, 3) between two nodes
+  const connectOrSetBond = (idA: string, idB: string, explicitOrder?: 1 | 2 | 3) => {
     if (idA === idB) return;
     const existing = bonds.find(
       (b) => (b.from === idA && b.to === idB) || (b.from === idB && b.to === idA)
     );
+    let nextBonds = [...bonds];
+    let targetBondId = '';
+
     if (existing) {
-      const nextOrder = ((existing.order % 3) + 1) as 1 | 2 | 3;
-      setBonds(bonds.map((b) => (b.id === existing.id ? { ...b, order: nextOrder } : b)));
-      setSelectedBondId(existing.id);
-      showToast(
-        `Switched covalent bond to ${
-          nextOrder === 1 ? 'Single Bond' : nextOrder === 2 ? 'Double Bond' : 'Triple Bond'
-        }`
-      );
+      const nextOrder = explicitOrder ?? (((existing.order % 3) + 1) as 1 | 2 | 3);
+      nextBonds = bonds.map((b) => (b.id === existing.id ? { ...b, order: nextOrder } : b));
+      targetBondId = existing.id;
     } else {
       const newBond: TopologyBond = {
         id: `b_${idA}_${idB}_${Date.now().toString(36).slice(-2)}`,
         from: idA,
         to: idB,
-        order: 1,
+        order: explicitOrder ?? 1,
       };
-      setBonds([...bonds, newBond]);
-      setSelectedBondId(newBond.id);
+      nextBonds = [...bonds, newBond];
+      targetBondId = newBond.id;
     }
+
+    const autoParams = synthesizeDefaultsForNodesAndBonds(
+      nodes,
+      nextBonds,
+      bondLengthsInput,
+      bondAnglesInput
+    );
+
+    setBonds(nextBonds);
+    setSelectedBondId(targetBondId);
+    setSelectedNodeId(null);
+    setGeometry(autoParams.geometry);
+    setHybridization(autoParams.hybridization);
+    setBondLengthsInput(autoParams.bondLengths);
+    setBondAnglesInput(autoParams.bondAngles);
   };
 
   // Auto-fill hydrogens for the selected atom based on standard valence
@@ -415,19 +472,41 @@ export const MoleculeBuilderModal: React.FC = () => {
         order: 1,
       });
     }
+
+    const autoParams = synthesizeDefaultsForNodesAndBonds(
+      newNodes,
+      newBonds,
+      bondLengthsInput,
+      bondAnglesInput
+    );
+
     setNodes(newNodes);
     setBonds(newBonds);
+    setName(autoParams.name);
+    setFormula(autoParams.formula);
+    setDescription(autoParams.description);
+    setGeometry(autoParams.geometry);
+    setHybridization(autoParams.hybridization);
+    setBondLengthsInput(autoParams.bondLengths);
+    setBondAnglesInput(autoParams.bondAngles);
     showToast(`Added ${needed} H atom${needed > 1 ? 's' : ''} to ${target.element}.`);
   };
 
   // Toggle radical on selected node
   const toggleSelectedNodeRadical = () => {
     if (!selectedNodeId) return;
-    setNodes(
-      nodes.map((n) =>
-        n.id === selectedNodeId ? { ...n, radical: n.radical ? 0 : 1 } : n
-      )
+    const updated: TopologyNode[] = nodes.map((n) =>
+      n.id === selectedNodeId ? { ...n, radical: (n.radical ? 0 : 1) as 0 | 1 } : n
     );
+    const autoParams = synthesizeDefaultsForNodesAndBonds(
+      updated,
+      bonds,
+      bondLengthsInput,
+      bondAnglesInput
+    );
+    setNodes(updated);
+    setGeometry(autoParams.geometry);
+    setHybridization(autoParams.hybridization);
   };
 
   // Delete selected node (and any terminal H atoms exclusively attached to it)
@@ -460,76 +539,51 @@ export const MoleculeBuilderModal: React.FC = () => {
       return;
     }
 
+    const autoParams = synthesizeDefaultsForNodesAndBonds(
+      nextNodes,
+      nextBonds,
+      bondLengthsInput,
+      bondAnglesInput
+    );
+
     setNodes(nextNodes);
     setBonds(nextBonds);
     setSelectedNodeId(nextNodes[0]?.id || null);
+    setName(autoParams.name);
+    setFormula(autoParams.formula);
+    setDescription(autoParams.description);
+    setGeometry(autoParams.geometry);
+    setHybridization(autoParams.hybridization);
+    setBondLengthsInput(autoParams.bondLengths);
+    setBondAnglesInput(autoParams.bondAngles);
   };
 
   const deleteSelectedBond = () => {
     if (!selectedBondId) return;
-    setBonds(bonds.filter((b) => b.id !== selectedBondId));
+    const nextBonds = bonds.filter((b) => b.id !== selectedBondId);
+    setBonds(nextBonds);
     setSelectedBondId(null);
   };
 
-  // ONE-CLICK AUTO-FILL
+  // ONE-CLICK AUTO-FILL (Fills recommended VSEPR geometry, bond lengths & angles)
   const handleFillRecommendedDefaults = () => {
     if (nodes.length === 0) {
       showToast('Please select an element from the periodic table to add atoms first.');
       return;
     }
-    const inferred = inferFormulaAndName(nodes, bonds);
-    setFormula(inferred.formula);
-    setName(inferred.name);
-    setDescription(inferred.description);
-
-    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-    const nextLengths: Record<string, string> = {};
-    for (const b of bonds) {
-      const n1 = nodeMap.get(b.from);
-      const n2 = nodeMap.get(b.to);
-      if (!n1 || !n2) continue;
-      const key = getCanonicalBondKey(n1.element, n2.element);
-      const recLen = getRecommendedBondLength(n1.element, n2.element, b.order);
-      nextLengths[key] = String(recLen);
-    }
-    setBondLengthsInput(nextLengths);
-
-    const adj = new Map<string, string[]>();
-    nodes.forEach((n) => adj.set(n.id, []));
-    bonds.forEach((b) => {
-      if (adj.has(b.from) && adj.has(b.to)) {
-        adj.get(b.from)!.push(b.to);
-        adj.get(b.to)!.push(b.from);
-      }
-    });
-
-    const sortedCenters = [...nodes].sort(
-      (a, b) => (adj.get(b.id)?.length || 0) - (adj.get(a.id)?.length || 0)
+    const autoParams = synthesizeDefaultsForNodesAndBonds(
+      nodes,
+      bonds,
+      {},
+      {}
     );
-    const primaryCenter = sortedCenters[0];
-    const primaryNbEls = (adj.get(primaryCenter.id) || []).map(
-      (id) => nodeMap.get(id)!.element
-    );
-    const recCenter = recommendCenterConfig(
-      primaryCenter.element,
-      primaryNbEls,
-      primaryCenter.radical
-    );
-
-    setGeometry(recCenter.geometry);
-    setHybridization(recCenter.hybridization);
-
-    const nextAngles: Record<string, string> = {};
-    for (const [k, v] of Object.entries(recCenter.bondAngles)) {
-      nextAngles[k] = String(v);
-    }
-    for (const ak of activeAngleKeys) {
-      if (!nextAngles[ak]) {
-        const defOpt = GEOMETRY_OPTIONS.find((g) => g.value === recCenter.geometry);
-        nextAngles[ak] = String(defOpt?.defaultAngle || 109.5);
-      }
-    }
-    setBondAnglesInput(nextAngles);
+    setFormula(autoParams.formula);
+    setName(autoParams.name);
+    setDescription(autoParams.description);
+    setGeometry(autoParams.geometry);
+    setHybridization(autoParams.hybridization);
+    setBondLengthsInput(autoParams.bondLengths);
+    setBondAnglesInput(autoParams.bondAngles);
     showToast('Auto-filled recommended parameters!');
   };
 
@@ -640,51 +694,74 @@ export const MoleculeBuilderModal: React.FC = () => {
     bondAnglesInput,
     geometry,
     hybridization,
-    name,
-    formula,
   ]);
 
-  // Callback refs for the 3D stage box & viewport so Radix Portal mount always triggers WebGL init
-  const [previewWrapEl, setPreviewWrapEl] = useState<HTMLDivElement | null>(null);
-  const [previewVpEl, setPreviewVpEl] = useState<HTMLDivElement | null>(null);
+  // Save the constructed molecule into the Zustand store
+  const handleSaveMolecule = () => {
+    if (nodes.length === 0) {
+      showToast('Please add at least one atom to the structure.');
+      return;
+    }
+    if (!connectedGraph) {
+      showToast('All atoms in the molecule must be connected into a single structure.');
+      return;
+    }
+    if (!geometry) {
+      showToast('Please specify the Spatial Geometry (e.g. tetrahedral, linear).');
+      return;
+    }
+    for (const bk of activeBondKeys) {
+      if (!bondLengthsInput[bk] || Number(bondLengthsInput[bk]) <= 0) {
+        showToast(`Please enter a valid bond length for ${bk}.`);
+        return;
+      }
+    }
+    for (const ak of activeAngleKeys) {
+      if (!bondAnglesInput[ak] || Number(bondAnglesInput[ak]) <= 0) {
+        showToast(`Please enter a valid bond angle for ${ak}.`);
+        return;
+      }
+    }
+    if (!currentDoc) {
+      showToast('Invalid molecule configuration. Please check the parameter inputs.');
+      return;
+    }
 
-  const threeCtxRef = useRef<{
+    saveMoleculeDoc(currentDoc, editingMolId);
+    showToast(`Saved substance ${currentDoc.formula} (${currentDoc.name}) successfully!`);
+    closeBuilder();
+  };
+
+  // 3D Preview Three.js WebGL rendering
+  const previewVpRef = useRef<HTMLDivElement | null>(null);
+  const previewWrapRef = useRef<HTMLDivElement | null>(null);
+  const threeContextRef = useRef<{
     renderer: THREE.WebGLRenderer;
     scene: THREE.Scene;
     camera: THREE.OrthographicCamera;
     root: THREE.Group;
     sphereGeo: THREE.SphereGeometry;
     cylinderGeo: THREE.CylinderGeometry;
-    meshItems: {
-      mesh: THREE.Mesh;
-      label: THREE.Sprite;
-      dot: THREE.Mesh;
-      radius: number;
-      hasRadical: boolean;
-    }[];
     rotation: { x: number; y: number };
     zoom: { value: number };
-    modelRadius: { value: number };
     draw: () => void;
     resize: () => void;
-    zoomBy: (factor: number) => void;
     resetView: () => void;
+    cleanup: () => void;
   } | null>(null);
 
-  // Effect 1: Initialize persistent WebGL Renderer + Pointer/Wheel interactivity when Portal DOM mounts
-  useEffect(() => {
-    if (!builderOpen || !previewVpEl || !previewWrapEl) return;
+  const setupThreePreview = useCallback(() => {
+    const vp = previewVpRef.current;
+    const wrap = previewWrapRef.current;
+    if (!vp || !wrap) return;
 
-    const vp = previewVpEl;
-    const wrap = previewWrapEl;
+    if (threeContextRef.current) {
+      threeContextRef.current.cleanup();
+      threeContextRef.current = null;
+    }
     vp.replaceChildren();
 
-    let renderer: THREE.WebGLRenderer;
-    try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    } catch {
-      return;
-    }
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -699,58 +776,53 @@ export const MoleculeBuilderModal: React.FC = () => {
     const root = new THREE.Group();
     scene.add(root);
     scene.add(new THREE.HemisphereLight(0xffffff, 0x94a3b8, 0.72));
-    const dirLight = new THREE.DirectionalLight(0xfffdf5, 1.25);
+    const dirLight = new THREE.DirectionalLight(0xfffdf5, 1.3);
     dirLight.position.set(-4, 7, 9);
     scene.add(dirLight);
-    const fillLight = new THREE.DirectionalLight(0xe0f2fe, 0.42);
+    const fillLight = new THREE.DirectionalLight(0xe0f2fe, 0.45);
     fillLight.position.set(7, -2, 5);
     scene.add(fillLight);
 
     const sphereGeo = new THREE.SphereGeometry(1, 36, 24);
     const cylinderGeo = new THREE.CylinderGeometry(1, 1, 1, 16);
 
-    const rotation = { x: 0.28, y: 0.48 };
+    const rotation = { x: 0.22, y: 0.38 };
     const zoom = { value: 1 };
-    const modelRadius = { value: 2.2 };
-    const meshItems: {
-      mesh: THREE.Mesh;
-      label: THREE.Sprite;
-      dot: THREE.Mesh;
-      radius: number;
-      hasRadical: boolean;
-    }[] = [];
 
     const draw = () => {
       root.rotation.set(rotation.x, rotation.y, 0);
       root.updateMatrixWorld(true);
+
       const inv = root.quaternion.clone().invert();
       const front = new THREE.Vector3(0, 0, 1).applyQuaternion(inv);
       const right = new THREE.Vector3(1, 0, 0).applyQuaternion(inv);
       const up = new THREE.Vector3(0, 1, 0).applyQuaternion(inv);
 
-      for (const item of meshItems) {
-        item.label.position
-          .copy(item.mesh.position)
-          .addScaledVector(front, item.radius + 0.02);
-        if (item.hasRadical) {
-          item.dot.position
-            .copy(item.mesh.position)
-            .addScaledVector(right, item.radius * 0.9)
-            .addScaledVector(up, item.radius * 0.9)
+      root.traverse((obj) => {
+        if (obj.userData?.isLabel) {
+          const r = obj.userData.radius;
+          obj.position.copy(obj.userData.basePos).addScaledVector(front, r + 0.02);
+        } else if (obj.userData?.isRadicalDot) {
+          const r = obj.userData.radius;
+          obj.position
+            .copy(obj.userData.basePos)
+            .addScaledVector(right, r * 0.9)
+            .addScaledVector(up, r * 0.9)
             .addScaledVector(front, 0.05);
         }
-      }
+      });
+
       root.updateMatrixWorld(true);
       renderer.render(scene, camera);
     };
 
     const resize = () => {
-      const w = Math.max(1, wrap.clientWidth);
-      const h = Math.max(1, wrap.clientHeight);
+      const rect = wrap.getBoundingClientRect();
+      const w = Math.max(1, rect.width);
+      const h = Math.max(1, rect.height);
       renderer.setSize(w, h);
       const aspect = w / h;
-      const baseSpan = Math.max(2.1, modelRadius.value * 1.35);
-      const halfH = Math.max(baseSpan, (baseSpan * 1.25) / Math.max(0.5, aspect)) / zoom.value;
+      const halfH = Math.max(2.0, 3.1 / aspect) / zoom.value;
       camera.left = -halfH * aspect;
       camera.right = halfH * aspect;
       camera.top = halfH;
@@ -759,15 +831,9 @@ export const MoleculeBuilderModal: React.FC = () => {
       draw();
     };
 
-    const zoomBy = (factor: number) => {
-      zoom.value = Math.max(0.5, Math.min(2.5, Number((zoom.value * factor).toFixed(3))));
-      setPreview3DZoomPct(Math.round(zoom.value * 100));
-      resize();
-    };
-
     const resetView = () => {
-      rotation.x = 0.28;
-      rotation.y = 0.48;
+      rotation.x = 0.22;
+      rotation.y = 0.38;
       zoom.value = 1;
       setPreview3DZoomPct(100);
       resize();
@@ -775,19 +841,17 @@ export const MoleculeBuilderModal: React.FC = () => {
 
     const pointers = new Map<number, { x: number; y: number }>();
     const onPointerDown = (e: PointerEvent) => {
-      e.stopPropagation();
       vp.setPointerCapture(e.pointerId);
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     };
     const onPointerMove = (e: PointerEvent) => {
       const old = pointers.get(e.pointerId);
       if (!old) return;
-      e.stopPropagation();
       const dx = e.clientX - old.x;
       const dy = e.clientY - old.y;
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      rotation.y += dx * 0.009;
-      rotation.x = Math.max(-1.45, Math.min(1.45, rotation.x + dy * 0.009));
+      rotation.y += dx * 0.008;
+      rotation.x = Math.max(-1.4, Math.min(1.4, rotation.x + dy * 0.008));
       draw();
     };
     const onPointerUp = (e: PointerEvent) => {
@@ -795,8 +859,7 @@ export const MoleculeBuilderModal: React.FC = () => {
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      e.stopPropagation();
-      zoom.value = Math.max(0.5, Math.min(2.5, zoom.value * Math.exp(-e.deltaY * 0.0012)));
+      zoom.value = Math.max(0.65, Math.min(2.5, zoom.value * Math.exp(-e.deltaY * 0.001)));
       setPreview3DZoomPct(Math.round(zoom.value * 100));
       resize();
     };
@@ -810,27 +873,8 @@ export const MoleculeBuilderModal: React.FC = () => {
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
     resize();
-    const postAnimTimer = window.setTimeout(resize, 180);
 
-    threeCtxRef.current = {
-      renderer,
-      scene,
-      camera,
-      root,
-      sphereGeo,
-      cylinderGeo,
-      meshItems,
-      rotation,
-      zoom,
-      modelRadius,
-      draw,
-      resize,
-      zoomBy,
-      resetView,
-    };
-
-    return () => {
-      window.clearTimeout(postAnimTimer);
+    const cleanup = () => {
       ro.disconnect();
       vp.removeEventListener('pointerdown', onPointerDown);
       vp.removeEventListener('pointermove', onPointerMove);
@@ -840,66 +884,70 @@ export const MoleculeBuilderModal: React.FC = () => {
       sphereGeo.dispose();
       cylinderGeo.dispose();
       renderer.dispose();
-      vp.replaceChildren();
-      threeCtxRef.current = null;
     };
-  }, [builderOpen, previewVpEl, previewWrapEl]);
 
-  // Effect 2: Sync 3D meshes whenever `previewMol` changes (clears immediately when `previewMol` is null)
-  useEffect(() => {
-    const ctx = threeCtxRef.current;
+    threeContextRef.current = {
+      renderer,
+      scene,
+      camera,
+      root,
+      sphereGeo,
+      cylinderGeo,
+      rotation,
+      zoom,
+      draw,
+      resize,
+      resetView,
+      cleanup,
+    };
+  }, []);
+
+  // Update 3D scene whenever previewMol changes
+  const updateThreeModel = useCallback((mol: any | null) => {
+    const ctx = threeContextRef.current;
     if (!ctx) return;
+    const { root, sphereGeo, cylinderGeo, draw, resize } = ctx;
 
-    while (ctx.root.children.length > 0) {
-      ctx.root.remove(ctx.root.children[0]);
-    }
-    ctx.meshItems.length = 0;
+    root.clear();
 
-    if (!previewMol || previewMol.atoms.length === 0) {
-      ctx.draw();
+    if (!mol || !mol.atoms.length) {
+      draw();
       return;
     }
 
-    // Center atoms around [0, 0, 0] and compute bounding radius
-    const atoms = previewMol.atoms;
-    let cx = 0;
-    let cy = 0;
-    let cz = 0;
-    for (const a of atoms) {
+    let cx = 0,
+      cy = 0,
+      cz = 0;
+    for (const a of mol.atoms) {
       cx += a.position[0];
       cy += a.position[1];
       cz += a.position[2];
     }
-    cx /= atoms.length;
-    cy /= atoms.length;
-    cz /= atoms.length;
+    cx /= mol.atoms.length;
+    cy /= mol.atoms.length;
+    cz /= mol.atoms.length;
 
-    let maxDist = 1.6;
-    const posMap = new Map<string, [number, number, number]>();
+    const posMap = new Map<string, THREE.Vector3>();
     const elemMap = new Map<string, string>();
+    const radicalSet = new Set(mol.radicals || []);
 
-    for (const a of atoms) {
-      const centered: [number, number, number] = [
-        a.position[0] - cx,
-        a.position[1] - cy,
-        a.position[2] - cz,
-      ];
-      posMap.set(a.id, centered);
+    for (const a of mol.atoms) {
+      const v = new THREE.Vector3(a.position[0] - cx, a.position[1] - cy, a.position[2] - cz);
+      posMap.set(a.id, v);
       elemMap.set(a.id, a.element);
-      const radius = getElementRadius(a.element);
-      const d = Math.hypot(...centered) + radius;
-      if (d > maxDist) maxDist = d;
 
+      const radius = getElementRadius(a.element);
       const mesh = new THREE.Mesh(
-        ctx.sphereGeo,
+        sphereGeo,
         new THREE.MeshStandardMaterial({
           color: new THREE.Color(getElementColor(a.element)),
-          roughness: 0.34,
-          metalness: 0.04,
+          roughness: 0.36,
+          metalness: 0,
         })
       );
       mesh.scale.setScalar(radius);
-      mesh.position.fromArray(centered);
+      mesh.position.copy(v);
+      root.add(mesh);
 
       const label = new THREE.Sprite(
         new THREE.SpriteMaterial({
@@ -911,93 +959,77 @@ export const MoleculeBuilderModal: React.FC = () => {
         })
       );
       label.scale.setScalar(radius * 1.14);
+      label.userData = { isLabel: true, basePos: v, radius };
+      root.add(label);
 
-      const hasRadical = a.radical === 1;
-      const dot = new THREE.Mesh(
-        ctx.sphereGeo,
-        new THREE.MeshBasicMaterial({ color: RADICAL_COLOR })
-      );
-      dot.scale.setScalar(0.085);
-      dot.visible = hasRadical;
-
-      ctx.root.add(mesh, label, dot);
-      ctx.meshItems.push({ mesh, label, dot, radius, hasRadical });
-    }
-
-    const axis = new THREE.Vector3(0, 1, 0);
-    for (const b of previewMol.bonds) {
-      const p1 = posMap.get(b.atoms[0]);
-      const p2 = posMap.get(b.atoms[1]);
-      if (!p1 || !p2) continue;
-      const v1 = new THREE.Vector3(...p1);
-      const v2 = new THREE.Vector3(...p2);
-      const dir = v2.clone().sub(v1);
-      const len = dir.length();
-      if (len < 0.001) continue;
-      const unitDir = dir.clone().normalize();
-      const perp = new THREE.Vector3(0, 0, 1).cross(unitDir);
-      if (perp.lengthSq() < 0.01) perp.set(0, 1, 0).cross(unitDir);
-      perp.normalize();
-
-      const order = b.order || 1;
-      const offsets =
-        order === 3 ? [-0.11, 0, 0.11] : order === 2 ? [-0.075, 0.075] : [0];
-      const cylRadius = order === 3 ? 0.038 : order === 2 ? 0.046 : 0.066;
-
-      for (const off of offsets) {
-        const shift = perp.clone().multiplyScalar(off);
-        b.atoms.forEach((atomId, idx) => {
-          const el = elemMap.get(atomId) || 'C';
-          const m = new THREE.Mesh(
-            ctx.cylinderGeo,
-            new THREE.MeshStandardMaterial({
-              color: new THREE.Color(getElementColor(el)),
-              roughness: 0.45,
-            })
-          );
-          m.position.copy(v1).lerp(v2, idx === 0 ? 0.25 : 0.75).add(shift);
-          m.quaternion.setFromUnitVectors(axis, unitDir);
-          m.scale.set(cylRadius, len / 2, cylRadius);
-          ctx.root.add(m);
-        });
+      if (radicalSet.has(a.id) || a.radical === 1) {
+        const dot = new THREE.Mesh(
+          sphereGeo,
+          new THREE.MeshBasicMaterial({ color: RADICAL_COLOR })
+        );
+        dot.scale.setScalar(0.08);
+        dot.userData = { isRadicalDot: true, basePos: v, radius };
+        root.add(dot);
       }
     }
 
-    ctx.modelRadius.value = maxDist;
-    ctx.resize();
-  }, [previewMol, previewVpEl]);
+    const axis = new THREE.Vector3(0, 1, 0);
+    for (const b of mol.bonds) {
+      const p1 = posMap.get(b.atoms[0]);
+      const p2 = posMap.get(b.atoms[1]);
+      if (!p1 || !p2) continue;
+      const dir = p2.clone().sub(p1);
+      const len = dir.length();
 
-  // Save to store
-  const handleSaveMolecule = () => {
-    if (nodes.length === 0) {
-      showToast('Please add at least 1 atom to the canvas.');
-      return;
+      b.atoms.forEach((atomId, idx) => {
+        const el = elemMap.get(atomId) || 'C';
+        const m = new THREE.Mesh(
+          cylinderGeo,
+          new THREE.MeshStandardMaterial({
+            color: new THREE.Color(getElementColor(el)),
+            roughness: 0.5,
+          })
+        );
+        m.position.copy(p1).lerp(p2, idx === 0 ? 0.25 : 0.75);
+        m.quaternion.setFromUnitVectors(axis, dir.clone().normalize());
+        m.scale.set(0.068, len / 2, 0.068);
+        root.add(m);
+      });
     }
-    if (!connectedGraph) {
-      showToast('Please connect all atoms on the canvas with covalent bonds.');
-      return;
-    }
-    if (!currentDoc) {
-      showToast('Please complete the parameters or click "Auto-Fill" in the top right.');
-      return;
-    }
-    const saved = saveMoleculeDoc(currentDoc, editingMolId);
-    showToast(
-      editingMolId
-        ? `Updated "${saved.mol.name} (${saved.mol.formula})"`
-        : `Added "${saved.mol.name} (${saved.mol.formula})"`
-    );
-    closeBuilder();
-  };
 
-  const selectedNode = nodes.find((n) => n.id === selectedNodeId) || null;
-  const selectedBond = bonds.find((b) => b.id === selectedBondId) || null;
+    resize();
+  }, []);
 
-  // Compute dynamic 2D viewBox from topoZoom & topoPan
+  const [previewWrapEl, setPreviewWrapEl] = useState<HTMLDivElement | null>(null);
+  const [previewVpEl, setPreviewVpEl] = useState<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    previewWrapRef.current = previewWrapEl;
+    previewVpRef.current = previewVpEl;
+    if (previewWrapEl && previewVpEl && builderOpen) {
+      setupThreePreview();
+      updateThreeModel(previewMol);
+    }
+    return () => {
+      if (threeContextRef.current) {
+        threeContextRef.current.cleanup();
+        threeContextRef.current = null;
+      }
+    };
+  }, [previewWrapEl, previewVpEl, builderOpen, setupThreePreview, updateThreeModel, previewMol]);
+
+  useEffect(() => {
+    updateThreeModel(previewMol);
+  }, [previewMol, updateThreeModel]);
+
+  // 2D SVG ViewBox calculation
   const vbW = 500 / topoZoom;
   const vbH = 320 / topoZoom;
-  const vbX = 250 - vbW / 2 + topoPan.x;
-  const vbY = 160 - vbH / 2 + topoPan.y;
+  const vbX = topoPan.x - (vbW - 500) / 2;
+  const vbY = topoPan.y - (vbH - 320) / 2;
+
+  const selectedNode = selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) : null;
+  const selectedBond = selectedBondId ? bonds.find((b) => b.id === selectedBondId) : null;
 
   return (
     <Dialog.Root open={builderOpen} onOpenChange={(open) => !open && closeBuilder()}>
@@ -1007,7 +1039,7 @@ export const MoleculeBuilderModal: React.FC = () => {
           className="radix-dialog-content dialog-surface mol-builder-dialog"
           aria-describedby={undefined}
         >
-          {/* Top Header: Title on left, Auto-Fill + Close on right (no Export JSON) */}
+          {/* Top Header: Title on left, Close on right */}
           <div className="dialog-header mol-builder-header">
             <div>
               <span className="small-label">INTERACTIVE MOLECULE BUILDER</span>
@@ -1016,16 +1048,6 @@ export const MoleculeBuilderModal: React.FC = () => {
               </Dialog.Title>
             </div>
             <div className="mol-builder-header-actions">
-              <button
-                type="button"
-                id="builder-autofill-defaults-btn"
-                className="autofill-defaults-btn"
-                onClick={handleFillRecommendedDefaults}
-                title="Auto-fill recommended VSEPR geometry, hybridization, bond lengths, and angles"
-              >
-                <Sparkles size={16} />
-                <span>Auto-Fill</span>
-              </button>
               <Dialog.Close asChild>
                 <button className="icon-button" aria-label="Close Builder" title="Close">
                   <X size={20} />
@@ -1098,48 +1120,52 @@ export const MoleculeBuilderModal: React.FC = () => {
                     >
                       All (118)
                     </button>
-                    {(Object.entries(CATEGORY_LABELS) as [ElementCategory, string][]).map(
-                      ([cat, label]) => (
-                        <button
-                          key={cat}
-                          type="button"
-                          className={`ptable-cat-chip cat-${cat} ${
-                            categoryFilter === cat ? 'active' : ''
-                          }`}
-                          onClick={() =>
-                            setCategoryFilter(categoryFilter === cat ? 'all' : cat)
-                          }
-                        >
-                          {label}
-                        </button>
-                      )
-                    )}
+                    {(
+                      [
+                        ['nonmetal', 'Reactive Nonmetals'],
+                        ['noble-gas', 'Noble Gases'],
+                        ['alkali-metal', 'Alkali Metals'],
+                        ['alkaline-earth', 'Alkaline Earth'],
+                        ['transition', 'Transition Metals'],
+                        ['halogen', 'Halogens'],
+                      ] as const
+                    ).map(([cat, label]) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        className={`ptable-cat-chip ${categoryFilter === cat ? 'active' : ''}`}
+                        onClick={() => setCategoryFilter(cat as ElementCategory)}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
 
-                  {/* 18-Column Standard Periodic Table Grid */}
-                  <div className="ptable-grid" role="grid" aria-label="Full Periodic Table of Elements">
-                    {PERIODIC_TABLE.map((el: PeriodicElement) => {
-                      const dimmed =
+                  <div className="ptable-grid">
+                    {PERIODIC_TABLE.map((el) => {
+                      const isDim =
                         categoryFilter !== 'all' && el.category !== categoryFilter;
-                      const gridRow = el.period <= 7 ? el.period : el.period + 1;
-                      const gridColumn = el.group;
                       return (
                         <button
                           key={el.number}
                           type="button"
                           className={`ptable-cell cat-${el.category} ${
                             activeElement === el.symbol ? 'selected' : ''
-                          } ${dimmed ? 'dimmed' : ''}`}
-                          style={{ gridRow, gridColumn }}
-                          title={`${el.number} ${el.name} (${el.symbol}) · Click to add atom`}
+                          } ${isDim ? 'dimmed' : ''}`}
+                          style={{
+                            gridRow: el.period,
+                            gridColumn: el.group,
+                          }}
                           onClick={() => addAtomNode(el.symbol)}
+                          title={`${el.name} (${el.symbol}) · Atomic No. ${el.number}`}
                         >
                           <span className="pt-num">{el.number}</span>
-                          <strong className="pt-sym">{el.symbol}</strong>
+                          <span className="pt-sym">{el.symbol}</span>
                           <span className="pt-name">{el.name}</span>
                         </button>
                       );
                     })}
+
                     <div
                       className="ptable-series-placeholder"
                       style={{ gridRow: 6, gridColumn: 3 }}
@@ -1161,35 +1187,18 @@ export const MoleculeBuilderModal: React.FC = () => {
 
             {/* Section 2: Two-column workspace (Left: 2D Topology + Live 3D Preview; Right: Parameters Form) */}
             <div className="builder-main-columns">
-              {/* Left Column: 2D Topology Canvas + Live 3D Preview (both support zoom!) */}
+              {/* Left Column: 2D Topology Canvas + Live 3D Preview */}
               <div className="builder-visual-col">
                 <div className="builder-canvas-card">
                   <div className="builder-canvas-toolbar">
-                    <div className="canvas-tool-group">
-                      <button
-                        type="button"
-                        className={`canvas-tool-btn ${canvasTool === 'connect' ? 'active' : ''}`}
-                        onClick={() => setCanvasTool('connect')}
-                        title="Bond / Select mode: Drag between atoms to connect"
-                      >
-                        <Link2 size={15} />
-                        <span>Bond</span>
-                      </button>
-                      <button
-                        type="button"
-                        className={`canvas-tool-btn ${canvasTool === 'move' ? 'active' : ''}`}
-                        onClick={() => setCanvasTool('move')}
-                        title="Move mode: Drag atoms to rearrange 2D layout"
-                      >
-                        <Move size={15} />
-                        <span>Move</span>
-                      </button>
-                    </div>
+                    <span className="canvas-header-hint">
+                      Click to select · Drag to move · Drag between atoms to bond
+                    </span>
 
                     {selectedNode && (
                       <div className="canvas-node-actions">
                         <span className="selected-node-badge">
-                          <strong>{selectedNode.element}</strong> ({selectedNode.id})
+                          <strong>{selectedNode.element}</strong>
                         </span>
                         <button
                           type="button"
@@ -1197,8 +1206,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                           onClick={autoFillHydrogensForSelected}
                           title="Auto-fill Hydrogen atoms based on standard valence"
                         >
-                          <Plus size={14} />
-                          <span>H</span>
+                          <span>+ H</span>
                         </button>
                         <button
                           type="button"
@@ -1223,18 +1231,20 @@ export const MoleculeBuilderModal: React.FC = () => {
                     {selectedBond && !selectedNode && (
                       <div className="canvas-node-actions">
                         <span className="selected-node-badge">
-                          Order {selectedBond.order}
+                          Bond Order:
                         </span>
-                        <button
-                          type="button"
-                          className="canvas-mini-btn"
-                          onClick={() =>
-                            connectOrToggleBond(selectedBond.from, selectedBond.to)
-                          }
-                          title="Cycle Single / Double / Triple Bond"
-                        >
-                          <span>1 / 2 / 3</span>
-                        </button>
+                        <div className="bond-order-pill-group">
+                          {([1, 2, 3] as const).map((ord) => (
+                            <button
+                              key={ord}
+                              type="button"
+                              className={`bond-order-pill ${selectedBond.order === ord ? 'active' : ''}`}
+                              onClick={() => connectOrSetBond(selectedBond.from, selectedBond.to, ord)}
+                            >
+                              {ord === 1 ? 'Single' : ord === 2 ? 'Double' : 'Triple'}
+                            </button>
+                          ))}
+                        </div>
                         <button
                           type="button"
                           className="canvas-mini-btn danger"
@@ -1260,7 +1270,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                     )}
                   </div>
 
-                  {/* 2D Interactive Topology Canvas with Wheel + Button Zoom & Pan */}
+                  {/* 2D Interactive Topology Canvas: Unified Click, Drag-to-Move, and Drag-to-Connect */}
                   <div className="topology-canvas-wrap" ref={svgWrapRef}>
                     <svg
                       ref={svgRef}
@@ -1269,6 +1279,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                       onPointerDown={(e) => {
                         if (e.target === svgRef.current || (e.target as Element).tagName === 'rect') {
                           setSelectedBondId(null);
+                          setSelectedNodeId(null);
                           setIsPanning2D(true);
                           panStartRef.current = {
                             clientX: e.clientX,
@@ -1280,21 +1291,35 @@ export const MoleculeBuilderModal: React.FC = () => {
                       }}
                       onPointerMove={(e) => {
                         if (!svgRef.current) return;
-                        if (draggingNodeId) {
-                          const pt = clientToSvgPoint(svgRef.current, e.clientX, e.clientY);
-                          dragMovedRef.current = true;
-                          const nextX = Math.round(pt.x + dragOffsetRef.current.dx);
-                          const nextY = Math.round(pt.y + dragOffsetRef.current.dy);
-                          setNodes((prev) =>
-                            prev.map((n) =>
-                              n.id === draggingNodeId
-                                ? { ...n, x: nextX, y: nextY }
-                                : n
-                            )
+
+                        if (activePointerDownNodeRef.current) {
+                          const dist = Math.hypot(
+                            e.clientX - pointerDownPosRef.current.clientX,
+                            e.clientY - pointerDownPosRef.current.clientY
                           );
-                        } else if (dragLinkFromId) {
-                          const pt = clientToSvgPoint(svgRef.current, e.clientX, e.clientY);
-                          setDragLinkCursor(pt);
+
+                          // When dragging past threshold (> 6px): determine if it's node move or bond connection
+                          if (dist > 6) {
+                            const pt = clientToSvgPoint(svgRef.current, e.clientX, e.clientY);
+                            if (e.shiftKey) {
+                              // Shift + Drag: drag to connect bond
+                              setDragLinkFromId(activePointerDownNodeRef.current.id);
+                              setDragLinkCursor(pt);
+                              isDraggingNodeRef.current = false;
+                            } else {
+                              // Default drag: move atom
+                              isDraggingNodeRef.current = true;
+                              const nextX = Math.round(pt.x + dragOffsetRef.current.dx);
+                              const nextY = Math.round(pt.y + dragOffsetRef.current.dy);
+                              setNodes((prev) =>
+                                prev.map((n) =>
+                                  n.id === activePointerDownNodeRef.current?.id
+                                    ? { ...n, x: nextX, y: nextY }
+                                    : n
+                                )
+                              );
+                            }
+                          }
                         } else if (isPanning2D) {
                           const rect = svgRef.current.getBoundingClientRect();
                           const scaleX = vbW / Math.max(1, rect.width);
@@ -1308,13 +1333,15 @@ export const MoleculeBuilderModal: React.FC = () => {
                         }
                       }}
                       onPointerUp={() => {
-                        setDraggingNodeId(null);
+                        activePointerDownNodeRef.current = null;
+                        isDraggingNodeRef.current = false;
                         setDragLinkFromId(null);
                         setDragLinkCursor(null);
                         setIsPanning2D(false);
                       }}
                       onPointerCancel={() => {
-                        setDraggingNodeId(null);
+                        activePointerDownNodeRef.current = null;
+                        isDraggingNodeRef.current = false;
                         setDragLinkFromId(null);
                         setDragLinkCursor(null);
                         setIsPanning2D(false);
@@ -1494,39 +1521,39 @@ export const MoleculeBuilderModal: React.FC = () => {
                             transform={`translate(${x}, ${y})`}
                             onPointerDown={(e) => {
                               e.stopPropagation();
-                              dragMovedRef.current = false;
-                              if (canvasTool === 'move' || e.shiftKey) {
-                                if (svgRef.current) {
-                                  const pt = clientToSvgPoint(
-                                    svgRef.current,
-                                    e.clientX,
-                                    e.clientY
-                                  );
-                                  dragOffsetRef.current = {
-                                    dx: x - pt.x,
-                                    dy: y - pt.y,
-                                  };
-                                } else {
-                                  dragOffsetRef.current = { dx: 0, dy: 0 };
-                                }
-                                setDraggingNodeId(n.id);
-                                setSelectedNodeId(n.id);
-                                setSelectedBondId(null);
-                              } else {
-                                setDragLinkFromId(n.id);
-                                setDragLinkCursor({ x, y });
+                              activePointerDownNodeRef.current = n;
+                              pointerDownPosRef.current = { clientX: e.clientX, clientY: e.clientY };
+                              isDraggingNodeRef.current = false;
+
+                              if (svgRef.current) {
+                                const pt = clientToSvgPoint(
+                                  svgRef.current,
+                                  e.clientX,
+                                  e.clientY
+                                );
+                                dragOffsetRef.current = {
+                                  dx: x - pt.x,
+                                  dy: y - pt.y,
+                                };
                               }
                             }}
                             onPointerUp={(e) => {
                               e.stopPropagation();
+                              // If we were dragging a link from another atom onto this one
                               if (dragLinkFromId && dragLinkFromId !== n.id) {
-                                connectOrToggleBond(dragLinkFromId, n.id);
+                                connectOrSetBond(dragLinkFromId, n.id);
                                 setSelectedNodeId(n.id);
-                              } else if (!dragMovedRef.current) {
+                              } else if (!isDraggingNodeRef.current) {
+                                // Simple click without drag
+                                if (selectedNodeId && selectedNodeId !== n.id) {
+                                  // Click another node while one is selected: connect or toggle bond
+                                  connectOrSetBond(selectedNodeId, n.id);
+                                }
                                 setSelectedNodeId(n.id);
                                 setSelectedBondId(null);
                               }
-                              setDraggingNodeId(null);
+                              activePointerDownNodeRef.current = null;
+                              isDraggingNodeRef.current = false;
                               setDragLinkFromId(null);
                               setDragLinkCursor(null);
                             }}
@@ -1578,29 +1605,25 @@ export const MoleculeBuilderModal: React.FC = () => {
                         className="canvas-zoom-btn"
                         title="Zoom Out (2D)"
                         aria-label="Zoom Out 2D"
-                        onClick={() =>
-                          setTopoZoom((z) => Math.max(0.5, Number((z / 1.2).toFixed(2))))
-                        }
+                        onClick={() => setTopoZoom((z) => Math.max(0.5, z * 0.85))}
                       >
                         <ZoomOut size={14} />
                       </button>
-                      <span className="canvas-zoom-pct mono">{Math.round(topoZoom * 100)}%</span>
+                      <span className="canvas-zoom-pct">{Math.round(topoZoom * 100)}%</span>
                       <button
                         type="button"
                         className="canvas-zoom-btn"
                         title="Zoom In (2D)"
                         aria-label="Zoom In 2D"
-                        onClick={() =>
-                          setTopoZoom((z) => Math.min(2.5, Number((z * 1.2).toFixed(2))))
-                        }
+                        onClick={() => setTopoZoom((z) => Math.min(2.5, z * 1.18))}
                       >
                         <ZoomIn size={14} />
                       </button>
                       <button
                         type="button"
                         className="canvas-zoom-btn"
-                        title="Reset 2D View"
-                        aria-label="Reset 2D View"
+                        title="Reset 2D Canvas"
+                        aria-label="Reset 2D Canvas"
                         onClick={() => {
                           setTopoZoom(1);
                           setTopoPan({ x: 0, y: 0 });
@@ -1612,36 +1635,34 @@ export const MoleculeBuilderModal: React.FC = () => {
 
                     {nodes.length === 0 && (
                       <div className="topology-empty-overlay">
-                        <Atom size={32} />
-                        <strong>Canvas is empty · Click an element above to add atoms</strong>
+                        <Sparkles size={28} />
+                        <strong>Canvas is Empty</strong>
                         <span>
-                          Drag between atoms to form bonds, or scroll to zoom in/out.
+                          Click any element in the periodic table above to place atoms.
                         </span>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Live 3D Ball-and-Stick Preview Card (Interactive Rotate + Wheel/Button Zoom) */}
-                <div className="builder-3d-card">
+                {/* 3D Real-time Ball-and-Stick Preview (Dynamic Equal Height) */}
+                <div className="builder-3d-card" ref={setPreviewWrapEl}>
                   <div className="builder-3d-header">
-                    <span>Live 3D Structure Preview</span>
+                    <span>Live 3D Ball-and-Stick Model</span>
                     {previewMol && (
-                      <span className="builder-3d-meta">
-                        {previewMol.name} · {previewMol.geometry}
+                      <span className="builder-3d-meta mono">
+                        {previewMol.atoms.length} Atoms · {previewMol.bonds.length} Bonds
                       </span>
                     )}
                   </div>
-                  <div className="builder-3d-stage-box" ref={setPreviewWrapEl}>
+
+                  <div className="builder-3d-stage-box">
                     <div
-                      ref={setPreviewVpEl}
                       className="builder-3d-viewport"
-                      style={{
-                        opacity: previewMol ? 1 : 0,
-                        pointerEvents: previewMol ? 'auto' : 'none',
-                      }}
+                      ref={setPreviewVpEl}
+                      tabIndex={0}
                       role="img"
-                      aria-label="Interactive 3D Molecular Structure Preview: drag to rotate, scroll to zoom"
+                      aria-label="Interactive 3D Ball-and-Stick Model Preview"
                     />
 
                     {previewMol ? (
@@ -1653,17 +1674,31 @@ export const MoleculeBuilderModal: React.FC = () => {
                             className="canvas-zoom-btn"
                             title="Zoom Out (3D)"
                             aria-label="Zoom Out 3D"
-                            onClick={() => threeCtxRef.current?.zoomBy(1 / 1.2)}
+                            onClick={() => {
+                              const ctx = threeContextRef.current;
+                              if (ctx) {
+                                ctx.zoom.value = Math.max(0.65, ctx.zoom.value * 0.85);
+                                setPreview3DZoomPct(Math.round(ctx.zoom.value * 100));
+                                ctx.resize();
+                              }
+                            }}
                           >
                             <ZoomOut size={14} />
                           </button>
-                          <span className="canvas-zoom-pct mono">{preview3DZoomPct}%</span>
+                          <span className="canvas-zoom-pct">{preview3DZoomPct}%</span>
                           <button
                             type="button"
                             className="canvas-zoom-btn"
                             title="Zoom In (3D)"
                             aria-label="Zoom In 3D"
-                            onClick={() => threeCtxRef.current?.zoomBy(1.2)}
+                            onClick={() => {
+                              const ctx = threeContextRef.current;
+                              if (ctx) {
+                                ctx.zoom.value = Math.min(2.5, ctx.zoom.value * 1.18);
+                                setPreview3DZoomPct(Math.round(ctx.zoom.value * 100));
+                                ctx.resize();
+                              }
+                            }}
                           >
                             <ZoomIn size={14} />
                           </button>
@@ -1672,7 +1707,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                             className="canvas-zoom-btn"
                             title="Reset 3D View"
                             aria-label="Reset 3D View"
-                            onClick={() => threeCtxRef.current?.resetView()}
+                            onClick={() => threeContextRef.current?.resetView()}
                           >
                             <RotateCcw size={13} />
                           </button>
@@ -1686,7 +1721,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                             ? 'Add atoms from the periodic table above to build a 3D molecular model.'
                             : !connectedGraph
                             ? 'Unconnected atoms detected — connect all atoms on the 2D canvas or delete isolated atoms.'
-                            : 'Complete parameters on the right or click "Auto-Fill" in the top right to generate the 3D model.'}
+                            : 'Complete parameters on the right or click "Auto-Fill" to generate the 3D model.'}
                         </p>
                       </div>
                     )}
@@ -1694,13 +1729,23 @@ export const MoleculeBuilderModal: React.FC = () => {
                 </div>
               </div>
 
-              {/* Right Column: Parameters Configuration Form */}
+              {/* Right Column: Parameters Configuration Form (with Auto-Fill in top right) */}
               <div className="builder-params-col">
                 <div className="builder-params-top">
                   <div>
                     <h3>2. Structure & Bond Parameters</h3>
-                    <p>Configure geometric parameters or click Auto-Fill in the top right</p>
+                    <p>Adjust spatial geometry, hybridization, and bond parameters</p>
                   </div>
+                  <button
+                    type="button"
+                    id="builder-autofill-defaults-btn"
+                    className="autofill-defaults-btn"
+                    onClick={handleFillRecommendedDefaults}
+                    title="Auto-fill recommended VSEPR geometry, hybridization, bond lengths, and angles"
+                  >
+                    <Sparkles size={15} />
+                    <span>Auto-Fill</span>
+                  </button>
                 </div>
 
                 <div className="builder-params-scroll">
@@ -1749,17 +1794,16 @@ export const MoleculeBuilderModal: React.FC = () => {
                             value={geometry}
                             onChange={(e) => setGeometry(e.target.value)}
                           >
-                            <option value="">Select spatial geometry…</option>
+                            <option value="">Select Spatial Geometry…</option>
                             {GEOMETRY_OPTIONS.map((opt) => (
                               <option key={opt.value} value={opt.value}>
-                                {opt.label}
+                                {opt.label} ({opt.value})
                               </option>
                             ))}
                           </select>
-                          <ChevronDown size={16} className="select-chevron" />
+                          <ChevronDown size={14} className="select-chevron" />
                         </div>
                       </label>
-
                       <label className="param-field">
                         <span>Central Hybridization (hybridization)</span>
                         <div className="select-wrapper">
@@ -1767,14 +1811,14 @@ export const MoleculeBuilderModal: React.FC = () => {
                             value={hybridization}
                             onChange={(e) => setHybridization(e.target.value)}
                           >
-                            <option value="">Select hybridization…</option>
-                            {HYBRIDIZATION_OPTIONS.map((h) => (
-                              <option key={h} value={h}>
-                                {h === 'none' ? 'None (none)' : h}
+                            <option value="">Select Hybridization…</option>
+                            {HYBRIDIZATION_OPTIONS.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
                               </option>
                             ))}
                           </select>
-                          <ChevronDown size={16} className="select-chevron" />
+                          <ChevronDown size={14} className="select-chevron" />
                         </div>
                       </label>
                     </div>
@@ -1783,13 +1827,11 @@ export const MoleculeBuilderModal: React.FC = () => {
                   {/* Covalent Bond Lengths (Å) */}
                   <div className="param-group-card">
                     <div className="param-group-title">
-                      <span>Covalent Bond Lengths (bondLengths · in Å) *</span>
+                      <span>Bond Lengths (bondLengths · in Å) *</span>
                     </div>
                     {activeBondKeys.length === 0 ? (
                       <div className="param-empty-hint">
-                        {nodes.length <= 1
-                          ? 'Monatomic species have no intramolecular covalent bonds.'
-                          : 'Connect atoms on the left canvas to configure bond lengths.'}
+                        Single monatomic radical species do not require covalent bond lengths.
                       </div>
                     ) : (
                       <div className="param-grid-2">
@@ -1800,8 +1842,8 @@ export const MoleculeBuilderModal: React.FC = () => {
                               type="number"
                               step="0.001"
                               min="0.1"
-                              max="10"
-                              placeholder="e.g. 1.09"
+                              max="4.0"
+                              placeholder="e.g. 1.087 or 1.4"
                               value={bondLengthsInput[k] || ''}
                               onChange={(e) =>
                                 setBondLengthsInput((prev) => ({
@@ -1850,28 +1892,30 @@ export const MoleculeBuilderModal: React.FC = () => {
                     )}
                   </div>
                 </div>
-
-                {/* Footer Save Bar */}
-                <div className="builder-params-footer">
-                  <button
-                    type="button"
-                    className="toolbar-btn-outline"
-                    onClick={closeBuilder}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    id="builder-save-mol-btn"
-                    className="primary-button"
-                    onClick={handleSaveMolecule}
-                  >
-                    <span>Save</span>
-                  </button>
-                </div>
               </div>
             </div>
           </div>
+
+          {/* Fixed Modal Bottom Bar: Cancel on left, Save on right */}
+          <footer className="mol-builder-fixed-footer">
+            <div className="mol-builder-footer-inner">
+              <button
+                type="button"
+                className="toolbar-btn-outline"
+                onClick={closeBuilder}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                id="builder-save-mol-btn"
+                className="primary-button"
+                onClick={handleSaveMolecule}
+              >
+                <span>Save</span>
+              </button>
+            </div>
+          </footer>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
