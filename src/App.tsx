@@ -23,32 +23,30 @@ export const App: React.FC = () => {
   const appMode = useFreeChemStore((s) => s.appMode);
   const freeScreen = useFreeChemStore((s) => s.screen);
 
-  // URL Hash-based routing synchronization (independent addresses: #/, #/guided, #/free)
+  // HTML5 History API Routing (/guided, /free, /)
   useEffect(() => {
-    const parseHashRoute = () => {
-      const hash = window.location.hash.toLowerCase();
-      if (hash.startsWith('#/guided')) {
+    const handlePopState = () => {
+      const pathname = window.location.pathname.toLowerCase();
+      if (pathname === '/guided') {
         useFreeChemStore.getState().setAppMode('guided');
-      } else if (hash.startsWith('#/free')) {
+      } else if (pathname === '/free') {
         useFreeChemStore.getState().setAppMode('free');
       } else {
         useFreeChemStore.getState().setAppMode('home');
       }
     };
 
-    // Listen to hash change
-    window.addEventListener('hashchange', parseHashRoute);
-    parseHashRoute();
+    window.addEventListener('popstate', handlePopState);
+    handlePopState();
 
-    return () => window.removeEventListener('hashchange', parseHashRoute);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Sync state changes to browser URL hash
+  // Sync mode changes to History API without full reload
   useEffect(() => {
-    const targetHash =
-      appMode === 'guided' ? '#/guided' : appMode === 'free' ? '#/free' : '#/';
-    if (window.location.hash !== targetHash) {
-      window.history.replaceState(null, '', targetHash);
+    const targetPath = appMode === 'guided' ? '/guided' : appMode === 'free' ? '/free' : '/';
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState(null, '', targetPath);
     }
   }, [appMode]);
 

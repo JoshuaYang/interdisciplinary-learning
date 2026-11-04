@@ -74,6 +74,17 @@ export const FreeGateScreen: React.FC = () => {
     showToast(`Exported ${molecules.length} substances as a ZIP archive!`);
   };
 
+  const handleClearAllWithConfirm = () => {
+    setMoreMenuOpen(false);
+    if (molecules.length === 0) return;
+    const ok = window.confirm(
+      `Are you sure you want to delete all ${molecules.length} chemical substances from the library? This action cannot be undone.`
+    );
+    if (ok) {
+      clearAllMolecules();
+    }
+  };
+
   return (
     <Tooltip.Provider delayDuration={140}>
       <section
@@ -169,10 +180,7 @@ export const FreeGateScreen: React.FC = () => {
                           type="button"
                           className="toolbar-dropdown-item danger"
                           role="menuitem"
-                          onClick={() => {
-                            setMoreMenuOpen(false);
-                            clearAllMolecules();
-                          }}
+                          onClick={handleClearAllWithConfirm}
                         >
                           <Trash2 size={16} />
                           <span>Clear All Substances</span>

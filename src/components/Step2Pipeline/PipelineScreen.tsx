@@ -219,6 +219,15 @@ export const PipelineScreen: React.FC = () => {
     }
   };
 
+  const handleResetPipelineWithConfirm = () => {
+    const ok = window.confirm(
+      'Are you sure you want to clear all reaction stages and placed species?'
+    );
+    if (ok) {
+      resetPipeline();
+    }
+  };
+
   const currentStep = PIPELINE_STEPS[activePipelineTab] || PIPELINE_STEPS[0];
   const activeDragSlot = activeDragMolId
     ? POOL_MOLECULES.find((s) => s.id === activeDragMolId)
@@ -248,10 +257,10 @@ export const PipelineScreen: React.FC = () => {
               <button
                 id="pipeline-reset-btn"
                 type="button"
-                className="toolbar-icon-btn"
+                className="toolbar-icon-btn danger-icon-btn"
                 title="Clear all stages"
                 aria-label="Clear all stages"
-                onClick={resetPipeline}
+                onClick={handleResetPipelineWithConfirm}
               >
                 <RotateCcw size={17} />
               </button>

@@ -110,8 +110,8 @@ export const MoleculeBuilderModal: React.FC = () => {
   const [bonds, setBonds] = useState<TopologyBond[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedBondId, setSelectedBondId] = useState<string | null>(null);
-  const [activeElement, setActiveElement] = useState<string>('C');
-  const [showFullPeriodicTable, setShowFullPeriodicTable] = useState<boolean>(true);
+  const [activeElement, setActiveElement] = useState<string | null>(null);
+  const [showFullPeriodicTable, setShowFullPeriodicTable] = useState<boolean>(false);
   const [categoryFilter, setCategoryFilter] = useState<ElementCategory | 'all'>('all');
 
   // 2D Topology Zoom & Pan state
@@ -338,6 +338,9 @@ export const MoleculeBuilderModal: React.FC = () => {
   // Add an atom of `symbol` to the 2D topology canvas
   const addAtomNode = (symbol: string, customPos?: { x: number; y: number }) => {
     setActiveElement(symbol);
+    setTimeout(() => {
+      setActiveElement((cur) => (cur === symbol ? null : cur));
+    }, 350);
     const sameCount = nodes.filter((n) => n.element === symbol).length;
     const newId = `${symbol.toLowerCase()}${sameCount + 1}_${Date.now().toString(36).slice(-2)}`;
 
@@ -564,6 +567,34 @@ export const MoleculeBuilderModal: React.FC = () => {
     setBonds(nextBonds);
     setSelectedBondId(null);
   };
+
+  // Listen to keyboard Delete / Backspace keys to remove selected atom or bond
+  useEffect(() => {
+    if (!builderOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput =
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          activeEl.tagName === 'SELECT' ||
+          (activeEl as HTMLElement).isContentEditable);
+      if (isInput) return;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedNodeId) {
+          e.preventDefault();
+          deleteSelectedNode();
+        } else if (selectedBondId) {
+          e.preventDefault();
+          deleteSelectedBond();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
 
   // ONE-CLICK AUTO-FILL (Fills recommended VSEPR geometry, bond lengths & angles)
   const handleFillRecommendedDefaults = () => {
@@ -1063,9 +1094,6 @@ export const MoleculeBuilderModal: React.FC = () => {
                 <div className="builder-section-title">
                   <Atom size={18} />
                   <strong>1. Select Elements from Periodic Table</strong>
-                  <span className="builder-hint-pill">
-                    Clicking an element while an atom is selected automatically forms a bond
-                  </span>
                 </div>
                 <div className="builder-periodic-controls">
                   <div className="quick-elements-row">
@@ -1091,16 +1119,17 @@ export const MoleculeBuilderModal: React.FC = () => {
                   </div>
                   <button
                     type="button"
-                    className="icon-button"
+                    className="ptable-toggle-button"
                     onClick={() => setShowFullPeriodicTable((v) => !v)}
                     title={
                       showFullPeriodicTable
                         ? 'Collapse Periodic Table'
-                        : 'Expand Full Periodic Table (118)'
+                        : 'Expand Full Periodic Table (118 Elements)'
                     }
                     aria-label="Toggle Periodic Table"
                   >
-                    <Grid size={16} />
+                    <Grid size={15} />
+                    <span>{showFullPeriodicTable ? 'Collapse Table' : 'Full Periodic Table (118)'}</span>
                     {showFullPeriodicTable ? (
                       <ChevronUp size={14} />
                     ) : (
@@ -1191,11 +1220,7 @@ export const MoleculeBuilderModal: React.FC = () => {
               <div className="builder-visual-col">
                 <div className="builder-canvas-card">
                   <div className="builder-canvas-toolbar">
-                    <span className="canvas-header-hint">
-                      Click to select · Drag to move · Drag between atoms to bond
-                    </span>
-
-                    {selectedNode && (
+                    {selectedNode ? (
                       <div className="canvas-node-actions">
                         <span className="selected-node-badge">
                           <strong>{selectedNode.element}</strong>
@@ -1220,15 +1245,13 @@ export const MoleculeBuilderModal: React.FC = () => {
                           type="button"
                           className="canvas-mini-btn danger"
                           onClick={deleteSelectedNode}
-                          title="Delete selected atom"
+                          title="Delete selected atom (or press Del / Backspace)"
                           aria-label="Delete selected atom"
                         >
                           <Trash2 size={14} />
                         </button>
                       </div>
-                    )}
-
-                    {selectedBond && !selectedNode && (
+                    ) : selectedBond ? (
                       <div className="canvas-node-actions">
                         <span className="selected-node-badge">
                           Bond Order:
@@ -1249,11 +1272,15 @@ export const MoleculeBuilderModal: React.FC = () => {
                           type="button"
                           className="canvas-mini-btn danger"
                           onClick={deleteSelectedBond}
-                          title="Delete selected bond"
+                          title="Delete selected bond (or press Del / Backspace)"
                           aria-label="Delete selected bond"
                         >
                           <Trash2 size={14} />
                         </button>
+                      </div>
+                    ) : (
+                      <div className="canvas-empty-state-hint">
+                        <span>Click an atom to select · Drag its handle to link bonds</span>
                       </div>
                     )}
 
@@ -1292,7 +1319,10 @@ export const MoleculeBuilderModal: React.FC = () => {
                       onPointerMove={(e) => {
                         if (!svgRef.current) return;
 
-                        if (activePointerDownNodeRef.current) {
+                        if (dragLinkFromId) {
+                          const pt = clientToSvgPoint(svgRef.current, e.clientX, e.clientY);
+                          setDragLinkCursor(pt);
+                        } else if (activePointerDownNodeRef.current) {
                           const dist = Math.hypot(
                             e.clientX - pointerDownPosRef.current.clientX,
                             e.clientY - pointerDownPosRef.current.clientY
@@ -1544,11 +1574,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                                 connectOrSetBond(dragLinkFromId, n.id);
                                 setSelectedNodeId(n.id);
                               } else if (!isDraggingNodeRef.current) {
-                                // Simple click without drag
-                                if (selectedNodeId && selectedNodeId !== n.id) {
-                                  // Click another node while one is selected: connect or toggle bond
-                                  connectOrSetBond(selectedNodeId, n.id);
-                                }
+                                // Simple click: ONLY select target node, NEVER automatically create bond!
                                 setSelectedNodeId(n.id);
                                 setSelectedBondId(null);
                               }
@@ -1593,10 +1619,37 @@ export const MoleculeBuilderModal: React.FC = () => {
                                 strokeWidth="1.6"
                               />
                             )}
+                            {isSelected && (
+                              <g
+                                className="topo-connect-handle"
+                                transform={`translate(${r * 0.72 + 6}, ${-r * 0.72 - 6})`}
+                                onPointerDown={(e) => {
+                                  e.stopPropagation();
+                                  setDragLinkFromId(n.id);
+                                  if (svgRef.current) {
+                                    const pt = clientToSvgPoint(
+                                      svgRef.current,
+                                      e.clientX,
+                                      e.clientY
+                                    );
+                                    setDragLinkCursor(pt);
+                                  }
+                                }}
+                              >
+                                <circle r="8.5" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
+                                <line x1="-3.5" y1="0" x2="3.5" y2="0" stroke="#ffffff" strokeWidth="1.6" strokeLinecap="round" />
+                                <line x1="0" y1="-3.5" x2="0" y2="3.5" stroke="#ffffff" strokeWidth="1.6" strokeLinecap="round" />
+                              </g>
+                            )}
                           </g>
                         );
                       })}
                     </svg>
+
+                    {/* Floating mini guide in canvas corner */}
+                    <div className="canvas-floating-guide">
+                      <span>Click to select · Drag atom to move · Drag + handle or Shift+drag to bond · Del to remove</span>
+                    </div>
 
                     {/* 2D Zoom & Reset Controls */}
                     <div className="canvas-zoom-bar">

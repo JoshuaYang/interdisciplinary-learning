@@ -292,6 +292,9 @@ export const MoleculePreviewModal: React.FC = () => {
 
   if (!isOpen || !mol || !previewSlotId) return null;
 
+  const bondLengths = (mol.measurements || []).filter((q) => q.atoms.length === 2);
+  const bondAngles = (mol.measurements || []).filter((q) => q.atoms.length === 3);
+
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && setPreviewSlotId(null)}>
       <Dialog.Portal>
@@ -361,51 +364,85 @@ export const MoleculePreviewModal: React.FC = () => {
           </div>
 
           <div className="mol-preview-info" id="mol-preview-info">
-            <div className="mol-spec-grid">
-              <div className="mol-spec-item">
-                <span className="mol-spec-label">Spatial Geometry</span>
-                <strong className="mol-spec-value">{mol.geometry || '-'}</strong>
+            {/* 1. General Chemical Specs */}
+            <div className="mol-preview-section">
+              <span className="mol-preview-section-title">General Specifications</span>
+              <div className="mol-spec-grid-general">
+                <div className="mol-spec-item">
+                  <span className="mol-spec-label">Spatial Geometry</span>
+                  <strong className="mol-spec-value">{mol.geometry || '-'}</strong>
+                </div>
+                <div className="mol-spec-item">
+                  <span className="mol-spec-label">Central Hybridization</span>
+                  <strong className="mol-spec-value mono">
+                    {doc.hybridization && doc.hybridization !== 'none' ? doc.hybridization : 'None'}
+                  </strong>
+                </div>
+                <div className="mol-spec-item">
+                  <span className="mol-spec-label">Composition</span>
+                  <strong className="mol-spec-value mono">
+                    {mol.atoms.length} Atoms · {mol.bonds.length} Bonds
+                  </strong>
+                </div>
+                <div className="mol-spec-item">
+                  <span className="mol-spec-label">Electronic State</span>
+                  <strong className="mol-spec-value">
+                    {mol.radicals && mol.radicals.length > 0
+                      ? `${mol.radicals.length} Unpaired (Radical)`
+                      : 'Closed-Shell (Stable)'}
+                  </strong>
+                </div>
               </div>
-              <div className="mol-spec-item">
-                <span className="mol-spec-label">Central Hybridization</span>
-                <strong className="mol-spec-value mono">
-                  {doc.hybridization && doc.hybridization !== 'none' ? doc.hybridization : 'None'}
-                </strong>
-              </div>
-              <div className="mol-spec-item">
-                <span className="mol-spec-label">Atoms / Covalent Bonds</span>
-                <strong className="mol-spec-value mono">
-                  {mol.atoms.length} Atoms · {mol.bonds.length} Bonds
-                </strong>
-              </div>
-              <div className="mol-spec-item">
-                <span className="mol-spec-label">Unpaired Electrons</span>
-                <strong className="mol-spec-value">
-                  {mol.radicals && mol.radicals.length > 0
-                    ? `${mol.radicals.length} (Radical Species)`
-                    : '0 (Closed-Shell)'}
-                </strong>
-              </div>
-              {Array.isArray(mol.measurements) &&
-                mol.measurements.map((q) => {
-                  const val = core.measure(mol, q.atoms);
-                  const unit = q.atoms.length === 2 ? ' Å' : '°';
-                  const formatted = Number.isFinite(val)
-                    ? val.toFixed(q.atoms.length === 2 ? 3 : 2)
-                    : '';
-                  return (
-                    <div key={q.label} className="mol-spec-item">
-                      <span className="mol-spec-label">{q.label}</span>
-                      <strong className="mol-spec-value mono">
-                        {formatted}
-                        {unit}
-                      </strong>
-                    </div>
-                  );
-                })}
             </div>
+
+            {/* 2. Covalent Bond Lengths */}
+            {bondLengths.length > 0 && (
+              <div className="mol-preview-section">
+                <span className="mol-preview-section-title">
+                  Covalent Bond Lengths ({bondLengths.length})
+                </span>
+                <div className="mol-measure-pills-grid">
+                  {bondLengths.map((q) => {
+                    const val = core.measure(mol, q.atoms);
+                    const formatted = Number.isFinite(val) ? val.toFixed(3) : '-';
+                    return (
+                      <div key={q.label} className="mol-measure-pill">
+                        <span className="measure-pill-label">{q.label}</span>
+                        <strong className="measure-pill-value mono">{formatted} Å</strong>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 3. Covalent Bond Angles */}
+            {bondAngles.length > 0 && (
+              <div className="mol-preview-section">
+                <span className="mol-preview-section-title">
+                  Bond Angles ({bondAngles.length})
+                </span>
+                <div className="mol-measure-pills-grid">
+                  {bondAngles.map((q) => {
+                    const val = core.measure(mol, q.atoms);
+                    const formatted = Number.isFinite(val) ? val.toFixed(2) : '-';
+                    return (
+                      <div key={q.label} className="mol-measure-pill">
+                        <span className="measure-pill-label">{q.label}</span>
+                        <strong className="measure-pill-value mono">{formatted}°</strong>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 4. Substance Description */}
             {(mol.description || doc.description) && (
-              <p className="mol-preview-desc">{mol.description || doc.description}</p>
+              <div className="mol-preview-section">
+                <span className="mol-preview-section-title">Chemical Description</span>
+                <p className="mol-preview-desc">{mol.description || doc.description}</p>
+              </div>
             )}
           </div>
         </Dialog.Content>

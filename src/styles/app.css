@@ -66,7 +66,15 @@
 
 body {
   margin: 0;
-  background: var(--bg);
+  background-color: #f8fafc;
+  background-image:
+    radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.06) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(99, 102, 241, 0.04) 0px, transparent 50%),
+    linear-gradient(rgba(203, 213, 225, 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(203, 213, 225, 0.35) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--fs-base);
@@ -1090,12 +1098,11 @@ summary:focus-visible,
 
 .track-flow {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 16px;
-  padding: 18px;
-  background: var(--surface-subtle);
-  border-radius: 10px;
-  border: 1px solid var(--line);
+  padding: 0;
+  background: transparent;
+  border: none;
 }
 
 .track-slots-group {
@@ -1234,19 +1241,22 @@ summary:focus-visible,
 }
 
 .particle-remove-btn {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: rgba(15, 23, 42, 0.08);
-  color: var(--ink-secondary);
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .particle-remove-btn:hover {
   background: var(--danger);
+  border-color: var(--danger);
   color: #ffffff;
 }
 
@@ -1763,6 +1773,51 @@ summary:focus-visible,
   font-weight: 600;
   white-space: nowrap;
   padding: 6px 10px;
+}
+
+.scrub-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  flex: 1;
+  min-width: 180px;
+}
+
+.scrub-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.scrub-status-badge {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 360px;
+}
+
+.scrub-pct-badge {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.scrub-slider-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.scrub-slider-row input[type="range"] {
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  flex: 1;
 }
 
 .scrub-row {
@@ -2335,7 +2390,63 @@ kbd {
 .mol-preview-info {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+}
+
+.mol-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mol-preview-section-title {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.mol-spec-grid-general {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 8px;
+}
+
+.mol-measure-pills-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.mol-measure-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: var(--fs-sm);
+  transition: all 0.14s ease;
+}
+
+.mol-measure-pill:hover {
+  background: var(--paper);
+  border-color: var(--accent-border);
+}
+
+.measure-pill-label {
+  font-weight: 600;
+  color: var(--ink-secondary);
+}
+
+.measure-pill-value {
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .mol-spec-grid {
@@ -2953,10 +3064,17 @@ kbd {
   background: var(--accent-soft);
 }
 
-.card-mini-icon-btn.danger:hover {
+.card-mini-icon-btn.danger {
   border-color: var(--danger-border);
   color: var(--danger);
   background: var(--danger-soft);
+}
+
+.card-mini-icon-btn.danger:hover {
+  border-color: var(--danger);
+  color: #ffffff;
+  background: var(--danger);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.28);
 }
 
 .add-mol-card {
@@ -3134,12 +3252,28 @@ kbd {
   border: 1px solid rgba(15, 23, 42, 0.25);
 }
 
-.ptable-toggle-btn {
+.ptable-toggle-btn,
+.ptable-toggle-button {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
   font-size: var(--fs-sm);
-  padding: 7px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.1);
+}
+
+.ptable-toggle-button:hover {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  transform: translateY(-1px);
 }
 
 .ptable-wrapper {
@@ -3441,6 +3575,38 @@ kbd {
 
 .topo-bond-group {
   cursor: pointer;
+}
+
+.topo-connect-handle {
+  cursor: crosshair;
+  transition: transform 0.15s ease;
+}
+
+.topo-connect-handle:hover {
+  transform: scale(1.25);
+}
+
+.canvas-floating-guide {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 4;
+  pointer-events: none;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: var(--fs-xs);
+  color: var(--ink-secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.canvas-empty-state-hint {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
 }
 
 /* Floating Zoom Control Bar for 2D Topology & 3D Preview Canvases */
@@ -3752,8 +3918,8 @@ kbd {
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 /* ============================================================================
@@ -3804,21 +3970,23 @@ kbd {
 .stage-delete-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   border-radius: 8px;
   border: 1px solid var(--danger-border);
   background: var(--danger-soft);
   color: var(--danger);
-  font-size: var(--fs-sm);
-  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .stage-delete-btn:hover {
   background: var(--danger);
+  border-color: var(--danger);
   color: #ffffff;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
 }
 
 /* Free Stage Right Sidebar Summary */

@@ -218,6 +218,15 @@ export const FreePipelineScreen: React.FC = () => {
     }
   };
 
+  const handleClearCurrentStageWithConfirm = () => {
+    const ok = window.confirm(
+      'Are you sure you want to clear reactants and products in the current stage?'
+    );
+    if (ok) {
+      clearCurrentStageZones();
+    }
+  };
+
   const currentStage = stages[activeStageTab] || stages[0];
   const activeDragItem = activeDragMolId ? moleculesMap.get(activeDragMolId) : null;
 
@@ -244,10 +253,10 @@ export const FreePipelineScreen: React.FC = () => {
             <div className="pipeline-header-actions">
               <button
                 type="button"
-                className="toolbar-icon-btn"
+                className="toolbar-icon-btn danger-icon-btn"
                 title="Clear current stage reactants & products"
                 aria-label="Clear current stage"
-                onClick={clearCurrentStageZones}
+                onClick={handleClearCurrentStageWithConfirm}
               >
                 <RotateCcw size={17} />
               </button>
@@ -324,65 +333,56 @@ export const FreePipelineScreen: React.FC = () => {
           {/* Active Stage Editor: Stage Name + [Reactants] ➔ [Products] */}
           {currentStage && (
             <div className="pipeline-active-stage">
-              <motion.div
-                key={currentStage.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.18 }}
-                className="pipeline-track-card"
-              >
-                <div className="track-header free-track-header">
-                  <div className="stage-name-editor">
-                    <Edit3 size={16} className="stage-name-icon" />
-                    <label htmlFor="free-stage-name-input" className="stage-name-label">
-                      Stage Name:
-                    </label>
-                    <input
-                      id="free-stage-name-input"
-                      type="text"
-                      className="stage-name-input"
-                      value={currentStage.name}
-                      placeholder="Enter stage name…"
-                      onChange={(e) => renameStage(currentStage.id, e.target.value)}
-                    />
-                  </div>
-                  {stages.length > 1 && (
-                    <button
-                      type="button"
-                      className="stage-delete-btn"
-                      title="Delete stage"
-                      aria-label="Delete stage"
-                      onClick={() => removeStage(currentStage.id)}
-                    >
-                      <Trash2 size={15} />
-                      <span>Delete</span>
-                    </button>
-                  )}
+              <div className="track-header free-track-header">
+                <div className="stage-name-editor">
+                  <Edit3 size={16} className="stage-name-icon" />
+                  <label htmlFor="free-stage-name-input" className="stage-name-label">
+                    Stage Name:
+                  </label>
+                  <input
+                    id="free-stage-name-input"
+                    type="text"
+                    className="stage-name-input"
+                    value={currentStage.name}
+                    placeholder="Enter stage name…"
+                    onChange={(e) => renameStage(currentStage.id, e.target.value)}
+                  />
                 </div>
+                {stages.length > 1 && (
+                  <button
+                    type="button"
+                    className="stage-delete-btn"
+                    title="Delete stage"
+                    aria-label="Delete stage"
+                    onClick={() => removeStage(currentStage.id)}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
+              </div>
 
-                {/* Clean [Reactants] ➔ [Products] Layout */}
-                <div className="track-flow">
-                  <FreeDropZone
-                    stageId={currentStage.id}
-                    role="reactants"
-                    titleText="Reactants (Before Reaction)"
-                    particles={currentStage.reactants}
-                    moleculesMap={moleculesMap}
-                  />
-                  <div className="track-arrow-zone">
-                    <span className="track-arrow" aria-hidden="true">
-                      ➔
-                    </span>
-                  </div>
-                  <FreeDropZone
-                    stageId={currentStage.id}
-                    role="products"
-                    titleText="Products (After Reaction)"
-                    particles={currentStage.products}
-                    moleculesMap={moleculesMap}
-                  />
+              {/* Clean [Reactants] ➔ [Products] Layout */}
+              <div className="track-flow">
+                <FreeDropZone
+                  stageId={currentStage.id}
+                  role="reactants"
+                  titleText="Reactants (Before Reaction)"
+                  particles={currentStage.reactants}
+                  moleculesMap={moleculesMap}
+                />
+                <div className="track-arrow-zone">
+                  <span className="track-arrow" aria-hidden="true">
+                    ➔
+                  </span>
                 </div>
-              </motion.div>
+                <FreeDropZone
+                  stageId={currentStage.id}
+                  role="products"
+                  titleText="Products (After Reaction)"
+                  particles={currentStage.products}
+                  moleculesMap={moleculesMap}
+                />
+              </div>
             </div>
           )}
         </div>

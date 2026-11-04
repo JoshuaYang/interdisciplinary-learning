@@ -720,17 +720,23 @@ export const FreeStageScreen: React.FC = () => {
               </button>
             </div>
 
-            <div className="scrub-row">
-              <span id="animation-status">{phaseHintText}</span>
-              <input
-                type="range"
-                min="0"
-                max="1000"
-                value={Math.round(progress * 1000)}
-                aria-label="Stage Animation Progress"
-                onChange={(e) => setProgress(Number(e.target.value) / 1000, true)}
-              />
-              <span className="mono">{Math.round(progress * 100)}%</span>
+            <div className="scrub-container">
+              <div className="scrub-meta-row">
+                <span id="animation-status" className="scrub-status-badge">
+                  {phaseHintText}
+                </span>
+                <span className="scrub-pct-badge mono">{Math.round(progress * 100)}%</span>
+              </div>
+              <div className="scrub-slider-row">
+                <input
+                  type="range"
+                  min="0"
+                  max="1000"
+                  value={Math.round(progress * 1000)}
+                  aria-label="Stage Animation Progress"
+                  onChange={(e) => setProgress(Number(e.target.value) / 1000, true)}
+                />
+              </div>
             </div>
           </div>
 

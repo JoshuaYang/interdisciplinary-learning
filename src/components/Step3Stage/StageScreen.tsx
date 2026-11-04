@@ -1029,31 +1029,35 @@ export const StageScreen: React.FC = () => {
               </button>
             </div>
 
-            <div className="scrub-row">
-              <span id="animation-status">
-                {playing
-                  ? progress === 1
-                    ? 'Holding'
-                    : 'Playing'
-                  : progress < 1
-                  ? 'Paused'
-                  : index === 6
-                  ? 'Completed'
-                  : 'Ready'}
-              </span>
-              <input
-                id="progress"
-                type="range"
-                min="0"
-                max="1000"
-                value={Math.round(progress * 1000)}
-                disabled={!isCurrentSolved || index === 0}
-                aria-label="Step Animation Progress"
-                onChange={(e) => setProgress(Number(e.target.value) / 1000, true)}
-              />
-              <span id="progress-label" className="mono">
-                {Math.round(progress * 100)}%
-              </span>
+            <div className="scrub-container">
+              <div className="scrub-meta-row">
+                <span id="animation-status" className="scrub-status-badge">
+                  {playing
+                    ? progress === 1
+                      ? 'Holding'
+                      : 'Playing'
+                    : progress < 1
+                    ? 'Paused'
+                    : index === 6
+                    ? 'Completed'
+                    : 'Ready'}
+                </span>
+                <span id="progress-label" className="scrub-pct-badge mono">
+                  {Math.round(progress * 100)}%
+                </span>
+              </div>
+              <div className="scrub-slider-row">
+                <input
+                  id="progress"
+                  type="range"
+                  min="0"
+                  max="1000"
+                  value={Math.round(progress * 1000)}
+                  disabled={!isCurrentSolved || index === 0}
+                  aria-label="Step Animation Progress"
+                  onChange={(e) => setProgress(Number(e.target.value) / 1000, true)}
+                />
+              </div>
             </div>
           </div>
 
