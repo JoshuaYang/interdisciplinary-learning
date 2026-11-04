@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  HelpCircle,
   Lock,
   RotateCcw,
   Sparkles,
@@ -710,8 +711,34 @@ export const StageScreen: React.FC = () => {
             <small>UV Light</small>
           </div>
 
-          <div className="stage-hint" id="stage-hint">
-            Drag to rotate · Scroll to zoom
+          <div className="canvas-help-trigger stage-help-corner" id="stage-help-trigger">
+            <button
+              type="button"
+              className="canvas-help-icon-btn"
+              title="3D Stage Controls"
+              aria-label="3D Stage Controls"
+            >
+              <HelpCircle size={15} />
+            </button>
+            <div className="canvas-help-popover">
+              <div className="help-popover-title">3D Stage Controls</div>
+              <div className="help-popover-item">
+                <span className="help-key">Drag</span>
+                <span>Rotate 3D model</span>
+              </div>
+              <div className="help-popover-item">
+                <span className="help-key">Wheel</span>
+                <span>Zoom in / out</span>
+              </div>
+              <div className="help-popover-item">
+                <span className="help-key">Right Drag</span>
+                <span>Pan viewport</span>
+              </div>
+              <div className="help-popover-item">
+                <span className="help-key">Space</span>
+                <span>Play / Pause</span>
+              </div>
+            </div>
           </div>
 
           {selectedAtom && (

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, HelpCircle, RotateCcw } from 'lucide-react';
 import { useFreeChemStore } from '../../store/useFreeChemStore';
 import {
   formatFormulaHtml,
@@ -567,7 +567,35 @@ export const FreeStageScreen: React.FC = () => {
               </span>
             </div>
 
-            <div className="stage-hint">Drag to rotate · Scroll to zoom</div>
+            <div className="canvas-help-trigger stage-help-corner">
+              <button
+                type="button"
+                className="canvas-help-icon-btn"
+                title="3D Stage Controls"
+                aria-label="3D Stage Controls"
+              >
+                <HelpCircle size={15} />
+              </button>
+              <div className="canvas-help-popover">
+                <div className="help-popover-title">3D Stage Controls</div>
+                <div className="help-popover-item">
+                  <span className="help-key">Drag</span>
+                  <span>Rotate 3D model</span>
+                </div>
+                <div className="help-popover-item">
+                  <span className="help-key">Wheel</span>
+                  <span>Zoom in / out</span>
+                </div>
+                <div className="help-popover-item">
+                  <span className="help-key">Right Drag</span>
+                  <span>Pan viewport</span>
+                </div>
+                <div className="help-popover-item">
+                  <span className="help-key">Space</span>
+                  <span>Play / Pause</span>
+                </div>
+              </div>
+            </div>
 
             {selectedAtom && (
               <div id="atom-detail">

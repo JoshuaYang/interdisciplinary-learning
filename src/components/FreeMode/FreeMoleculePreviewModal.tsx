@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import * as Dialog from '@radix-ui/react-dialog';
-import { RotateCcw, X } from 'lucide-react';
+import { HelpCircle, RotateCcw, X } from 'lucide-react';
 import { useFreeChemStore } from '../../store/useFreeChemStore';
 import * as core from '../../engine/core';
 import {
@@ -358,7 +358,33 @@ export const FreeMoleculePreviewModal: React.FC = () => {
                 </span>
               )}
             </div>
-            <div className="stage-hint">Drag to rotate · Scroll to zoom</div>
+
+            {/* Corner floating help trigger */}
+            <div className="canvas-help-trigger">
+              <button
+                type="button"
+                className="canvas-help-icon-btn"
+                title="3D View Controls"
+                aria-label="3D View Controls"
+              >
+                <HelpCircle size={15} />
+              </button>
+              <div className="canvas-help-popover">
+                <div className="help-popover-title">3D View Controls</div>
+                <div className="help-popover-item">
+                  <span className="help-key">Drag</span>
+                  <span>Rotate 3D model</span>
+                </div>
+                <div className="help-popover-item">
+                  <span className="help-key">Wheel</span>
+                  <span>Zoom in / out</span>
+                </div>
+                <div className="help-popover-item">
+                  <span className="help-key">Reset</span>
+                  <span>Reset camera view</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="mol-preview-info">

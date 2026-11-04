@@ -271,7 +271,6 @@ export const FreePipelineScreen: React.FC = () => {
                 />
                 Available Chemical Substance Pool
               </span>
-              <small>Drag or click a substance to place it into "Reactants" or "Products" below</small>
             </div>
             <div className="molecule-chips">
               {molecules.length === 0 ? (

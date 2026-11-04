@@ -274,7 +274,6 @@ export const PipelineScreen: React.FC = () => {
                 />
                 Available Species Pool
               </span>
-              <small>Drag or click species into the reaction zones below (radicals are marked with ·)</small>
             </div>
             <div className="molecule-chips" id="molecule-chips">
               {POOL_MOLECULES.map((slot) => (
@@ -297,44 +296,6 @@ export const PipelineScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Stage Selector Bar */}
-          <div className="stage-bar-header">
-            <div className="stage-pills-track" id="pipeline-tabs-nav" role="tablist">
-              {PIPELINE_STEPS.map((step, idx) => {
-                const stageObj =
-                  pipelineData[step.id] ||
-                  (step.isMultiReaction ? { reactions: [] } : { reactants: [], products: [] });
-                let badgeContent = String(idx + 1);
-                let statusClass = '';
-
-                if (pipelineVerified) {
-                  const check = verifyStage(step.id, stageObj);
-                  if (check.ok) {
-                    statusClass = 'is-valid';
-                    badgeContent = '✓';
-                  } else {
-                    statusClass = 'is-invalid';
-                    badgeContent = '!';
-                  }
-                }
-
-                return (
-                  <button
-                    key={step.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={idx === activePipelineTab}
-                    className={`stage-pill-tab ${idx === activePipelineTab ? 'active' : ''} ${statusClass}`}
-                    onClick={() => setActivePipelineTab(idx)}
-                  >
-                    <span className="tab-badge">{badgeContent}</span>
-                    <span>{step.phaseName}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Active Stage Workspace */}
           <div className="pipeline-active-stage" id="pipeline-active-stage">
             <motion.div
@@ -344,6 +305,44 @@ export const PipelineScreen: React.FC = () => {
               transition={{ duration: 0.18 }}
               className="pipeline-track-card"
             >
+              {/* Integrated Stage Tabs Bar */}
+              <div className="stage-bar-header">
+                <div className="stage-pills-track" id="pipeline-tabs-nav" role="tablist">
+                  {PIPELINE_STEPS.map((step, idx) => {
+                    const stageObj =
+                      pipelineData[step.id] ||
+                      (step.isMultiReaction ? { reactions: [] } : { reactants: [], products: [] });
+                    let badgeContent = String(idx + 1);
+                    let statusClass = '';
+
+                    if (pipelineVerified) {
+                      const check = verifyStage(step.id, stageObj);
+                      if (check.ok) {
+                        statusClass = 'is-valid';
+                        badgeContent = '✓';
+                      } else {
+                        statusClass = 'is-invalid';
+                        badgeContent = '!';
+                      }
+                    }
+
+                    return (
+                      <button
+                        key={step.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={idx === activePipelineTab}
+                        className={`stage-pill-tab ${idx === activePipelineTab ? 'active' : ''} ${statusClass}`}
+                        onClick={() => setActivePipelineTab(idx)}
+                      >
+                        <span className="tab-badge">{badgeContent}</span>
+                        <span>{step.phaseName}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="track-header">
                 <div className="track-header-left">
                   <span className="track-summary">{currentStep.summary}</span>

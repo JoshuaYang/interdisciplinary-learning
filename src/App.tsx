@@ -8,6 +8,7 @@ import { FreeHeader } from './components/FreeMode/FreeHeader';
 import { FreeGateScreen } from './components/FreeMode/FreeGateScreen';
 import { FreePipelineScreen } from './components/FreeMode/FreePipelineScreen';
 import { FreeStageScreen } from './components/FreeMode/FreeStageScreen';
+import { AmbientParticles } from './components/Common/AmbientParticles';
 import { useChemStore } from './store/useChemStore';
 import { useFreeChemStore } from './store/useFreeChemStore';
 import * as core from './engine/core';
@@ -160,6 +161,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="app-shell">
+      <AmbientParticles />
       {appMode === 'home' && <HomeEntry />}
 
       {appMode === 'guided' && (

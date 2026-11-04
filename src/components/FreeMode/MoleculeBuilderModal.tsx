@@ -5,9 +5,13 @@ import {
   Atom,
   ChevronDown,
   ChevronUp,
+  Compass,
+  FlaskConical,
   Grid,
   HelpCircle,
+  Layers,
   RotateCcw,
+  Ruler,
   Sparkles,
   Trash2,
   X,
@@ -32,6 +36,7 @@ import {
   GEOMETRY_OPTIONS,
   HYBRIDIZATION_OPTIONS,
   buildUniversalMolecule,
+  formatFormulaHtml,
   getCanonicalBondKey,
   getRecommendedBondLength,
   inferFormulaAndName,
@@ -149,6 +154,22 @@ export const MoleculeBuilderModal: React.FC = () => {
     panX: 0,
     panY: 0,
   });
+
+  // Isolate 2D canvas wheel scrolling: prevent whole dialog from scrolling
+  useEffect(() => {
+    const el = svgWrapRef.current;
+    if (!el) return;
+    const handleNativeWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const factor = e.deltaY < 0 ? 1.1 : 0.9;
+      setTopoZoom((z) => Math.min(2.5, Math.max(0.4, Number((z * factor).toFixed(2)))));
+    };
+    el.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleNativeWheel);
+    };
+  }, [builderOpen]);
 
   const resetEmptyBuilder = useCallback(() => {
     setNodes([]);
@@ -1343,11 +1364,6 @@ export const MoleculeBuilderModal: React.FC = () => {
                   <div
                     className="topology-canvas-wrap"
                     ref={svgWrapRef}
-                    onWheel={(e) => {
-                      e.preventDefault();
-                      const factor = e.deltaY < 0 ? 1.1 : 0.9;
-                      setTopoZoom((z) => Math.min(2.5, Math.max(0.4, Number((z * factor).toFixed(2)))));
-                    }}
                   >
                     <svg
                       ref={svgRef}
@@ -1909,8 +1925,19 @@ export const MoleculeBuilderModal: React.FC = () => {
 
                 <div className="builder-params-scroll">
                   {/* Basic Identity */}
-                  <div className="param-group-card">
-                    <div className="param-group-title">Basic Identity</div>
+                  <div className="param-group-card param-group-identity">
+                    <div className="param-group-title">
+                      <div className="param-title-left">
+                        <FlaskConical size={16} className="param-icon identity-icon" />
+                        <span>Basic Identity & Formula</span>
+                      </div>
+                      {formula && (
+                        <span
+                          className="formula-preview-badge"
+                          dangerouslySetInnerHTML={{ __html: formatFormulaHtml(formula) }}
+                        />
+                      )}
+                    </div>
                     <div className="param-grid-2">
                       <label className="param-field">
                         <span>Chemical Formula (formula)</span>
@@ -1943,8 +1970,13 @@ export const MoleculeBuilderModal: React.FC = () => {
                   </div>
 
                   {/* Spatial Geometry & Hybridization */}
-                  <div className="param-group-card">
-                    <div className="param-group-title">Spatial Geometry & Hybridization</div>
+                  <div className="param-group-card param-group-geometry">
+                    <div className="param-group-title">
+                      <div className="param-title-left">
+                        <Layers size={16} className="param-icon geometry-icon" />
+                        <span>Spatial Geometry & Hybridization</span>
+                      </div>
+                    </div>
                     <div className="param-grid-2">
                       <label className="param-field">
                         <span>Spatial Geometry (geometry) *</span>
@@ -1984,9 +2016,12 @@ export const MoleculeBuilderModal: React.FC = () => {
                   </div>
 
                   {/* Covalent Bond Lengths (Å) */}
-                  <div className="param-group-card">
+                  <div className="param-group-card param-group-lengths">
                     <div className="param-group-title">
-                      <span>Bond Lengths (bondLengths · in Å) *</span>
+                      <div className="param-title-left">
+                        <Ruler size={16} className="param-icon ruler-icon" />
+                        <span>Bond Lengths (bondLengths · in Å) *</span>
+                      </div>
                     </div>
                     {activeBondKeys.length === 0 ? (
                       <div className="param-empty-hint">
@@ -1997,20 +2032,23 @@ export const MoleculeBuilderModal: React.FC = () => {
                         {activeBondKeys.map((k) => (
                           <label key={k} className="param-field">
                             <span className="mono">{k} Bond Length (Å)</span>
-                            <input
-                              type="number"
-                              step="0.001"
-                              min="0.1"
-                              max="4.0"
-                              placeholder="e.g. 1.087 or 1.4"
-                              value={bondLengthsInput[k] || ''}
-                              onChange={(e) =>
-                                setBondLengthsInput((prev) => ({
-                                  ...prev,
-                                  [k]: e.target.value,
-                                }))
-                              }
-                            />
+                            <div className="input-unit-wrap">
+                              <input
+                                type="number"
+                                step="0.001"
+                                min="0.1"
+                                max="4.0"
+                                placeholder="e.g. 1.087 or 1.4"
+                                value={bondLengthsInput[k] || ''}
+                                onChange={(e) =>
+                                  setBondLengthsInput((prev) => ({
+                                    ...prev,
+                                    [k]: e.target.value,
+                                  }))
+                                }
+                              />
+                              <span className="input-unit-tag">Å</span>
+                            </div>
                           </label>
                         ))}
                       </div>
@@ -2018,9 +2056,12 @@ export const MoleculeBuilderModal: React.FC = () => {
                   </div>
 
                   {/* Bond Angles (°) */}
-                  <div className="param-group-card">
+                  <div className="param-group-card param-group-angles">
                     <div className="param-group-title">
-                      <span>Bond Angles (bondAngles · in °) *</span>
+                      <div className="param-title-left">
+                        <Compass size={16} className="param-icon compass-icon" />
+                        <span>Bond Angles (bondAngles · in °) *</span>
+                      </div>
                     </div>
                     {activeAngleKeys.length === 0 ? (
                       <div className="param-empty-hint">
@@ -2031,20 +2072,23 @@ export const MoleculeBuilderModal: React.FC = () => {
                         {activeAngleKeys.map((k) => (
                           <label key={k} className="param-field">
                             <span className="mono">{k} Bond Angle (°)</span>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="30"
-                              max="180"
-                              placeholder="e.g. 109.5 or 120"
-                              value={bondAnglesInput[k] || ''}
-                              onChange={(e) =>
-                                setBondAnglesInput((prev) => ({
-                                  ...prev,
-                                  [k]: e.target.value,
-                                }))
-                              }
-                            />
+                            <div className="input-unit-wrap">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="30"
+                                max="180"
+                                placeholder="e.g. 109.5 or 120"
+                                value={bondAnglesInput[k] || ''}
+                                onChange={(e) =>
+                                  setBondAnglesInput((prev) => ({
+                                    ...prev,
+                                    [k]: e.target.value,
+                                  }))
+                                }
+                              />
+                              <span className="input-unit-tag">°</span>
+                            </div>
                           </label>
                         ))}
                       </div>
