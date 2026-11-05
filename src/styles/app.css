@@ -2423,6 +2423,186 @@ input[type="range"] {
 }
 
 /* ============================================================================
+ * Potential Energy Surface (PES) HUD Floating Widget
+ * ============================================================================ */
+.pes-hud-card {
+  position: absolute;
+  bottom: 24px;
+  left: 20px;
+  z-index: 20;
+  width: 256px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px -4px rgba(15, 23, 42, 0.1), 0 2px 6px rgba(15, 23, 42, 0.04);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  user-select: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pes-hud-card.is-collapsed {
+  width: auto;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.pes-hud-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pes-hud-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pes-hud-icon {
+  color: var(--accent, #2563eb);
+}
+
+.pes-hud-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+
+.pes-hud-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.pes-hud-toggle-btn:hover {
+  color: #0f172a;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.pes-hud-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pes-hud-metrics {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #475569;
+  flex-wrap: wrap;
+}
+
+.pes-metric-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.pes-metric-label {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.pes-metric-val {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.pes-metric-divider {
+  color: #cbd5e1;
+}
+
+.pes-ts-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: #ef4444;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 1px 5px;
+  border-radius: 4px;
+  animation: pesPulseBadge 1s infinite alternate ease-in-out;
+}
+
+@keyframes pesPulseBadge {
+  from {
+    transform: scale(0.96);
+    opacity: 0.85;
+  }
+  to {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+.pes-svg-wrap {
+  position: relative;
+  width: 100%;
+  cursor: crosshair;
+  background: rgba(248, 250, 252, 0.6);
+  border-radius: 6px;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  padding: 2px;
+}
+
+.pes-svg-canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.pes-node-label {
+  font-size: 9px;
+  font-weight: 600;
+  fill: #64748b;
+}
+
+.pes-ts-label {
+  fill: #ef4444;
+  font-weight: 700;
+}
+
+.pes-ts-label.is-active {
+  fill: #dc2626;
+  font-size: 10px;
+}
+
+.pes-ball-pulse-ring {
+  animation: pesPulseRing 0.8s infinite ease-out;
+}
+
+@keyframes pesPulseRing {
+  0% {
+    r: 6;
+    opacity: 0.9;
+  }
+  100% {
+    r: 16;
+    opacity: 0;
+  }
+}
+
+/* ============================================================================
  * 5. Dialogs, Modals & Toast Notifications
  * ============================================================================ */
 .radix-dialog-overlay {
@@ -4143,6 +4323,47 @@ kbd {
   font-weight: 600;
   color: var(--ink);
   min-height: 34px;
+}
+
+.builder-3d-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.builder-mode-switcher {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.05);
+  border: 1px solid var(--line);
+  padding: 2px;
+  border-radius: 8px;
+  gap: 2px;
+}
+
+.builder-mode-btn {
+  background: transparent;
+  border: none;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1.2;
+}
+
+.builder-mode-btn:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.builder-mode-btn.active {
+  color: var(--accent);
+  background: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .builder-3d-meta {

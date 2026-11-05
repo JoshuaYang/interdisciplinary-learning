@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useChemStore } from '../../store/useChemStore';
 import { CustomSelect } from '../Common/CustomSelect';
+import { ReactionPESHUD } from '../Common/ReactionPESHUD';
 import * as core from '../../engine/core';
 import * as deduction from '../../engine/deduction';
 import type { ChemConfig, CompiledState, StepInstance } from '../../types/chem';
@@ -226,6 +227,18 @@ export const StageScreen: React.FC = () => {
       meshes.set(id, { mesh, label, dot, element: a.element });
     }
 
+    // Transition State Quantum Shockwave Mesh (expands on bond break/formation at progress ~ 0.5)
+    const shockwaveGeo = new THREE.RingGeometry(0.12, 0.28, 36);
+    const shockwaveMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+    });
+    const shockwaveMesh = new THREE.Mesh(shockwaveGeo, shockwaveMat);
+    root.add(shockwaveMesh);
+
     const allBonds = new Map<string, { atoms: [string, string] }>();
     states.forEach((s) =>
       Object.entries(s.bonds).forEach(([k, b]) => allBonds.set(k, b))
@@ -334,6 +347,31 @@ export const StageScreen: React.FC = () => {
         dotMat.opacity = a.radical * a.opacity;
         obj.dot.visible = a.radical > 0.01;
         dotMat.depthWrite = a.opacity > 0.7;
+        if (a.radical > 0.01) {
+          const pulse = 0.075 * (1 + 0.32 * Math.sin(Date.now() * 0.009));
+          obj.dot.scale.setScalar(pulse);
+        }
+      }
+
+      // Transition State Quantum Burst Shockwave Update
+      const tsDelta = Math.abs(st.progress - 0.5);
+      if (tsDelta < 0.12) {
+        const norm = 1 - tsDelta / 0.12; // 0 -> 1 -> 0
+        shockwaveMesh.visible = true;
+        const ringScale = 1.0 + (1 - norm) * 4.6;
+        shockwaveMesh.scale.set(ringScale, ringScale, ringScale);
+        shockwaveMat.opacity = Math.pow(norm, 1.8) * 0.8;
+        shockwaveMesh.quaternion.copy(camera.quaternion);
+
+        const primaryAtoms = Object.values(state.atoms).filter((a) => a.opacity > 0.8);
+        if (primaryAtoms.length > 0) {
+          const avgX = primaryAtoms.reduce((s, a) => s + a.position[0], 0) / primaryAtoms.length;
+          const avgY = primaryAtoms.reduce((s, a) => s + a.position[1], 0) / primaryAtoms.length;
+          const avgZ = primaryAtoms.reduce((s, a) => s + a.position[2], 0) / primaryAtoms.length;
+          shockwaveMesh.position.set(avgX, avgY, avgZ);
+        }
+      } else {
+        shockwaveMesh.visible = false;
       }
 
       const axis = new THREE.Vector3(0, 1, 0);
@@ -356,6 +394,16 @@ export const StageScreen: React.FC = () => {
           mat.opacity = b.weight * b.opacity;
           mat.depthWrite = mat.opacity > 0.8;
           m.castShadow = mat.opacity > 0.8;
+
+          // Transition State / Breaking bond high-energy glow
+          if (b.weight > 0.01 && b.weight < 0.92) {
+            const glowFactor = Math.sin(b.weight * Math.PI);
+            mat.emissive.setHex(0x38bdf8);
+            mat.emissiveIntensity = glowFactor * 1.3;
+          } else {
+            mat.emissive.setHex(0x000000);
+            mat.emissiveIntensity = 0;
+          }
         });
       }
 
@@ -706,6 +754,15 @@ export const StageScreen: React.FC = () => {
               <b>·</b> Unpaired Electron
             </span>
           </div>
+
+          {/* Real-time Interactive Potential Energy Surface (PES) HUD */}
+          <ReactionPESHUD
+            progress={progress}
+            onSeek={(p) => setProgress(p, true)}
+            stageName={currentStep.title}
+            eaKj={index === 1 ? 193 : index === 3 ? 75 : index === 5 ? 12 : 2}
+            deltaHKj={index === 1 ? 193 : index === 3 ? 67 : index === 5 ? -101 : -350}
+          />
 
           <div id="light-cue" ref={lightCueRef} hidden={index !== 1}>
             <span>hν</span>

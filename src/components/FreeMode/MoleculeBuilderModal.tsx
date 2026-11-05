@@ -194,6 +194,7 @@ export const MoleculeBuilderModal: React.FC = () => {
   const [activeElement, setActiveElement] = useState<string | null>(null);
   const [showFullPeriodicTable, setShowFullPeriodicTable] = useState<boolean>(false);
   const [categoryFilter, setCategoryFilter] = useState<ElementCategory | 'all'>('all');
+  const [renderMode3D, setRenderMode3D] = useState<'ball-stick' | 'spacefill'>('ball-stick');
 
   // 2D Topology Zoom & Pan state
   const [topoZoom, setTopoZoom] = useState<number>(1);
@@ -1218,15 +1219,21 @@ export const MoleculeBuilderModal: React.FC = () => {
       posMap.set(a.id, v);
       elemMap.set(a.id, a.element);
 
-      const radius = getElementRadius(a.element);
-      const mesh = new THREE.Mesh(
-        sphereGeo,
-        new THREE.MeshStandardMaterial({
-          color: new THREE.Color(getElementColor(a.element)),
-          roughness: 0.36,
-          metalness: 0,
-        })
-      );
+      const isTargeted = a.id === hoveredNodeId || a.id === selectedNodeId;
+      const radius =
+        renderMode3D === 'spacefill'
+          ? getElementRadius(a.element) * 1.95
+          : getElementRadius(a.element);
+
+      const meshMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(getElementColor(a.element)),
+        roughness: renderMode3D === 'spacefill' ? 0.42 : 0.36,
+        metalness: renderMode3D === 'spacefill' ? 0.05 : 0,
+        emissive: isTargeted ? new THREE.Color(0x38bdf8) : new THREE.Color(0x000000),
+        emissiveIntensity: isTargeted ? 0.65 : 0,
+      });
+
+      const mesh = new THREE.Mesh(sphereGeo, meshMat);
       mesh.scale.setScalar(radius);
       mesh.position.copy(v);
       root.add(mesh);
@@ -1255,58 +1262,61 @@ export const MoleculeBuilderModal: React.FC = () => {
       }
     }
 
-    const axis = new THREE.Vector3(0, 1, 0);
-    const zAxis = new THREE.Vector3(0, 0, 1);
-    const xAxis = new THREE.Vector3(1, 0, 0);
+    // Only render covalent bond cylinders in Ball & Stick mode
+    if (renderMode3D === 'ball-stick') {
+      const axis = new THREE.Vector3(0, 1, 0);
+      const zAxis = new THREE.Vector3(0, 0, 1);
+      const xAxis = new THREE.Vector3(1, 0, 0);
 
-    for (const b of mol.bonds) {
-      const p1 = posMap.get(b.atoms[0]);
-      const p2 = posMap.get(b.atoms[1]);
-      if (!p1 || !p2) continue;
-      const dir = p2.clone().sub(p1);
-      const len = dir.length();
-      const bondDir = dir.clone().normalize();
+      for (const b of mol.bonds) {
+        const p1 = posMap.get(b.atoms[0]);
+        const p2 = posMap.get(b.atoms[1]);
+        if (!p1 || !p2) continue;
+        const dir = p2.clone().sub(p1);
+        const len = dir.length();
+        const bondDir = dir.clone().normalize();
 
-      // Orthogonal normal vector to offset multiple bonds
-      const refAxis = Math.abs(bondDir.dot(zAxis)) < 0.88 ? zAxis : xAxis;
-      const normal = bondDir.clone().cross(refAxis).normalize();
+        // Orthogonal normal vector to offset multiple bonds
+        const refAxis = Math.abs(bondDir.dot(zAxis)) < 0.88 ? zAxis : xAxis;
+        const normal = bondDir.clone().cross(refAxis).normalize();
 
-      const bondOrder = (b as any).order || 1;
-      let offsets: number[] = [0];
-      let cylRadius = 0.065;
+        const bondOrder = (b as any).order || 1;
+        let offsets: number[] = [0];
+        let cylRadius = 0.065;
 
-      if (bondOrder === 2) {
-        offsets = [-0.09, 0.09];
-        cylRadius = 0.052;
-      } else if (bondOrder === 3) {
-        offsets = [-0.13, 0, 0.13];
-        cylRadius = 0.044;
-      }
+        if (bondOrder === 2) {
+          offsets = [-0.09, 0.09];
+          cylRadius = 0.052;
+        } else if (bondOrder === 3) {
+          offsets = [-0.13, 0, 0.13];
+          cylRadius = 0.044;
+        }
 
-      for (const off of offsets) {
-        const shift = normal.clone().multiplyScalar(off);
-        const sp1 = p1.clone().add(shift);
-        const sp2 = p2.clone().add(shift);
+        for (const off of offsets) {
+          const shift = normal.clone().multiplyScalar(off);
+          const sp1 = p1.clone().add(shift);
+          const sp2 = p2.clone().add(shift);
 
-        b.atoms.forEach((atomId, idx) => {
-          const el = elemMap.get(atomId) || 'C';
-          const m = new THREE.Mesh(
-            cylinderGeo,
-            new THREE.MeshStandardMaterial({
-              color: new THREE.Color(getElementColor(el)),
-              roughness: 0.5,
-            })
-          );
-          m.position.copy(sp1).lerp(sp2, idx === 0 ? 0.25 : 0.75);
-          m.quaternion.setFromUnitVectors(axis, bondDir);
-          m.scale.set(cylRadius, len / 2, cylRadius);
-          root.add(m);
-        });
+          b.atoms.forEach((atomId, idx) => {
+            const el = elemMap.get(atomId) || 'C';
+            const m = new THREE.Mesh(
+              cylinderGeo,
+              new THREE.MeshStandardMaterial({
+                color: new THREE.Color(getElementColor(el)),
+                roughness: 0.5,
+              })
+            );
+            m.position.copy(sp1).lerp(sp2, idx === 0 ? 0.25 : 0.75);
+            m.quaternion.setFromUnitVectors(axis, bondDir);
+            m.scale.set(cylRadius, len / 2, cylRadius);
+            root.add(m);
+          });
+        }
       }
     }
 
     resize();
-  }, []);
+  }, [renderMode3D, hoveredNodeId, selectedNodeId]);
 
   const [previewWrapEl, setPreviewWrapEl] = useState<HTMLDivElement | null>(null);
   const [previewVpEl, setPreviewVpEl] = useState<HTMLDivElement | null>(null);
@@ -2046,10 +2056,34 @@ export const MoleculeBuilderModal: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 3D Real-time Ball-and-Stick Preview (Dynamic Equal Height) */}
+                {/* 3D Real-time Molecular Preview (Dynamic Equal Height) */}
                 <div className="builder-3d-card" ref={setPreviewWrapEl}>
                   <div className="builder-3d-header">
-                    <span>Live 3D Ball-and-Stick Model</span>
+                    <div className="builder-3d-header-left">
+                      <span>Live 3D Structure</span>
+                      <div className="builder-mode-switcher" role="tablist" aria-label="3D Rendering Mode">
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={renderMode3D === 'ball-stick'}
+                          className={`builder-mode-btn ${renderMode3D === 'ball-stick' ? 'active' : ''}`}
+                          onClick={() => setRenderMode3D('ball-stick')}
+                          title="Ball and Stick representation"
+                        >
+                          Ball & Stick
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={renderMode3D === 'spacefill'}
+                          className={`builder-mode-btn ${renderMode3D === 'spacefill' ? 'active' : ''}`}
+                          onClick={() => setRenderMode3D('spacefill')}
+                          title="Spacefill (Van der Waals) representation"
+                        >
+                          Spacefill (VdW)
+                        </button>
+                      </div>
+                    </div>
                     {previewMol && (
                       <span className="builder-3d-meta mono">
                         {previewMol.atoms.length} Atoms · {previewMol.bonds.length} Bonds
