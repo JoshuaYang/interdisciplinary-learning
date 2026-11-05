@@ -329,14 +329,29 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
   closeBuilderForSlot: () => set({ builderSlotId: null }),
   saveDocForSlot: (slotId, builderDoc) => {
     const guidedDoc = buildGuidedStudentDoc(builderDoc);
-    const result = get().verifySingleDoc(guidedDoc, slotId);
-    if (result.success) {
-      get().showToast(`Verified: ${guidedDoc.name} (${guidedDoc.formula}) configuration is valid!`);
-      set({ builderSlotId: null });
-    } else {
-      get().showToast(`Verification issue: ${result.error}`);
+    let verifyRes: any = { success: false, error: 'Structure incomplete' };
+    try {
+      verifyRes = get().verifySingleDoc(guidedDoc, slotId);
+    } catch (e: any) {
+      verifyRes = { success: false, error: e.message || 'Structure incomplete' };
     }
-    return result;
+
+    // Always preserve user's edited document in slotState and let outer card reflect status
+    set((state) => ({
+      slotState: {
+        ...state.slotState,
+        [slotId]: {
+          status: verifyRes.success ? 'valid' : 'error',
+          doc: builderDoc,
+          mol: verifyRes.mol || null,
+          error: verifyRes.success ? null : verifyRes.error || 'Configuration incomplete',
+          warnings: verifyRes.warnings || [],
+        },
+      },
+      builderSlotId: null,
+    }));
+
+    return { success: true };
   },
   setConfigDialogOpen: (open) => {
     if (open) get().pause();

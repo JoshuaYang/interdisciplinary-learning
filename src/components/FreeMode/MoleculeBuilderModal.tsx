@@ -962,6 +962,24 @@ export const MoleculeBuilderModal: React.FC = () => {
 
   // Save the constructed molecule into the Zustand store
   const handleSaveMolecule = () => {
+    // In Guided Mode: save current configuration immediately without modal popup error blockades
+    if (guidedSlotId) {
+      const docToSave = currentDoc || {
+        name,
+        formula,
+        description,
+        nodes,
+        bonds,
+        geometry,
+        hybridization,
+        bondLengths: bondLengthsInput,
+        bondAngles: bondAnglesInput,
+      };
+      saveDocForSlot(guidedSlotId, docToSave);
+      handleCloseModal();
+      return;
+    }
+
     if (nodes.length === 0) {
       const err = 'Please add atoms from the periodic table above before saving.';
       showToast(err);
@@ -1003,18 +1021,9 @@ export const MoleculeBuilderModal: React.FC = () => {
       return;
     }
 
-    if (guidedSlotId) {
-      const res = saveDocForSlot(guidedSlotId, currentDoc);
-      if (!res.success) {
-        triggerSaveError(res.error || 'Verification issue. Please review the structure.');
-        return;
-      }
-      handleCloseModal();
-    } else {
-      saveMoleculeDoc(currentDoc, editingMolId);
-      showToast(`Saved substance ${currentDoc.formula} (${currentDoc.name}) successfully!`);
-      handleCloseModal();
-    }
+    saveMoleculeDoc(currentDoc, editingMolId);
+    showToast(`Saved substance ${currentDoc.formula} (${currentDoc.name}) successfully!`);
+    handleCloseModal();
   };
 
   // 3D Preview Three.js WebGL rendering
