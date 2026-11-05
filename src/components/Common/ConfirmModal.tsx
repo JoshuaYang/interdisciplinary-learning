@@ -26,7 +26,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="radix-dialog-overlay" />
+        <Dialog.Overlay className="radix-dialog-overlay confirm-dialog-overlay" />
         <Dialog.Content className="radix-dialog-content dialog-surface confirm-dialog" aria-describedby={undefined}>
           <div className="confirm-dialog-body">
             <div className={`confirm-dialog-icon-wrap ${danger ? 'danger' : 'info'}`}>

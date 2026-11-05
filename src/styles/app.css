@@ -1944,7 +1944,7 @@ summary:focus-visible,
 
 #atom-detail {
   position: absolute;
-  bottom: 12px;
+  top: 56px;
   right: 16px;
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(8px);
@@ -1956,6 +1956,7 @@ summary:focus-visible,
   max-width: 300px;
   border-radius: 8px;
   pointer-events: none;
+  z-index: 15;
 }
 
 .load-error {
@@ -2427,10 +2428,11 @@ input[type="range"] {
  * ============================================================================ */
 .pes-hud-card {
   position: absolute;
-  bottom: 24px;
-  left: 20px;
+  bottom: 20px;
+  right: 20px;
+  left: auto;
   z-index: 20;
-  width: 256px;
+  width: 260px;
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -2446,9 +2448,9 @@ input[type="range"] {
 }
 
 .pes-hud-card.is-collapsed {
-  width: auto;
-  padding: 6px 10px;
-  border-radius: 8px;
+  width: 260px;
+  padding: 8px 12px;
+  border-radius: 10px;
 }
 
 .pes-hud-header {
@@ -3797,6 +3799,42 @@ kbd {
   transform: translateY(-1px);
 }
 
+.ptable-chevron-icon {
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ptable-chevron-icon.rotate-180 {
+  transform: rotate(180deg);
+}
+
+.ptable-collapsible {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.34s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.26s ease,
+              margin-top 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0;
+  overflow: hidden;
+  margin-top: 0;
+}
+
+.ptable-collapsible.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: 10px;
+}
+
+.ptable-collapsible-inner {
+  min-height: 0;
+  overflow: hidden;
+  transform: translateY(-6px);
+  transition: transform 0.34s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ptable-collapsible.is-open .ptable-collapsible-inner {
+  transform: translateY(0);
+}
+
 .ptable-wrapper {
   display: flex;
   flex-direction: column;
@@ -4849,7 +4887,12 @@ kbd {
 }
 
 /* Custom Secondary Confirmation Dialog */
+.confirm-dialog-overlay {
+  z-index: 105;
+}
+
 .confirm-dialog {
+  z-index: 106;
   width: 90vw;
   max-width: 440px;
   padding: 24px;

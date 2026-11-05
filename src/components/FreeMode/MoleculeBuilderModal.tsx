@@ -22,6 +22,7 @@ import {
 import { useFreeChemStore, getSampleDocForSlot } from '../../store/useFreeChemStore';
 import { useChemStore, REQUIRED_SLOTS } from '../../store/useChemStore';
 import { CustomSelect } from '../Common/CustomSelect';
+import { ConfirmModal } from '../Common/ConfirmModal';
 import {
   CATEGORY_LABELS,
   ELEMENT_MAP,
@@ -195,6 +196,7 @@ export const MoleculeBuilderModal: React.FC = () => {
   const [showFullPeriodicTable, setShowFullPeriodicTable] = useState<boolean>(false);
   const [categoryFilter, setCategoryFilter] = useState<ElementCategory | 'all'>('all');
   const [renderMode3D, setRenderMode3D] = useState<'ball-stick' | 'spacefill'>('ball-stick');
+  const [confirmResetOpen, setConfirmResetOpen] = useState<boolean>(false);
 
   // 2D Topology Zoom & Pan state
   const [topoZoom, setTopoZoom] = useState<number>(1);
@@ -1368,7 +1370,8 @@ export const MoleculeBuilderModal: React.FC = () => {
   const selectedBond = selectedBondId ? bonds.find((b) => b.id === selectedBondId) : null;
 
   return (
-    <Dialog.Root open={isModalOpen} onOpenChange={(open) => !open && handleCloseModal()}>
+    <>
+      <Dialog.Root open={isModalOpen} onOpenChange={(open) => !open && handleCloseModal()}>
       <Dialog.Portal>
         <Dialog.Overlay className="radix-dialog-overlay" />
         <Dialog.Content
@@ -1448,88 +1451,92 @@ export const MoleculeBuilderModal: React.FC = () => {
                   >
                     <Grid size={15} />
                     <span>{showFullPeriodicTable ? 'Collapse Table' : 'Full Periodic Table'}</span>
-                    {showFullPeriodicTable ? (
-                      <ChevronUp size={14} />
-                    ) : (
-                      <ChevronDown size={14} />
-                    )}
+                    <ChevronDown
+                      size={14}
+                      className={`ptable-chevron-icon ${showFullPeriodicTable ? 'rotate-180' : ''}`}
+                    />
                   </button>
                 </div>
               </div>
 
-              {showFullPeriodicTable && (
-                <div className="ptable-wrapper">
-                  <div className="ptable-category-bar">
-                    <button
-                      type="button"
-                      className={`ptable-cat-chip ${categoryFilter === 'all' ? 'active' : ''}`}
-                      onClick={() => setCategoryFilter('all')}
-                    >
-                      All (118)
-                    </button>
-                    {(
-                      [
-                        ['nonmetal', 'Reactive Nonmetals'],
-                        ['noble-gas', 'Noble Gases'],
-                        ['alkali-metal', 'Alkali Metals'],
-                        ['alkaline-earth', 'Alkaline Earth'],
-                        ['transition', 'Transition Metals'],
-                        ['halogen', 'Halogens'],
-                      ] as const
-                    ).map(([cat, label]) => (
+              <div
+                className={`ptable-collapsible ${showFullPeriodicTable ? 'is-open' : ''}`}
+                aria-hidden={!showFullPeriodicTable}
+              >
+                <div className="ptable-collapsible-inner">
+                  <div className="ptable-wrapper">
+                    <div className="ptable-category-bar">
                       <button
-                        key={cat}
                         type="button"
-                        className={`ptable-cat-chip ${categoryFilter === cat ? 'active' : ''}`}
-                        onClick={() => setCategoryFilter(cat as ElementCategory)}
+                        className={`ptable-cat-chip ${categoryFilter === 'all' ? 'active' : ''}`}
+                        onClick={() => setCategoryFilter('all')}
                       >
-                        {label}
+                        All (118)
                       </button>
-                    ))}
-                  </div>
-
-                  <div className="ptable-grid">
-                    {PERIODIC_TABLE.map((el) => {
-                      const isDim =
-                        categoryFilter !== 'all' && el.category !== categoryFilter;
-                      return (
+                      {(
+                        [
+                          ['nonmetal', 'Reactive Nonmetals'],
+                          ['noble-gas', 'Noble Gases'],
+                          ['alkali-metal', 'Alkali Metals'],
+                          ['alkaline-earth', 'Alkaline Earth'],
+                          ['transition', 'Transition Metals'],
+                          ['halogen', 'Halogens'],
+                        ] as const
+                      ).map(([cat, label]) => (
                         <button
-                          key={el.number}
+                          key={cat}
                           type="button"
-                          className={`ptable-cell cat-${el.category} ${
-                            activeElement === el.symbol ? 'selected' : ''
-                          } ${isDim ? 'dimmed' : ''}`}
-                          style={{
-                            gridRow: el.period,
-                            gridColumn: el.group,
-                          }}
-                          onClick={() => addAtomNode(el.symbol)}
-                          title={`${el.name} (${el.symbol}) · Atomic No. ${el.number}`}
+                          className={`ptable-cat-chip ${categoryFilter === cat ? 'active' : ''}`}
+                          onClick={() => setCategoryFilter(cat as ElementCategory)}
                         >
-                          <span className="pt-num">{el.number}</span>
-                          <span className="pt-sym">{el.symbol}</span>
-                          <span className="pt-name">{el.name}</span>
+                          {label}
                         </button>
-                      );
-                    })}
-
-                    <div
-                      className="ptable-series-placeholder"
-                      style={{ gridRow: 6, gridColumn: 3 }}
-                    >
-                      57-71
-                      <small>Lanthanides</small>
+                      ))}
                     </div>
-                    <div
-                      className="ptable-series-placeholder"
-                      style={{ gridRow: 7, gridColumn: 3 }}
-                    >
-                      89-103
-                      <small>Actinides</small>
+
+                    <div className="ptable-grid">
+                      {PERIODIC_TABLE.map((el) => {
+                        const isDim =
+                          categoryFilter !== 'all' && el.category !== categoryFilter;
+                        return (
+                          <button
+                            key={el.number}
+                            type="button"
+                            className={`ptable-cell cat-${el.category} ${
+                              activeElement === el.symbol ? 'selected' : ''
+                            } ${isDim ? 'dimmed' : ''}`}
+                            style={{
+                              gridRow: el.period,
+                              gridColumn: el.group,
+                            }}
+                            onClick={() => addAtomNode(el.symbol)}
+                            title={`${el.name} (${el.symbol}) · Atomic No. ${el.number}`}
+                          >
+                            <span className="pt-num">{el.number}</span>
+                            <span className="pt-sym">{el.symbol}</span>
+                            <span className="pt-name">{el.name}</span>
+                          </button>
+                        );
+                      })}
+
+                      <div
+                        className="ptable-series-placeholder"
+                        style={{ gridRow: 6, gridColumn: 3 }}
+                      >
+                        57-71
+                        <small>Lanthanides</small>
+                      </div>
+                      <div
+                        className="ptable-series-placeholder"
+                        style={{ gridRow: 7, gridColumn: 3 }}
+                      >
+                        89-103
+                        <small>Actinides</small>
+                      </div>
                     </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Section 2: Two-column workspace (Left: 2D Topology + Live 3D Preview; Right: Parameters Form) */}
@@ -1606,9 +1613,9 @@ export const MoleculeBuilderModal: React.FC = () => {
                       <button
                         type="button"
                         className="canvas-mini-btn danger"
-                        onClick={() => resetEmptyBuilder(!!guidedSlotId)}
-                        title="Clear entire structure"
-                        aria-label="Clear entire structure"
+                        onClick={() => setConfirmResetOpen(true)}
+                        title="Reset entire structure"
+                        aria-label="Reset entire structure"
                       >
                         <RotateCcw size={14} />
                       </button>
@@ -2391,5 +2398,19 @@ export const MoleculeBuilderModal: React.FC = () => {
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+
+    <ConfirmModal
+      open={confirmResetOpen}
+      onOpenChange={setConfirmResetOpen}
+      title="Reset Molecule Structure?"
+      description="Are you sure you want to clear all atoms and bonds on this canvas? This action cannot be undone."
+      confirmLabel="Reset Canvas"
+      danger
+      onConfirm={() => {
+        resetEmptyBuilder(!!guidedSlotId);
+        setConfirmResetOpen(false);
+      }}
+    />
+  </>
   );
 };

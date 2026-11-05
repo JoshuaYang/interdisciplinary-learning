@@ -136,7 +136,7 @@ export const ReactionPESHUD: React.FC<ReactionPESHUDProps> = ({
       <div className="pes-hud-header">
         <div className="pes-hud-title-wrap">
           <Activity size={14} className="pes-hud-icon" />
-          <span className="pes-hud-title">Potential Energy Surface (PES)</span>
+          <span className="pes-hud-title">Potential Energy Surface</span>
         </div>
         <button
           type="button"
