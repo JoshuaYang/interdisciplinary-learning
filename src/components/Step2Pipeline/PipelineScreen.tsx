@@ -298,13 +298,7 @@ export const PipelineScreen: React.FC = () => {
 
           {/* Active Stage Workspace */}
           <div className="pipeline-active-stage" id="pipeline-active-stage">
-            <motion.div
-              key={currentStep.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.18 }}
-              className="pipeline-track-card"
-            >
+            <div className="pipeline-track-card">
               {/* Integrated Stage Tabs Bar */}
               <div className="stage-bar-header">
                 <div className="stage-pills-track" id="pipeline-tabs-nav" role="tablist">
@@ -408,7 +402,7 @@ export const PipelineScreen: React.FC = () => {
                   />
                 </div>
               )}
-            </motion.div>
+            </div>
           </div>
 
           {/* Validation Feedback Card */}

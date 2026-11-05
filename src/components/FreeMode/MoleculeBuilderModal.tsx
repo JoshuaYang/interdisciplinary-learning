@@ -1558,8 +1558,8 @@ export const MoleculeBuilderModal: React.FC = () => {
                         </button>
                       </div>
                     ) : (
-                      <div className="canvas-empty-state-hint">
-                        <span>Click an atom to select · Drag its handle to link bonds</span>
+                      <div className="builder-canvas-header">
+                        <span>2D Molecular Topology Canvas</span>
                       </div>
                     )}
 
