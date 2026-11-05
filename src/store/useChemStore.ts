@@ -77,6 +77,53 @@ const createEmptyPipelineData = (): PipelineData => ({
   },
 });
 
+export type ToastType = 'success' | 'error' | 'warning' | 'info';
+
+export interface ToastPayload {
+  message: string;
+  type: ToastType;
+}
+
+export function inferToastType(msg: string, explicitType?: ToastType): ToastType {
+  if (explicitType) return explicitType;
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes('verified') ||
+    lower.includes('success') ||
+    lower.includes('congratulations') ||
+    lower.includes('unlocked') ||
+    lower.includes('exported') ||
+    lower.includes('restored default') ||
+    lower.includes('auto-filled')
+  ) {
+    return 'success';
+  }
+  if (
+    lower.includes('error') ||
+    lower.includes('failed') ||
+    lower.includes('invalid') ||
+    lower.includes('issue') ||
+    lower.includes('mismatch') ||
+    lower.includes('please add') ||
+    lower.includes('please enter') ||
+    lower.includes('please specify') ||
+    lower.includes('must be connected') ||
+    lower.includes('rejected')
+  ) {
+    return 'error';
+  }
+  if (
+    lower.includes('warning') ||
+    lower.includes('locked') ||
+    lower.includes('deviates') ||
+    lower.includes('only') ||
+    lower.includes('must be kept')
+  ) {
+    return 'warning';
+  }
+  return 'info';
+}
+
 export function buildGuidedStudentDoc(builderDoc: any): any {
   const nodes = builderDoc.nodes || [];
   const bonds = builderDoc.bonds || [];
@@ -158,11 +205,12 @@ export interface ChemStoreState {
   // Dialogs & Toast
   configDialogOpen: boolean;
   helpDialogOpen: boolean;
+  toast: ToastPayload | null;
   toastMessage: string | null;
   resetCameraTrigger: number;
 
   // Actions
-  showToast: (msg: string) => void;
+  showToast: (msg: string, type?: ToastType) => void;
   setScreen: (screen: 'gate' | 'pipeline' | 'stage') => void;
   setPreviewSlotId: (id: string | null) => void;
   openBuilderForSlot: (slotId: string) => void;
@@ -259,14 +307,19 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
 
   configDialogOpen: false,
   helpDialogOpen: false,
+  toast: null,
   toastMessage: null,
   resetCameraTrigger: 0,
 
-  showToast: (msg: string) => {
+  showToast: (msg: string, type?: ToastType) => {
     clearTimeout(toastTimer);
-    set({ toastMessage: msg });
+    const resolvedType = inferToastType(msg, type);
+    set({
+      toast: { message: msg, type: resolvedType },
+      toastMessage: msg,
+    });
     toastTimer = setTimeout(() => {
-      set({ toastMessage: null });
+      set({ toast: null, toastMessage: null });
     }, 4200);
   },
 
@@ -279,10 +332,10 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     const result = get().verifySingleDoc(guidedDoc, slotId);
     if (result.success) {
       get().showToast(`Verified: ${guidedDoc.name} (${guidedDoc.formula}) configuration is valid!`);
+      set({ builderSlotId: null });
     } else {
       get().showToast(`Verification issue: ${result.error}`);
     }
-    set({ builderSlotId: null });
     return result;
   },
   setConfigDialogOpen: (open) => {

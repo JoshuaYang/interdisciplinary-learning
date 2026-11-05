@@ -1,4 +1,6 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { AlertCircle, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 import { Header } from './components/Header';
 import { GateScreen } from './components/Step1Gate/GateScreen';
 import { PipelineScreen } from './components/Step2Pipeline/PipelineScreen';
@@ -18,7 +20,7 @@ import * as freeEngine from './engine/freeReactionEngine';
 
 export const App: React.FC = () => {
   const screen = useChemStore((s) => s.screen);
-  const toastMessage = useChemStore((s) => s.toastMessage);
+  const toast = useChemStore((s) => s.toast);
   const loadDefault = useChemStore((s) => s.loadDefault);
 
   const appMode = useFreeChemStore((s) => s.appMode);
@@ -196,15 +198,25 @@ export const App: React.FC = () => {
         </>
       )}
 
-      <div
-        className="toast"
-        id="toast"
-        role="status"
-        aria-live="polite"
-        hidden={!toastMessage}
-      >
-        {toastMessage}
-      </div>
+      {typeof document !== 'undefined' &&
+        toast &&
+        createPortal(
+          <div
+            className={`toast toast-${toast.type}`}
+            id="toast"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="toast-icon-wrap" aria-hidden="true">
+              {toast.type === 'success' && <CheckCircle2 size={16} />}
+              {toast.type === 'error' && <AlertCircle size={16} />}
+              {toast.type === 'warning' && <AlertTriangle size={16} />}
+              {toast.type === 'info' && <Info size={16} />}
+            </span>
+            <span className="toast-message-text">{toast.message}</span>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

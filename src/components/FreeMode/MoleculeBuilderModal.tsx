@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three';
 import * as Dialog from '@radix-ui/react-dialog';
 import {
+  AlertCircle,
   Atom,
   ChevronDown,
   ChevronUp,
@@ -228,6 +229,18 @@ export const MoleculeBuilderModal: React.FC = () => {
     panX: 0,
     panY: 0,
   });
+
+  // Modal validation / save error notification
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saveErrorTimerRef = useRef<any>(null);
+
+  const triggerSaveError = useCallback((msg: string) => {
+    clearTimeout(saveErrorTimerRef.current);
+    setSaveError(msg);
+    saveErrorTimerRef.current = setTimeout(() => {
+      setSaveError(null);
+    }, 4500);
+  }, []);
 
   // Isolate 2D canvas wheel scrolling: prevent whole dialog from scrolling
   useEffect(() => {
@@ -947,36 +960,52 @@ export const MoleculeBuilderModal: React.FC = () => {
   // Save the constructed molecule into the Zustand store
   const handleSaveMolecule = () => {
     if (nodes.length === 0) {
-      showToast('Please add at least one atom to the structure.');
+      const err = 'Please add atoms from the periodic table above before saving.';
+      showToast(err);
+      triggerSaveError(err);
       return;
     }
     if (!connectedGraph) {
-      showToast('All atoms in the molecule must be connected into a single structure.');
+      const err = 'All atoms in the molecule must be connected into a single structure.';
+      showToast(err);
+      triggerSaveError(err);
       return;
     }
     if (!geometry) {
-      showToast('Please specify the Spatial Geometry (e.g. tetrahedral, linear).');
+      const err = 'Please specify the Spatial Geometry (e.g. tetrahedral, linear).';
+      showToast(err);
+      triggerSaveError(err);
       return;
     }
     for (const bk of activeBondKeys) {
       if (!bondLengthsInput[bk] || Number(bondLengthsInput[bk]) <= 0) {
-        showToast(`Please enter a valid bond length for ${bk}.`);
+        const err = `Please enter a valid bond length for ${bk}.`;
+        showToast(err);
+        triggerSaveError(err);
         return;
       }
     }
     for (const ak of activeAngleKeys) {
       if (!bondAnglesInput[ak] || Number(bondAnglesInput[ak]) <= 0) {
-        showToast(`Please enter a valid bond angle for ${ak}.`);
+        const err = `Please enter a valid bond angle for ${ak}.`;
+        showToast(err);
+        triggerSaveError(err);
         return;
       }
     }
     if (!currentDoc) {
-      showToast('Invalid molecule configuration. Please check the parameter inputs.');
+      const err = 'Invalid molecule configuration. Please check the parameter inputs.';
+      showToast(err);
+      triggerSaveError(err);
       return;
     }
 
     if (guidedSlotId) {
-      saveDocForSlot(guidedSlotId, currentDoc);
+      const res = saveDocForSlot(guidedSlotId, currentDoc);
+      if (!res.success) {
+        triggerSaveError(res.error || 'Verification issue. Please review the structure.');
+        return;
+      }
       handleCloseModal();
     } else {
       saveMoleculeDoc(currentDoc, editingMolId);
@@ -2298,21 +2327,31 @@ export const MoleculeBuilderModal: React.FC = () => {
           {/* Fixed Modal Bottom Bar: Cancel on left, Save on right */}
           <footer className="mol-builder-fixed-footer">
             <div className="mol-builder-footer-inner">
-              <button
-                type="button"
-                className="toolbar-btn-outline"
-                onClick={handleCloseModal}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                id="builder-save-mol-btn"
-                className="primary-button"
-                onClick={handleSaveMolecule}
-              >
-                <span>Save</span>
-              </button>
+              <div className="mol-builder-footer-feedback">
+                {saveError && (
+                  <div className="mol-builder-save-error" role="alert">
+                    <AlertCircle size={15} />
+                    <span>{saveError}</span>
+                  </div>
+                )}
+              </div>
+              <div className="mol-builder-footer-btns">
+                <button
+                  type="button"
+                  className="toolbar-btn-outline"
+                  onClick={handleCloseModal}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  id="builder-save-mol-btn"
+                  className="primary-button"
+                  onClick={handleSaveMolecule}
+                >
+                  <span>Save</span>
+                </button>
+              </div>
             </div>
           </footer>
         </Dialog.Content>
