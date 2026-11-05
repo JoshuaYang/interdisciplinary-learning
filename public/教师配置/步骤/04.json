@@ -1,50 +1,101 @@
 {
-  "title": "首次碰撞反应",
-  "shortTitle": "碰撞反应 ①",
-  "phase": "链增长 ①",
+  "title": "First Collision & H-Abstraction",
+  "shortTitle": "Collision ①",
+  "phase": "Propagation ①",
   "formula": "Br· + CH₄  →  CH₃· + HBr",
-  "description": "观察活性微粒与甲烷碰撞时，哪些共价键发生断裂，并形成了什么新的微粒。",
-  "note": "追踪被转移的 H4 原子运动轨迹，观察碳原子的构型变化与成键状态。",
+  "description": "Observe which covalent bond breaks and which new species form when the bromine radical collides with methane.",
+  "note": "Track the transferred H4 atom and observe the geometry transition of carbon from tetrahedral to trigonal planar.",
   "instances": [
     {
       "molecule": "CH3",
-      "position": [2.15, 0.45, 0],
-      "rotation": [0, -53.130102, 0],
-      "atomMap": {"c": "C", "h1": "H1", "h2": "H2", "h3": "H3"},
+      "position": [
+        2.15,
+        0.45,
+        0
+      ],
+      "rotation": [
+        0,
+        -53.130102,
+        0
+      ],
+      "atomMap": {
+        "c": "C",
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3"
+      },
       "role": "focus"
     },
     {
       "molecule": "HBr",
-      "position": [-2.6, 0.45, 0],
-      "rotation": [0, 0, 0],
-      "atomMap": {"h": "H4", "br": "BrB"},
+      "position": [
+        -2.6,
+        0.45,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "atomMap": {
+        "h": "H4",
+        "br": "BrB"
+      },
       "role": "focus"
     },
     {
       "molecule": "Br",
-      "position": [-3.8, -2.4, -0.5],
-      "rotation": [0, 0, 0],
-      "atomMap": {"br": "BrA"},
+      "position": [
+        -3.8,
+        -2.4,
+        -0.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "atomMap": {
+        "br": "BrA"
+      },
       "role": "context",
-      "caption": "另一 Br· · 仍在体系中"
+      "caption": "Other Br· · still in system"
     },
     {
       "molecule": "Br2",
-      "position": [3.1, -2.4, -0.5],
-      "rotation": [0, 0, 0],
-      "atomMap": {"br1": "BrD", "br2": "BrC"},
+      "position": [
+        3.1,
+        -2.4,
+        -0.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "atomMap": {
+        "br1": "BrD",
+        "br2": "BrC"
+      },
       "role": "context",
-      "caption": "另一分子 Br₂ · 随后参与"
+      "caption": "Another Br₂ · participates later"
     }
   ],
   "transition": {
     "kind": "reaction",
     "duration": 5,
     "breakBonds": [
-      ["C", "H4"]
+      [
+        "C",
+        "H4"
+      ]
     ],
     "formBonds": [
-      ["H4", "BrB"]
+      [
+        "H4",
+        "BrB"
+      ]
     ]
   }
 }

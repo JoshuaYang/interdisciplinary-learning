@@ -1,41 +1,91 @@
 {
-  "title": "产物与净反应",
-  "shortTitle": "产物总结",
-  "phase": "总结",
+  "title": "Products & Net Reaction Summary",
+  "shortTitle": "Net Summary",
+  "phase": "Summary",
   "formula": "CH₄ + Br₂  →  CH₃Br + HBr",
-  "description": "纵观全过程物料转化，总结一溴代反应的净化学方程式与共价键总变化。",
-  "note": "这是链增长的净反应总结，不是链终止。两个溴自由基仍保留在背景。",
+  "description": "Review the overall transformation and summarize the net equation and covalent bond changes of monobromination.",
+  "note": "This is the net summary of chain propagation, not chain termination. Two bromine radicals remain in the background.",
   "instances": [
     {
       "molecule": "CH3Br",
-      "position": [2.15, 0.45, 0],
-      "rotation": [0, -53.130102, 0],
-      "atomMap": {"c": "C", "h1": "H1", "h2": "H2", "h3": "H3", "br": "BrC"},
+      "position": [
+        2.15,
+        0.45,
+        0
+      ],
+      "rotation": [
+        0,
+        -53.130102,
+        0
+      ],
+      "atomMap": {
+        "c": "C",
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "br": "BrC"
+      },
       "role": "focus"
     },
     {
       "molecule": "HBr",
-      "position": [-2.6, 0.45, 0],
-      "rotation": [0, 0, 0],
-      "atomMap": {"h": "H4", "br": "BrB"},
+      "position": [
+        -2.6,
+        0.45,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "atomMap": {
+        "h": "H4",
+        "br": "BrB"
+      },
       "role": "focus"
     },
     {
       "molecule": "Br",
-      "position": [-3.8, -2.4, -0.5],
-      "rotation": [0, 0, 0],
-      "atomMap": {"br": "BrA"},
+      "position": [
+        -3.8,
+        -2.4,
+        -0.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "atomMap": {
+        "br": "BrA"
+      },
       "role": "context",
-      "caption": "另一 Br· · 仍在体系中"
+      "caption": "Other Br· · still in system"
     },
     {
       "molecule": "Br",
-      "position": [3.3, -2.4, -0.5],
-      "rotation": [0, 0, 0],
-      "atomMap": {"br": "BrD"},
+      "position": [
+        3.3,
+        -2.4,
+        -0.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "atomMap": {
+        "br": "BrD"
+      },
       "role": "context",
-      "caption": "再生的 Br· · 可继续反应"
+      "caption": "Regenerated Br· · continues cycle"
     }
   ],
-  "transition": {"kind": "summary", "duration": 3, "breakBonds": [], "formBonds": []}
+  "transition": {
+    "kind": "summary",
+    "duration": 3,
+    "breakBonds": [],
+    "formBonds": []
+  }
 }

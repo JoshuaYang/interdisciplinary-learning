@@ -488,37 +488,9 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
   },
 
   loadDefault: async () => {
-    if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
-      const bundle = (window as any).CHEM_DEFAULT_FILES || CHEM_DEFAULT_FILES;
-      set({ baseData: bundle });
-      get().loadPreset(true);
-      return;
-    }
-    try {
-      async function read(path: string) {
-        const r = await fetch(path, { cache: 'no-store' });
-        if (!r.ok) throw new Error(`${path} (HTTP ${r.status})`);
-        return await r.json();
-      }
-      const project = await read('教师配置/项目.json');
-      files.checkManifest(project);
-      const [catalog, steps, students] = await Promise.all([
-        read('教师配置/分子参考.json'),
-        Promise.all(
-          project.stepFiles.map((f: string) => read('教师配置/步骤/' + encodeURIComponent(f)))
-        ),
-        Promise.all(
-          project.moleculeFiles.map((f: string) =>
-            read('教师配置/标准答案/' + encodeURIComponent(f))
-          )
-        ),
-      ]);
-      set({ baseData: { project, catalog, steps, students } });
-      get().loadPreset(true);
-    } catch {
-      set({ baseData: CHEM_DEFAULT_FILES });
-      get().loadPreset(true);
-    }
+    const bundle = (typeof window !== 'undefined' && (window as any).CHEM_DEFAULT_FILES) || CHEM_DEFAULT_FILES;
+    set({ baseData: bundle });
+    get().loadPreset(true);
   },
 
   setSelectedPoolMol: (id) => set({ selectedPoolMol: id }),

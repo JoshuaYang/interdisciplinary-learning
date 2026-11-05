@@ -1,5 +1,5 @@
 {
-  "name": "溴化氢",
+  "name": "Hydrogen Bromide",
   "formula": "HBr",
   "atoms": [
     "H",
@@ -9,5 +9,5 @@
   "bondLengths": {
     "H-Br": 1.414
   },
-  "description": "溴化氢在溴自由基夺取甲烷中的氢时形成。"
+  "description": "Hydrogen bromide is formed when a bromine radical abstracts a hydrogen atom from methane."
 }

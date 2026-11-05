@@ -1,41 +1,91 @@
 {
-  "title": "中间体接近溴单质",
-  "shortTitle": "接近另一分子 Br₂",
-  "phase": "链增长 ②",
+  "title": "Intermediate Approaches Bromine",
+  "shortTitle": "Approach Br₂",
+  "phase": "Propagation ②",
   "formula": "CH₃· + Br₂",
-  "description": "观察反应生成的含碳活性中间体在体系中向另一分子溴单质靠拢，准备下一次反应。",
-  "note": "已生成的产物移到背景；体系中另一分子 Br₂ 作为反应物进入视野。",
+  "description": "Observe the reactive methyl radical intermediate approaching another bromine molecule in the system.",
+  "note": "Previously formed HBr moves to the background; another Br₂ molecule enters focus.",
   "instances": [
     {
       "molecule": "CH3",
-      "position": [2.15, 0.45, 0],
-      "rotation": [0, -53.130102, 0],
-      "atomMap": {"c": "C", "h1": "H1", "h2": "H2", "h3": "H3"},
+      "position": [
+        2.15,
+        0.45,
+        0
+      ],
+      "rotation": [
+        0,
+        -53.130102,
+        0
+      ],
+      "atomMap": {
+        "c": "C",
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3"
+      },
       "role": "focus"
     },
     {
       "molecule": "Br2",
-      "position": [-2.6, 0.45, 0.7],
-      "rotation": [0, 0, 0],
-      "atomMap": {"br1": "BrD", "br2": "BrC"},
+      "position": [
+        -2.6,
+        0.45,
+        0.7
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "atomMap": {
+        "br1": "BrD",
+        "br2": "BrC"
+      },
       "role": "focus"
     },
     {
       "molecule": "Br",
-      "position": [-3.8, -2.4, -0.5],
-      "rotation": [0, 0, 0],
-      "atomMap": {"br": "BrA"},
+      "position": [
+        -3.8,
+        -2.4,
+        -0.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "atomMap": {
+        "br": "BrA"
+      },
       "role": "context",
-      "caption": "另一 Br· · 仍在体系中"
+      "caption": "Other Br· · still in system"
     },
     {
       "molecule": "HBr",
-      "position": [3.1, -2.4, -0.5],
-      "rotation": [0, 0, 0],
-      "atomMap": {"h": "H4", "br": "BrB"},
+      "position": [
+        3.1,
+        -2.4,
+        -0.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "atomMap": {
+        "h": "H4",
+        "br": "BrB"
+      },
       "role": "context",
-      "caption": "HBr · 已生成"
+      "caption": "HBr · formed earlier"
     }
   ],
-  "transition": {"kind": "reframe", "duration": 3, "breakBonds": [], "formBonds": []}
+  "transition": {
+    "kind": "reframe",
+    "duration": 3,
+    "breakBonds": [],
+    "formBonds": []
+  }
 }

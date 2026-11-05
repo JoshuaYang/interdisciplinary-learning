@@ -1,65 +1,198 @@
 {
   "CH4": {
-    "name": "甲烷",
+    "name": "Methane",
     "formula": "CH₄",
-    "geometry": "正四面体",
+    "geometry": "Regular Tetrahedral",
     "measurements": [
-      {"label": "C—H", "atoms": ["c", "h1"], "value": 1.087, "tolerance": 0.01},
-      {"label": "H—C—H", "atoms": ["h1", "c", "h2"], "value": 109.471, "tolerance": 0.5}
+      {
+        "label": "C—H",
+        "atoms": [
+          "c",
+          "h1"
+        ],
+        "value": 1.087,
+        "tolerance": 0.01
+      },
+      {
+        "label": "H—C—H",
+        "atoms": [
+          "h1",
+          "c",
+          "h2"
+        ],
+        "value": 109.471,
+        "tolerance": 0.5
+      }
     ],
-    "reference": {"status": "参考值，待化学老师确认", "source": "NIST CCCBDB", "url": "https://cccbdb.nist.gov/exp2x.asp?casno=74828&charge=0"},
-    "elements": {"c": "C", "h1": "H", "h2": "H", "h3": "H", "h4": "H"}
+    "reference": {
+      "status": "Reference value (NIST CCCBDB)",
+      "source": "NIST CCCBDB",
+      "url": "https://cccbdb.nist.gov/exp2x.asp?casno=74828&charge=0"
+    },
+    "elements": {
+      "c": "C",
+      "h1": "H",
+      "h2": "H",
+      "h3": "H",
+      "h4": "H"
+    }
   },
   "CH3": {
-    "name": "甲基自由基",
+    "name": "Methyl Radical",
     "formula": "CH₃·",
-    "geometry": "平面三角形",
+    "geometry": "Trigonal Planar",
     "measurements": [
-      {"label": "C—H", "atoms": ["c", "h1"], "value": 1.079, "tolerance": 0.01},
-      {"label": "H—C—H", "atoms": ["h1", "c", "h2"], "value": 120, "tolerance": 0.5}
+      {
+        "label": "C—H",
+        "atoms": [
+          "c",
+          "h1"
+        ],
+        "value": 1.079,
+        "tolerance": 0.01
+      },
+      {
+        "label": "H—C—H",
+        "atoms": [
+          "h1",
+          "c",
+          "h2"
+        ],
+        "value": 120,
+        "tolerance": 0.5
+      }
     ],
-    "reference": {"status": "参考值，待化学老师确认", "source": "NIST CCCBDB", "url": "https://cccbdb.nist.gov/exp2x.asp?casno=2229074"},
-    "elements": {"c": "C", "h1": "H", "h2": "H", "h3": "H"}
+    "reference": {
+      "status": "Reference value (NIST CCCBDB)",
+      "source": "NIST CCCBDB",
+      "url": "https://cccbdb.nist.gov/exp2x.asp?casno=2229074"
+    },
+    "elements": {
+      "c": "C",
+      "h1": "H",
+      "h2": "H",
+      "h3": "H"
+    }
   },
   "CH3Br": {
-    "name": "一溴甲烷",
+    "name": "Bromomethane",
     "formula": "CH₃Br",
-    "geometry": "四面体构型",
+    "geometry": "Tetrahedral",
     "measurements": [
-      {"label": "C—Br", "atoms": ["c", "br"], "value": 1.939, "tolerance": 0.01},
-      {"label": "C—H", "atoms": ["c", "h1"], "value": 1.09, "tolerance": 0.01},
-      {"label": "H—C—Br", "atoms": ["h1", "c", "br"], "value": 107.5, "tolerance": 0.5},
-      {"label": "H—C—H", "atoms": ["h1", "c", "h2"], "value": 111.37, "tolerance": 0.5}
+      {
+        "label": "C—Br",
+        "atoms": [
+          "c",
+          "br"
+        ],
+        "value": 1.939,
+        "tolerance": 0.01
+      },
+      {
+        "label": "C—H",
+        "atoms": [
+          "c",
+          "h1"
+        ],
+        "value": 1.09,
+        "tolerance": 0.01
+      },
+      {
+        "label": "H—C—Br",
+        "atoms": [
+          "h1",
+          "c",
+          "br"
+        ],
+        "value": 107.5,
+        "tolerance": 0.5
+      },
+      {
+        "label": "H—C—H",
+        "atoms": [
+          "h1",
+          "c",
+          "h2"
+        ],
+        "value": 111.37,
+        "tolerance": 0.5
+      }
     ],
-    "reference": {"status": "参考值，待化学老师确认", "source": "NIST CCCBDB", "url": "https://cccbdb.nist.gov/exp2x.asp?casno=74839&charge=0"},
-    "elements": {"c": "C", "h1": "H", "h2": "H", "h3": "H", "br": "Br"}
+    "reference": {
+      "status": "Reference value (NIST CCCBDB)",
+      "source": "NIST CCCBDB",
+      "url": "https://cccbdb.nist.gov/exp2x.asp?casno=74839&charge=0"
+    },
+    "elements": {
+      "c": "C",
+      "h1": "H",
+      "h2": "H",
+      "h3": "H",
+      "br": "Br"
+    }
   },
   "Br2": {
-    "name": "溴单质",
+    "name": "Bromine",
     "formula": "Br₂",
-    "geometry": "双原子分子",
+    "geometry": "Diatomic",
     "measurements": [
-      {"label": "Br—Br", "atoms": ["br1", "br2"], "value": 2.281, "tolerance": 0.01}
+      {
+        "label": "Br—Br",
+        "atoms": [
+          "br1",
+          "br2"
+        ],
+        "value": 2.281,
+        "tolerance": 0.01
+      }
     ],
-    "reference": {"status": "参考值，待化学老师确认", "source": "NIST CCCBDB", "url": "https://cccbdb.nist.gov/exp2x.asp?casno=7726956&charge=0"},
-    "elements": {"br1": "Br", "br2": "Br"}
+    "reference": {
+      "status": "Reference value (NIST CCCBDB)",
+      "source": "NIST CCCBDB",
+      "url": "https://cccbdb.nist.gov/exp2x.asp?casno=7726956&charge=0"
+    },
+    "elements": {
+      "br1": "Br",
+      "br2": "Br"
+    }
   },
   "Br": {
-    "name": "溴自由基",
+    "name": "Bromine Radical",
     "formula": "Br·",
-    "geometry": "单原子自由基",
+    "geometry": "Monatomic Radical",
     "measurements": [],
-    "reference": {"status": "课件中的溴自由基", "source": "化学教学大纲", "url": ""},
-    "elements": {"br": "Br"}
+    "reference": {
+      "status": "Bromine radical intermediate",
+      "source": "Chemistry Curriculum",
+      "url": ""
+    },
+    "elements": {
+      "br": "Br"
+    }
   },
   "HBr": {
-    "name": "溴化氢",
+    "name": "Hydrogen Bromide",
     "formula": "HBr",
-    "geometry": "双原子分子",
+    "geometry": "Diatomic",
     "measurements": [
-      {"label": "H—Br", "atoms": ["h", "br"], "value": 1.414, "tolerance": 0.01}
+      {
+        "label": "H—Br",
+        "atoms": [
+          "h",
+          "br"
+        ],
+        "value": 1.414,
+        "tolerance": 0.01
+      }
     ],
-    "reference": {"status": "参考值，待化学老师确认", "source": "NIST CCCBDB", "url": "https://cccbdb.nist.gov/exp2x.asp?casno=10035106&charge=0"},
-    "elements": {"h": "H", "br": "Br"}
+    "reference": {
+      "status": "Reference value (NIST CCCBDB)",
+      "source": "NIST CCCBDB",
+      "url": "https://cccbdb.nist.gov/exp2x.asp?casno=10035106&charge=0"
+    },
+    "elements": {
+      "h": "H",
+      "br": "Br"
+    }
   }
 }

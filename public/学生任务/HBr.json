@@ -1,8 +1,13 @@
 {
-  "name": "溴化氢",
-  "formula": "",
-  "atoms": [],
-  "geometry": "",
-  "bondLengths": {},
-  "description": ""
+  "name": "Hydrogen Bromide",
+  "formula": "HBr",
+  "atoms": [
+    "H",
+    "Br"
+  ],
+  "geometry": "diatomic",
+  "bondLengths": {
+    "H-Br": 1.414
+  },
+  "description": "Hydrogen bromide is formed when a bromine radical abstracts a hydrogen atom from methane."
 }

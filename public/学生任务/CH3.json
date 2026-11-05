@@ -1,12 +1,20 @@
 {
-  "name": "甲基自由基",
-  "formula": "",
-  "center": "",
-  "neighbors": [],
-  "geometry": "",
-  "bondLengths": {},
-  "unpairedElectrons": null,
-  "bondAngles": {},
-  "hybridization": "",
-  "description": ""
+  "name": "Methyl Radical",
+  "formula": "CH3·",
+  "center": "C",
+  "neighbors": [
+    "H",
+    "H",
+    "H"
+  ],
+  "geometry": "trigonalPlanar",
+  "bondLengths": {
+    "C-H": 1.079
+  },
+  "unpairedElectrons": 1,
+  "bondAngles": {
+    "H-C-H": 120
+  },
+  "hybridization": "sp2",
+  "description": "The methyl radical reacts with bromine to form bromomethane and regenerate a bromine radical."
 }

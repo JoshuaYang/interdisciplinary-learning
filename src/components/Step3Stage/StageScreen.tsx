@@ -11,11 +11,16 @@ import {
   HelpCircle,
   Lock,
   RotateCcw,
+  Shield,
   Sparkles,
+  Target,
+  TrendingUp,
 } from 'lucide-react';
 import { useChemStore } from '../../store/useChemStore';
 import { CustomSelect } from '../Common/CustomSelect';
 import { ReactionPESHUD } from '../Common/ReactionPESHUD';
+import { CurvedMechanismArrows, type ArrowSpec } from '../Common/CurvedArrowFX';
+import { BondCleavageFX, type ActiveBondCleavage } from '../Common/BondCleavageFX';
 import * as core from '../../engine/core';
 import * as deduction from '../../engine/deduction';
 import type { ChemConfig, CompiledState, StepInstance } from '../../types/chem';
@@ -118,6 +123,22 @@ export const StageScreen: React.FC = () => {
     setDeductionFeedback(null);
   }, [index]);
 
+  const [showArrows, setShowArrows] = useState(true);
+  const [showVdwShell, setShowVdwShell] = useState(false);
+  const [focusedAtomId, setFocusedAtomId] = useState<string | null>(null);
+
+  const showArrowsRef = useRef(true);
+  const showVdwShellRef = useRef(false);
+  const focusedAtomIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    showArrowsRef.current = showArrows;
+  }, [showArrows]);
+
+  useEffect(() => {
+    showVdwShellRef.current = showVdwShell;
+  }, [showVdwShell]);
+
   const rotationRef = useRef({ x: 0.1, y: 0.12 });
   const zoomRef = useRef(1);
   const currentSampleRef = useRef<CompiledState | null>(null);
@@ -125,6 +146,8 @@ export const StageScreen: React.FC = () => {
   useEffect(() => {
     rotationRef.current = { x: 0.1, y: 0.12 };
     zoomRef.current = 1;
+    focusedAtomIdRef.current = null;
+    setFocusedAtomId(null);
   }, [resetCameraTrigger]);
 
   useEffect(() => {
@@ -190,9 +213,18 @@ export const StageScreen: React.FC = () => {
 
     const meshes = new Map<
       string,
-      { mesh: THREE.Mesh; label: THREE.Sprite; dot: THREE.Mesh; element: string }
+      {
+        mesh: THREE.Mesh;
+        label: THREE.Sprite;
+        dot: THREE.Mesh;
+        vdwShell: THREE.Mesh;
+        element: string;
+      }
     >();
     const bonds = new Map<string, THREE.Mesh[]>();
+
+    const mechArrows = new CurvedMechanismArrows();
+    root.add(mechArrows.group);
 
     for (const [id, a] of Object.entries(states[0].atoms)) {
       const material = new THREE.MeshStandardMaterial({
@@ -223,21 +255,26 @@ export const StageScreen: React.FC = () => {
       );
       dot.scale.setScalar(0.075);
 
-      root.add(mesh, label, dot);
-      meshes.set(id, { mesh, label, dot, element: a.element });
+      const vdwShell = new THREE.Mesh(
+        sphereGeo,
+        new THREE.MeshBasicMaterial({
+          color: new THREE.Color(COLORS[a.element]),
+          wireframe: true,
+          transparent: true,
+          opacity: 0.18,
+          depthWrite: false,
+        })
+      );
+      vdwShell.scale.setScalar(RADII[a.element] * 2.18);
+      vdwShell.visible = false;
+
+      root.add(mesh, label, dot, vdwShell);
+      meshes.set(id, { mesh, label, dot, vdwShell, element: a.element });
     }
 
-    // Transition State Quantum Shockwave Mesh (expands on bond break/formation at progress ~ 0.5)
-    const shockwaveGeo = new THREE.RingGeometry(0.12, 0.28, 36);
-    const shockwaveMat = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0,
-      depthWrite: false,
-    });
-    const shockwaveMesh = new THREE.Mesh(shockwaveGeo, shockwaveMat);
-    root.add(shockwaveMesh);
+    // High-fidelity Microscopic Quantum Bond Cleavage & Formation FX
+    const cleavageFX = new BondCleavageFX();
+    root.add(cleavageFX.group);
 
     const allBonds = new Map<string, { atoms: [string, string] }>();
     states.forEach((s) =>
@@ -301,9 +338,32 @@ export const StageScreen: React.FC = () => {
       }
     };
 
+    const currentPivot = new THREE.Vector3(0, 0, 0);
+    const targetPivot = new THREE.Vector3(0, 0, 0);
+    let targetZoom = 1.0;
+
     const draw = (state: CompiledState) => {
       const st = useChemStore.getState();
       syncLabels(st.index, st.progress);
+
+      // Cinematic Focus Lock Lerp
+      const focusId = focusedAtomIdRef.current;
+      if (focusId && state.atoms[focusId]) {
+        const atomPos = state.atoms[focusId].position;
+        targetPivot.set(atomPos[0], atomPos[1], atomPos[2]);
+        targetZoom = 1.85;
+      } else {
+        targetPivot.set(0, 0, 0);
+        targetZoom = 1.0;
+      }
+      currentPivot.lerp(targetPivot, 0.08);
+      root.position.set(-currentPivot.x, -currentPivot.y, -currentPivot.z);
+
+      const zoomDiff = targetZoom - zoomRef.current;
+      if (Math.abs(zoomDiff) > 0.005) {
+        zoomRef.current += zoomDiff * 0.08;
+        resize();
+      }
 
       root.rotation.set(rotationRef.current.x, rotationRef.current.y, 0);
       root.updateMatrixWorld(true);
@@ -320,6 +380,7 @@ export const StageScreen: React.FC = () => {
           obj.mesh.visible = false;
           obj.label.visible = false;
           obj.dot.visible = false;
+          obj.vdwShell.visible = false;
           continue;
         }
         obj.mesh.visible = true;
@@ -332,6 +393,15 @@ export const StageScreen: React.FC = () => {
         obj.mesh.castShadow = a.opacity > 0.7;
         meshMat.emissive.setHex(st.selection === id ? SELECTION_EMISSIVE : 0x000000);
         meshMat.emissiveIntensity = 0.35;
+
+        // Steric Clash Van der Waals Wireframe Shell Update
+        obj.vdwShell.position.copy(obj.mesh.position);
+        const isVdwVisible =
+          showVdwShellRef.current && a.opacity > 0.05 && (a.opacity > 0.5 || st.showContext);
+        obj.vdwShell.visible = isVdwVisible;
+        if (isVdwVisible) {
+          (obj.vdwShell.material as THREE.MeshBasicMaterial).opacity = a.opacity * 0.22;
+        }
 
         obj.label.position
           .copy(obj.mesh.position)
@@ -353,28 +423,10 @@ export const StageScreen: React.FC = () => {
         }
       }
 
-      // Transition State Quantum Burst Shockwave Update
-      const tsDelta = Math.abs(st.progress - 0.5);
-      if (tsDelta < 0.12) {
-        const norm = 1 - tsDelta / 0.12; // 0 -> 1 -> 0
-        shockwaveMesh.visible = true;
-        const ringScale = 1.0 + (1 - norm) * 4.6;
-        shockwaveMesh.scale.set(ringScale, ringScale, ringScale);
-        shockwaveMat.opacity = Math.pow(norm, 1.8) * 0.8;
-        shockwaveMesh.quaternion.copy(camera.quaternion);
-
-        const primaryAtoms = Object.values(state.atoms).filter((a) => a.opacity > 0.8);
-        if (primaryAtoms.length > 0) {
-          const avgX = primaryAtoms.reduce((s, a) => s + a.position[0], 0) / primaryAtoms.length;
-          const avgY = primaryAtoms.reduce((s, a) => s + a.position[1], 0) / primaryAtoms.length;
-          const avgZ = primaryAtoms.reduce((s, a) => s + a.position[2], 0) / primaryAtoms.length;
-          shockwaveMesh.position.set(avgX, avgY, avgZ);
-        }
-      } else {
-        shockwaveMesh.visible = false;
-      }
-
       const axis = new THREE.Vector3(0, 1, 0);
+      let activeCleavage: ActiveBondCleavage | null = null;
+      let minTsDelta = Infinity;
+
       for (const [k, pair] of bonds) {
         const b = state.bonds[k];
         if (!b || b.weight < 0.01 || (b.opacity < 0.5 && !st.showContext)) {
@@ -385,27 +437,132 @@ export const StageScreen: React.FC = () => {
         const z = new THREE.Vector3(...state.atoms[b.atoms[1]].position);
         const direction = z.clone().sub(a);
         const len = direction.length();
+        const dirNorm = direction.clone().normalize();
+
+        const isTransitionBond = b.weight > 0.01 && b.weight < 0.94;
+        const normalHalf = len / 2;
+        // Physical fracture gap: as bond weakens, stubs snap back toward parent atoms
+        const gapFactor = isTransitionBond ? Math.pow(1 - b.weight, 1.4) : 0;
+        const stubLen = Math.max(0.04, normalHalf * (1 - gapFactor * 0.72));
+
+        if (isTransitionBond) {
+          const delta = Math.abs(b.weight - 0.5);
+          if (delta < minTsDelta) {
+            minTsDelta = delta;
+            activeCleavage = { id: k, posA: a, posB: z, weight: b.weight };
+          }
+        }
+
         pair.forEach((m, i) => {
           m.visible = true;
-          m.position.copy(a).lerp(z, i === 0 ? 0.25 : 0.75);
-          m.quaternion.setFromUnitVectors(axis, direction.clone().normalize());
-          m.scale.set(0.065, len / 2, 0.065);
+          // Atom 0 stub center is at stubLen / 2; Atom 1 stub center is at len - stubLen / 2
+          const centerDist = i === 0 ? stubLen / 2 : len - stubLen / 2;
+          const stubCenter = a.clone().addScaledVector(dirNorm, centerDist);
+          m.position.copy(stubCenter);
+          m.quaternion.setFromUnitVectors(axis, dirNorm);
+
+          // Necking: middle narrows under mechanical tension
+          const neckFactor = isTransitionBond ? 1 - 0.32 * Math.sin(b.weight * Math.PI) : 1;
+          const bondRadius = 0.065 * neckFactor;
+          m.scale.set(bondRadius, stubLen, bondRadius);
+
           const mat = m.material as THREE.MeshStandardMaterial;
           mat.opacity = b.weight * b.opacity;
           mat.depthWrite = mat.opacity > 0.8;
           m.castShadow = mat.opacity > 0.8;
 
-          // Transition State / Breaking bond high-energy glow
-          if (b.weight > 0.01 && b.weight < 0.92) {
+          // Transition State Dual-Stage Glow:
+          // Mechanical tension: warm amber (0xf59e0b) -> cleavage phase: excited plasma (0x38bdf8)
+          if (isTransitionBond) {
             const glowFactor = Math.sin(b.weight * Math.PI);
-            mat.emissive.setHex(0x38bdf8);
-            mat.emissiveIntensity = glowFactor * 1.3;
+            mat.emissive.setHex(b.weight > 0.5 ? 0xf59e0b : 0x38bdf8);
+            mat.emissiveIntensity = glowFactor * 1.5;
           } else {
             mat.emissive.setHex(0x000000);
             mat.emissiveIntensity = 0;
           }
         });
       }
+
+      // Update localized bond cleavage/formation quantum micro-sparks and plasma ring
+      cleavageFX.update(activeCleavage, Date.now() * 0.0018);
+
+      // 3D Electron-Pushing Mechanism Arrows Update
+      const isReactionStep = [1, 3, 5, 7].includes(st.index);
+      const arrowOpacity = isReactionStep ? Math.sin(Math.min(st.progress, 1) * Math.PI) : 0;
+      const arrowSpecs: ArrowSpec[] = [];
+
+      if (isReactionStep && arrowOpacity > 0.02) {
+        const atomList = Object.entries(state.atoms);
+        if (st.index === 1) {
+          // Initiation: Br2 -> 2 Br· (Homolytic cleavage)
+          const brAtoms = atomList.filter(([_, a]) => a.element === 'Br' && a.opacity > 0.8);
+          if (brAtoms.length >= 2) {
+            const p1 = new THREE.Vector3(...brAtoms[0][1].position);
+            const p2 = new THREE.Vector3(...brAtoms[1][1].position);
+            const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+            arrowSpecs.push(
+              { id: 'br2_cleave_1', start: mid, end: p1, curveHeight: 0.45, color: 0x38bdf8 },
+              { id: 'br2_cleave_2', start: mid, end: p2, curveHeight: 0.45, color: 0x38bdf8 }
+            );
+          }
+        } else if (st.index === 3) {
+          // Propagation 1: CH4 + Br· -> CH3· + HBr
+          const radicalBr = atomList.find(([_, a]) => a.element === 'Br' && a.opacity > 0.8);
+          const cAtom = atomList.find(([_, a]) => a.element === 'C' && a.opacity > 0.8);
+          const hAtoms = atomList.filter(([_, a]) => a.element === 'H' && a.opacity > 0.8);
+          if (radicalBr && cAtom && hAtoms.length > 0) {
+            const brPos = new THREE.Vector3(...radicalBr[1].position);
+            const cPos = new THREE.Vector3(...cAtom[1].position);
+            let targetH = hAtoms[0];
+            let minDist = Infinity;
+            for (const h of hAtoms) {
+              const d = brPos.distanceTo(new THREE.Vector3(...h[1].position));
+              if (d < minDist) {
+                minDist = d;
+                targetH = h;
+              }
+            }
+            const hPos = new THREE.Vector3(...targetH[1].position);
+            const chMid = new THREE.Vector3().addVectors(cPos, hPos).multiplyScalar(0.5);
+
+            arrowSpecs.push({ id: 'br_to_h', start: brPos, end: hPos, curveHeight: 0.5, color: 0x38bdf8 });
+            arrowSpecs.push({ id: 'ch_to_h', start: chMid, end: hPos, curveHeight: 0.35, color: 0x38bdf8, pulsePhase: 0.33 });
+            arrowSpecs.push({ id: 'ch_to_c', start: chMid, end: cPos, curveHeight: 0.4, color: 0x38bdf8, pulsePhase: 0.66 });
+          }
+        } else if (st.index === 5) {
+          // Propagation 2: CH3· + Br2 -> CH3Br + Br·
+          const cRadical = atomList.find(([_, a]) => a.element === 'C' && a.opacity > 0.8);
+          const brAtoms = atomList.filter(([_, a]) => a.element === 'Br' && a.opacity > 0.8);
+          if (cRadical && brAtoms.length >= 2) {
+            const cPos = new THREE.Vector3(...cRadical[1].position);
+            const br1Pos = new THREE.Vector3(...brAtoms[0][1].position);
+            const br2Pos = new THREE.Vector3(...brAtoms[1][1].position);
+            const d1 = cPos.distanceTo(br1Pos);
+            const d2 = cPos.distanceTo(br2Pos);
+            const [attackedBr, leavingBr] = d1 < d2 ? [br1Pos, br2Pos] : [br2Pos, br1Pos];
+            const brMid = new THREE.Vector3().addVectors(attackedBr, leavingBr).multiplyScalar(0.5);
+
+            arrowSpecs.push({ id: 'c_to_br', start: cPos, end: attackedBr, curveHeight: 0.52, color: 0x38bdf8 });
+            arrowSpecs.push({ id: 'brbr_to_attacked', start: brMid, end: attackedBr, curveHeight: 0.38, color: 0x38bdf8, pulsePhase: 0.33 });
+            arrowSpecs.push({ id: 'brbr_to_leaving', start: brMid, end: leavingBr, curveHeight: 0.42, color: 0x38bdf8, pulsePhase: 0.66 });
+          }
+        } else if (st.index === 7) {
+          // Termination: two radicals combine
+          const activeRadicals = atomList.filter(([_, a]) => a.opacity > 0.8 && a.radical > 0.05);
+          if (activeRadicals.length >= 2) {
+            const r1 = new THREE.Vector3(...activeRadicals[0][1].position);
+            const r2 = new THREE.Vector3(...activeRadicals[1][1].position);
+            const mid = new THREE.Vector3().addVectors(r1, r2).multiplyScalar(0.5);
+            arrowSpecs.push(
+              { id: 'term_1', start: r1, end: mid, curveHeight: 0.38, color: 0x38bdf8 },
+              { id: 'term_2', start: r2, end: mid, curveHeight: 0.38, color: 0x38bdf8, pulsePhase: 0.5 }
+            );
+          }
+        }
+      }
+
+      mechArrows.update(arrowSpecs, Date.now() * 0.0018, showArrowsRef.current, arrowOpacity);
 
       root.updateMatrixWorld(true);
       renderer.render(scene, camera);
@@ -536,6 +693,29 @@ export const StageScreen: React.FC = () => {
     vp.addEventListener('pointercancel', onPointerUp);
     vp.addEventListener('wheel', onWheel, { passive: false });
 
+    const onDblClick = (e: MouseEvent) => {
+      const rect = vp.getBoundingClientRect();
+      raycaster.setFromCamera(
+        new THREE.Vector2(
+          ((e.clientX - rect.left) / rect.width) * 2 - 1,
+          -((e.clientY - rect.top) / rect.height) * 2 + 1
+        ),
+        camera
+      );
+      const hit = raycaster.intersectObjects([...meshes.values()].map((m) => m.mesh));
+      const hitId = hit[0]?.object.userData.id;
+      if (hitId) {
+        const next = focusedAtomIdRef.current === hitId ? null : hitId;
+        focusedAtomIdRef.current = next;
+        setFocusedAtomId(next);
+      } else {
+        focusedAtomIdRef.current = null;
+        setFocusedAtomId(null);
+      }
+      if (currentSampleRef.current) draw(currentSampleRef.current);
+    };
+    vp.addEventListener('dblclick', onDblClick);
+
     let rafId = 0;
     let lastTime = performance.now();
     let hold = 0;
@@ -602,6 +782,9 @@ export const StageScreen: React.FC = () => {
       vp.removeEventListener('pointerup', onPointerUp);
       vp.removeEventListener('pointercancel', onPointerUp);
       vp.removeEventListener('wheel', onWheel);
+      vp.removeEventListener('dblclick', onDblClick);
+      mechArrows.dispose();
+      cleavageFX.dispose();
       sphereGeo.dispose();
       cylinderGeo.dispose();
       renderer.dispose();
@@ -717,6 +900,28 @@ export const StageScreen: React.FC = () => {
           <div id="labels" ref={labelsRef} aria-hidden="true" />
           <div className="stage-tools">
             <button
+              id="arrows-toggle"
+              type="button"
+              className="stage-icon-btn"
+              aria-pressed={showArrows}
+              title={showArrows ? 'Hide 3D mechanism curved arrows' : 'Show 3D mechanism curved arrows'}
+              aria-label="Toggle 3D mechanism electron-pushing arrows"
+              onClick={() => setShowArrows((v) => !v)}
+            >
+              <TrendingUp size={16} />
+            </button>
+            <button
+              id="vdw-shell-toggle"
+              type="button"
+              className="stage-icon-btn"
+              aria-pressed={showVdwShell}
+              title={showVdwShell ? 'Hide steric Van der Waals wireframe shell' : 'Show steric Van der Waals wireframe shell'}
+              aria-label="Toggle steric Van der Waals wireframe shell"
+              onClick={() => setShowVdwShell((v) => !v)}
+            >
+              <Shield size={16} />
+            </button>
+            <button
               id="context-toggle"
               type="button"
               className="stage-icon-btn"
@@ -739,6 +944,23 @@ export const StageScreen: React.FC = () => {
             </button>
           </div>
 
+          {focusedAtomId && (
+            <button
+              type="button"
+              className="stage-focus-badge"
+              onClick={() => {
+                focusedAtomIdRef.current = null;
+                setFocusedAtomId(null);
+              }}
+              title="Click to release focus"
+              aria-label="Click to release atom focus"
+            >
+              <Target size={13} />
+              <span>Focused on Atom {focusedAtomId}</span>
+              <small>(Click to Release)</small>
+            </button>
+          )}
+
           <div className="stage-legend">
             <span>
               <i className="element-dot carbon" />C
@@ -755,14 +977,17 @@ export const StageScreen: React.FC = () => {
             </span>
           </div>
 
-          {/* Real-time Interactive Potential Energy Surface (PES) HUD */}
-          <ReactionPESHUD
-            progress={progress}
-            onSeek={(p) => setProgress(p, true)}
-            stageName={currentStep.title}
-            eaKj={index === 1 ? 193 : index === 3 ? 75 : index === 5 ? 12 : 2}
-            deltaHKj={index === 1 ? 193 : index === 3 ? 67 : index === 5 ? -101 : -350}
-          />
+          {/* Real-time Interactive Potential Energy Surface (PES) HUD (only displayed after deduction is verified) */}
+          {isCurrentSolved && index > 0 && (
+            <ReactionPESHUD
+              progress={progress}
+              onSeek={(p) => setProgress(p, true)}
+              stageName={currentStep.title}
+              eaKj={index === 1 ? 193 : index === 3 ? 75 : index === 5 ? 12 : 2}
+              deltaHKj={index === 1 ? 193 : index === 3 ? 67 : index === 5 ? -101 : -350}
+              disabled={!isCurrentSolved}
+            />
+          )}
 
           <div id="light-cue" ref={lightCueRef} hidden={index !== 1}>
             <span>hν</span>

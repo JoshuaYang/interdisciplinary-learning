@@ -1,11 +1,20 @@
 {
-  "name": "甲烷",
+  "name": "Methane",
   "formula": "CH4",
   "center": "C",
-  "neighbors": ["H", "H", "H", "H"],
+  "neighbors": [
+    "H",
+    "H",
+    "H",
+    "H"
+  ],
   "geometry": "regularTetrahedral",
-  "bondLengths": {"C-H": 1.087},
-  "bondAngles": {"H-C-H": 109.471},
+  "bondLengths": {
+    "C-H": 1.087
+  },
+  "bondAngles": {
+    "H-C-H": 109.471
+  },
   "hybridization": "sp3",
-  "description": "甲烷在链增长中失去一个氢，形成甲基自由基。"
+  "description": "Methane loses a hydrogen atom during chain propagation to form a methyl radical."
 }

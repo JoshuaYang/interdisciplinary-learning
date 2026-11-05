@@ -1,8 +1,10 @@
 {
-  "name": "溴自由基",
-  "formula": "",
-  "atoms": [],
-  "geometry": "",
-  "unpairedElectrons": null,
-  "description": ""
+  "name": "Bromine Radical",
+  "formula": "Br·",
+  "atoms": [
+    "Br"
+  ],
+  "geometry": "atomic",
+  "unpairedElectrons": 1,
+  "description": "The bromine radical contains one unpaired electron and abstracts hydrogen from methane."
 }

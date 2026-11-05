@@ -1,11 +1,22 @@
 {
-  "name": "一溴甲烷",
-  "formula": "",
-  "center": "",
-  "neighbors": [],
-  "geometry": "",
-  "bondLengths": {},
-  "bondAngles": {},
-  "hybridization": "",
-  "description": ""
+  "name": "Bromomethane",
+  "formula": "CH3Br",
+  "center": "C",
+  "neighbors": [
+    "H",
+    "H",
+    "H",
+    "Br"
+  ],
+  "geometry": "tetrahedral",
+  "bondLengths": {
+    "C-H": 1.09,
+    "C-Br": 1.939
+  },
+  "bondAngles": {
+    "H-C-H": 111.37,
+    "H-C-Br": 107.5
+  },
+  "hybridization": "sp3",
+  "description": "Bromomethane is the organic substitution product of this reaction."
 }

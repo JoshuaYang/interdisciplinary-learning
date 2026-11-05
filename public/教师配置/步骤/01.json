@@ -1,33 +1,74 @@
 {
-  "title": "从甲烷与溴单质开始",
-  "shortTitle": "初始分子",
-  "phase": "准备",
+  "title": "Starting from Methane and Bromine",
+  "shortTitle": "Initial Species",
+  "phase": "Preparation",
   "formula": "CH₄ + Br₂",
-  "description": "观察甲烷的四面体结构，以及溴分子中的 Br—Br 键。",
-  "note": "先观察，再点击播放。背景粒子保留在体系中，灰淡显示。",
+  "description": "Observe the regular tetrahedral geometry of methane and the Br—Br covalent bond in bromine.",
+  "note": "Observe first, then click Play. Spectator particles remain dimmed in the background.",
   "instances": [
     {
       "molecule": "Br2",
-      "position": [-2.6, 0.45, 0],
-      "rotation": [0, 0, 0],
-      "atomMap": {"br1": "BrA", "br2": "BrB"},
+      "position": [
+        -2.6,
+        0.45,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "atomMap": {
+        "br1": "BrA",
+        "br2": "BrB"
+      },
       "role": "focus"
     },
     {
       "molecule": "CH4",
-      "position": [2.15, 0.45, 0],
-      "rotation": [0, -53.130102, 0],
-      "atomMap": {"c": "C", "h1": "H1", "h2": "H2", "h3": "H3", "h4": "H4"},
+      "position": [
+        2.15,
+        0.45,
+        0
+      ],
+      "rotation": [
+        0,
+        -53.130102,
+        0
+      ],
+      "atomMap": {
+        "c": "C",
+        "h1": "H1",
+        "h2": "H2",
+        "h3": "H3",
+        "h4": "H4"
+      },
       "role": "focus"
     },
     {
       "molecule": "Br2",
-      "position": [3.1, -2.4, -0.5],
-      "rotation": [0, 0, 0],
-      "atomMap": {"br1": "BrD", "br2": "BrC"},
+      "position": [
+        3.1,
+        -2.4,
+        -0.5
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "atomMap": {
+        "br1": "BrD",
+        "br2": "BrC"
+      },
       "role": "context",
-      "caption": "另一分子 Br₂ · 随后参与"
+      "caption": "Another Br₂ · participates later"
     }
   ],
-  "transition": {"kind": "initial", "duration": 0, "breakBonds": [], "formBonds": []}
+  "transition": {
+    "kind": "initial",
+    "duration": 0,
+    "breakBonds": [],
+    "formBonds": []
+  }
 }

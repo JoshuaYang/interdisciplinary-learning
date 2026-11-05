@@ -1,5 +1,5 @@
 {
-  "name": "溴单质",
+  "name": "Bromine",
   "formula": "Br2",
   "atoms": [
     "Br",
@@ -9,5 +9,5 @@
   "bondLengths": {
     "Br-Br": 2.281
   },
-  "description": "溴单质受光照发生均裂，也参与链增长。"
+  "description": "Bromine undergoes homolytic cleavage under UV light and also participates in chain propagation."
 }

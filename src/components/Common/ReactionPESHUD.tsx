@@ -8,6 +8,7 @@ export interface ReactionPESHUDProps {
   eaKj?: number; // Activation energy (kJ/mol), e.g. 58
   deltaHKj?: number; // Reaction enthalpy (kJ/mol), e.g. -75 (exothermic)
   className?: string;
+  disabled?: boolean;
 }
 
 export const ReactionPESHUD: React.FC<ReactionPESHUDProps> = ({
@@ -17,6 +18,7 @@ export const ReactionPESHUD: React.FC<ReactionPESHUDProps> = ({
   eaKj = 64,
   deltaHKj = -52,
   className = '',
+  disabled = false,
 }) => {
   const [collapsed, setCollapsed] = useState<boolean>(false);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -123,7 +125,7 @@ export const ReactionPESHUD: React.FC<ReactionPESHUDProps> = ({
 
   // Handle click / scrub on the PES curve to seek 3D animation
   const handleSeekEvent = (clientX: number) => {
-    if (!svgRef.current || !onSeek) return;
+    if (disabled || !svgRef.current || !onSeek) return;
     const rect = svgRef.current.getBoundingClientRect();
     const clickX = clientX - rect.left;
     const norm = Math.max(0, Math.min(1, (clickX - xReact) / (xProd - xReact)));
@@ -131,7 +133,7 @@ export const ReactionPESHUD: React.FC<ReactionPESHUDProps> = ({
   };
 
   return (
-    <div className={`pes-hud-card ${collapsed ? 'is-collapsed' : ''} ${className}`}>
+    <div className={`pes-hud-card ${collapsed ? 'is-collapsed' : ''} ${disabled ? 'is-disabled' : ''} ${className}`}>
       {/* Header bar */}
       <div className="pes-hud-header">
         <div className="pes-hud-title-wrap">
@@ -172,13 +174,15 @@ export const ReactionPESHUD: React.FC<ReactionPESHUDProps> = ({
 
           {/* Interactive SVG Curve */}
           <div
-            className="pes-svg-wrap"
+            className={`pes-svg-wrap ${disabled ? 'disabled' : ''}`}
             onPointerDown={(e) => {
+              if (disabled) return;
               isDraggingRef.current = true;
               handleSeekEvent(e.clientX);
               (e.target as HTMLElement).setPointerCapture(e.pointerId);
             }}
             onPointerMove={(e) => {
+              if (disabled) return;
               if (isDraggingRef.current) {
                 handleSeekEvent(e.clientX);
               }
@@ -189,7 +193,7 @@ export const ReactionPESHUD: React.FC<ReactionPESHUDProps> = ({
                 (e.target as HTMLElement).releasePointerCapture(e.pointerId);
               } catch {}
             }}
-            title="Click or drag along the curve to seek reaction step"
+            title={disabled ? 'PES seeking is disabled until mechanism is verified' : 'Click or drag along the curve to seek reaction step'}
           >
             <svg
               ref={svgRef}

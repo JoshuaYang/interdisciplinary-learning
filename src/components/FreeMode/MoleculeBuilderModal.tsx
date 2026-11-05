@@ -392,7 +392,7 @@ export const MoleculeBuilderModal: React.FC = () => {
       ? `free_${editingMolId}`
       : 'free_new';
 
-    // 仅在弹窗打开时针对当前目标初始化一次，避免编辑过程中依赖更新重复清空用户添加的内容
+    // Initialize once when modal opens for the target to prevent clearing unsaved changes on dependency updates
     if (lastTargetRef.current === currentTargetKey) {
       return;
     }
@@ -409,7 +409,7 @@ export const MoleculeBuilderModal: React.FC = () => {
       ) {
         targetDoc = existingSlotDoc;
       } else {
-        // 重置后或初次配置：只保留名字、化学式和描述，其余结构节点与参数全部置空，让学生自己填
+        // Upon reset or first-time setup: keep only name, formula, and description; clear canvas nodes for user creation
         const slotMeta = REQUIRED_SLOTS.find((s) => s.id === guidedSlotId);
         const sampleDoc = getSampleDocForSlot(guidedSlotId);
         const metaName = slotMeta?.name || sampleDoc?.name || '';

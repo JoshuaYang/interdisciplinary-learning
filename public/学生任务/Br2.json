@@ -1,8 +1,13 @@
 {
-  "name": "溴单质",
-  "formula": "",
-  "atoms": [],
-  "geometry": "",
-  "bondLengths": {},
-  "description": ""
+  "name": "Bromine",
+  "formula": "Br2",
+  "atoms": [
+    "Br",
+    "Br"
+  ],
+  "geometry": "diatomic",
+  "bondLengths": {
+    "Br-Br": 2.281
+  },
+  "description": "Bromine undergoes homolytic cleavage under UV light and also participates in chain propagation."
 }
