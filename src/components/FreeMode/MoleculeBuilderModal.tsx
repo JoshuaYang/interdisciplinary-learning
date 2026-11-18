@@ -1668,12 +1668,12 @@ export const MoleculeBuilderModal: React.FC = () => {
                           type="button"
                           className={`canvas-mini-btn ${selectedNode.radical ? 'is-radical' : ''}`}
                           onClick={toggleSelectedNodeRadical}
-                          title="Toggle unpaired electron (radical dot)"
+                          title="Toggle unpaired electron (Radical dot for free-radical reactions like Br·, CH3·)"
                         >
-                          <span>· {selectedNode.radical ? 'Radical' : 'No Radical'}</span>
+                          <span>{selectedNode.radical ? '● Radical' : '○ Radical'}</span>
                         </button>
                         {/* Multi-value Ion Charge Stepper */}
-                        <div className="node-charge-stepper-wrap">
+                        <div className="node-charge-stepper-wrap" title="Ion Formal Charge (Net charge from gained/lost electrons like Na+, Cl-)">
                           <span className="stepper-title">Charge:</span>
                           <button
                             type="button"
@@ -2087,18 +2087,20 @@ export const MoleculeBuilderModal: React.FC = () => {
                             >
                               {n.element}
                             </text>
+                            {/* Radical dot (unpaired single electron) */}
                             {n.radical === 1 && (
                               <circle
-                                cx={r * 0.75}
-                                cy={-r * 0.75}
+                                cx={typeof n.charge === 'number' && n.charge !== 0 ? r * 0.72 - 12 : r * 0.75}
+                                cy={typeof n.charge === 'number' && n.charge !== 0 ? -r * 0.72 - 4 : -r * 0.75}
                                 r="5.5"
                                 fill="#ea580c"
                                 stroke="#ffffff"
                                 strokeWidth="1.6"
                               />
                             )}
+                            {/* Ion formal charge badge */}
                             {typeof n.charge === 'number' && n.charge !== 0 && (
-                              <g transform={`translate(${r * 0.72}, ${-r * 0.72})`}>
+                              <g transform={`translate(${r * 0.72 + 4}, ${-r * 0.72 - 4})`}>
                                 <circle
                                   r="8.5"
                                   fill={n.charge > 0 ? '#ef4444' : '#0284c7'}
@@ -2123,10 +2125,11 @@ export const MoleculeBuilderModal: React.FC = () => {
                                 </text>
                               </g>
                             )}
+                            {/* Connect link handle (placed at east edge to prevent overlapping with charge / radical superscript) */}
                             {showHandle && (
                               <g
                                 className="topo-connect-handle"
-                                transform={`translate(${r * 0.72 + 6}, ${-r * 0.72 - 6})`}
+                                transform={`translate(${r + 10}, 0)`}
                                 onPointerDown={(e) => {
                                   e.stopPropagation();
                                   setDragLinkFromId(n.id);
