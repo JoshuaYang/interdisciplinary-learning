@@ -46,7 +46,7 @@ export const STEPS_DATA: DeductionStepData[] = [
     title: 'Photoexcitation',
     isObservation: false,
     phase: 'Initiation',
-    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Net Summary'],
+    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Termination', 'Net Summary'],
     fieldLabel: 'Species Change & Equation',
     equation: 'Br₂ → 2 Br·',
     equationOptions: [
@@ -74,7 +74,7 @@ export const STEPS_DATA: DeductionStepData[] = [
     title: 'Approach CH₄',
     isObservation: false,
     phase: 'Propagation ①',
-    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Net Summary'],
+    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Termination', 'Net Summary'],
     fieldLabel: 'Particle Dynamics',
     equation: 'Br· approaches CH₄',
     equationOptions: [
@@ -101,7 +101,7 @@ export const STEPS_DATA: DeductionStepData[] = [
     title: 'Collision ①',
     isObservation: false,
     phase: 'Propagation ①',
-    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Net Summary'],
+    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Termination', 'Net Summary'],
     fieldLabel: 'Species Change & Equation',
     equation: 'Br· + CH₄ → CH₃· + HBr',
     equationOptions: [
@@ -127,7 +127,7 @@ export const STEPS_DATA: DeductionStepData[] = [
     title: 'Approach Br₂',
     isObservation: false,
     phase: 'Propagation ②',
-    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Net Summary'],
+    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Termination', 'Net Summary'],
     fieldLabel: 'Particle Dynamics',
     equation: 'CH₃· approaches Br₂',
     equationOptions: [
@@ -154,7 +154,7 @@ export const STEPS_DATA: DeductionStepData[] = [
     title: 'Collision ②',
     isObservation: false,
     phase: 'Propagation ②',
-    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Net Summary'],
+    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Termination', 'Net Summary'],
     fieldLabel: 'Species Change & Equation',
     equation: 'CH₃· + Br₂ → CH₃Br + Br·',
     equationOptions: [
@@ -182,7 +182,7 @@ export const STEPS_DATA: DeductionStepData[] = [
     title: 'Net Summary',
     isObservation: false,
     phase: 'Net Summary',
-    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Net Summary'],
+    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Termination', 'Net Summary'],
     fieldLabel: 'Overall Reaction Equation',
     equation: 'CH₄ + Br₂ → CH₃Br + HBr',
     equationOptions: [
@@ -203,6 +203,37 @@ export const STEPS_DATA: DeductionStepData[] = [
     },
     summary:
       'The net radical substitution reaction between methane and bromine is CH₄ + Br₂ → CH₃Br + HBr, breaking C—H and Br—Br bonds and forming C—Br and H—Br bonds.',
+  },
+  {
+    index: 7,
+    title: 'Chain Termination',
+    isObservation: false,
+    phase: 'Termination',
+    phaseOptions: ['Initiation', 'Propagation ①', 'Propagation ②', 'Termination', 'Net Summary'],
+    fieldLabel: 'Radical Coupling Pathways',
+    equation: 'Radical Coupling (All 3 Pathways)',
+    equationOptions: [
+      'Radical Coupling (All 3 Pathways)',
+      '2 Br· → Br₂ (Pathway 1: Bromine Coupling)',
+      '2 CH₃· → CH₃—CH₃ (Pathway 2: Ethane Coupling)',
+      'CH₃· + Br· → CH₃Br (Pathway 3: Bromomethane Coupling)',
+    ],
+    breakBond: 'None',
+    breakBondOptions: ['None', 'Br—Br', 'C—H', 'C—Br', 'H—Br'],
+    formBond: 'Br—Br, C—C, C—Br',
+    formBondOptions: ['None', 'Br—Br', 'C—C', 'C—Br', 'Br—Br, C—C, C—Br'],
+    hints: {
+      phase:
+        'Hint: When reactive radicals collide pairwise into stable covalent molecules without generating new radicals, the chain reaction terminates. Which stage is this?',
+      equation:
+        'Hint: Termination proceeds via 3 radical coupling pathways: Br·+Br·→Br₂, CH₃·+CH₃·→CH₃CH₃, and CH₃·+Br·→CH₃Br.',
+      breakBond:
+        'Hint: Radical coupling combines already-free unpaired electrons directly. Are any covalent bonds cleaved?',
+      formBond:
+        'Hint: The coupling pathways form stable Br—Br, C—C (ethane), or C—Br bonds.',
+    },
+    summary:
+      'In the chain termination stage, radicals collide pairwise (Br· + Br· → Br₂, CH₃· + CH₃· → CH₃—CH₃, CH₃· + Br· → CH₃Br) to form stable covalent bonds, terminating the chain reaction!',
   },
 ];
 
@@ -232,6 +263,25 @@ export function verify(
   }
   if (submission.phase !== step.phase) {
     return { ok: false, errorField: 'phase', hint: step.hints!.phase };
+  }
+  if (stepIndex === 7) {
+    const validEquations = [
+      'Radical Coupling (All 3 Pathways)',
+      '2 Br· → Br₂ (Pathway 1: Bromine Coupling)',
+      '2 CH₃· → CH₃—CH₃ (Pathway 2: Ethane Coupling)',
+      'CH₃· + Br· → CH₃Br (Pathway 3: Bromomethane Coupling)',
+    ];
+    if (!submission.equation || !validEquations.includes(submission.equation)) {
+      return { ok: false, errorField: 'equation', hint: step.hints!.equation };
+    }
+    if (submission.breakBond !== 'None') {
+      return { ok: false, errorField: 'breakBond', hint: step.hints!.breakBond };
+    }
+    const validForms = ['Br—Br', 'C—C', 'C—Br', 'Br—Br, C—C, C—Br'];
+    if (!submission.formBond || !validForms.includes(submission.formBond)) {
+      return { ok: false, errorField: 'formBond', hint: step.hints!.formBond };
+    }
+    return { ok: true, summary: step.summary };
   }
   if (submission.equation !== step.equation) {
     return { ok: false, errorField: 'equation', hint: step.hints!.equation };

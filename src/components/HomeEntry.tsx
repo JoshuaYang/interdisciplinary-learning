@@ -2,9 +2,16 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { ArrowRight, Atom, Compass, FlaskConical, Layers, Sparkles } from 'lucide-react';
 import { useFreeChemStore } from '../store/useFreeChemStore';
+import { useChemStore } from '../store/useChemStore';
 
 export const HomeEntry: React.FC = () => {
   const setAppMode = useFreeChemStore((s) => s.setAppMode);
+
+  const handleEnterGuided = (e: React.MouseEvent) => {
+    const isBackdoor = e.metaKey || e.ctrlKey;
+    useChemStore.getState().initGuidedMode(isBackdoor);
+    setAppMode('guided');
+  };
 
   return (
     <div className="home-entry-shell">
@@ -41,7 +48,7 @@ export const HomeEntry: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.24 }}
               className="home-mode-card guided-card"
-              onClick={() => setAppMode('guided')}
+              onClick={handleEnterGuided}
             >
               <div className="home-card-top">
                 <span className="home-card-icon guided">
@@ -76,7 +83,7 @@ export const HomeEntry: React.FC = () => {
                 className="primary-button home-enter-btn"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setAppMode('guided');
+                  handleEnterGuided(e);
                 }}
               >
                 <span>Enter Guided Workbench</span>

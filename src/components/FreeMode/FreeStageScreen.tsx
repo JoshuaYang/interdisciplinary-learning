@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import {
   ArrowLeft,
@@ -56,6 +56,12 @@ export const FreeStageScreen: React.FC = () => {
   const [showArrows, setShowArrows] = useState(true);
   const [showVdwShell, setShowVdwShell] = useState(false);
   const [focusedAtomId, setFocusedAtomId] = useState<string | null>(null);
+
+  // User Deduction state for Broken & Formed Covalent Bonds
+  const [userBrokenBonds, setUserBrokenBonds] = useState<string[]>([]);
+  const [userFormedBonds, setUserFormedBonds] = useState<string[]>([]);
+  const [deductionFeedback, setDeductionFeedback] = useState<{ ok: boolean; message: string } | null>(null);
+  const [solvedStages, setSolvedStages] = useState<Record<string, boolean>>({});
 
   const showArrowsRef = useRef(true);
   const showVdwShellRef = useRef(false);
@@ -655,6 +661,102 @@ export const FreeStageScreen: React.FC = () => {
     );
   }
 
+  // Reset deduction inputs when current stage changes
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (!currentStage) return;
+    setUserBrokenBonds([]);
+    setUserFormedBonds([]);
+    setDeductionFeedback(null);
+  }, [currentStage?.stageId]);
+
+  // Available bond options extracted from stage + common covalent bonds
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  const availableBondOptions = useMemo(() => {
+    if (!currentStage) return ['None'];
+    const opts = new Set<string>(['None']);
+    Object.values(currentStage.bonds).forEach((b) => {
+      if (b.label) opts.add(b.label);
+    });
+    const els = new Set(Object.values(currentStage.atoms).map((a) => a.element));
+    if (els.has('C') && els.has('H')) opts.add('C—H');
+    if (els.has('Br')) opts.add('Br—Br');
+    if (els.has('C') && els.has('Br')) opts.add('C—Br');
+    if (els.has('H') && els.has('Br')) opts.add('H—Br');
+    if (els.has('C')) opts.add('C—C');
+    return Array.from(opts);
+  }, [currentStage]);
+
+  const toggleBondSelection = (role: 'broken' | 'formed', bondLabel: string) => {
+    const isBroken = role === 'broken';
+    const currentList = isBroken ? userBrokenBonds : userFormedBonds;
+    const setter = isBroken ? setUserBrokenBonds : setUserFormedBonds;
+
+    if (bondLabel === 'None') {
+      setter(currentList.includes('None') ? [] : ['None']);
+      return;
+    }
+
+    const withoutNone = currentList.filter((b) => b !== 'None');
+    if (withoutNone.includes(bondLabel)) {
+      setter(withoutNone.filter((b) => b !== bondLabel));
+    } else {
+      setter([...withoutNone, bondLabel]);
+    }
+  };
+
+  const handleVerifyDeduction = () => {
+    if (!currentStage) return;
+    const actualBroken =
+      currentStage.brokenBondLabels.length > 0 ? currentStage.brokenBondLabels : ['None'];
+    const actualFormed =
+      currentStage.formedBondLabels.length > 0 ? currentStage.formedBondLabels : ['None'];
+
+    const chosenBroken = userBrokenBonds.length > 0 ? userBrokenBonds : ['None'];
+    const chosenFormed = userFormedBonds.length > 0 ? userFormedBonds : ['None'];
+
+    const brokenMatch =
+      chosenBroken.length === actualBroken.length &&
+      [...chosenBroken].sort().join(',') === [...actualBroken].sort().join(',');
+
+    const formedMatch =
+      chosenFormed.length === actualFormed.length &&
+      [...chosenFormed].sort().join(',') === [...actualFormed].sort().join(',');
+
+    if (brokenMatch && formedMatch) {
+      setDeductionFeedback({
+        ok: true,
+        message: 'Correct! Covalent bond cleavage and formation mechanism verified.',
+      });
+      setSolvedStages((prev) => ({ ...prev, [currentStage.stageId]: true }));
+    } else if (!brokenMatch) {
+      setDeductionFeedback({
+        ok: false,
+        message: 'Broken bonds mismatch: review reactants undergoing covalent cleavage.',
+      });
+    } else {
+      setDeductionFeedback({
+        ok: false,
+        message: 'Formed bonds mismatch: check the newly formed bonds in the products.',
+      });
+    }
+  };
+
+  const handleShowAnswer = () => {
+    if (!currentStage) return;
+    const actualBroken =
+      currentStage.brokenBondLabels.length > 0 ? currentStage.brokenBondLabels : ['None'];
+    const actualFormed =
+      currentStage.formedBondLabels.length > 0 ? currentStage.formedBondLabels : ['None'];
+    setUserBrokenBonds(actualBroken);
+    setUserFormedBonds(actualFormed);
+    setDeductionFeedback({
+      ok: true,
+      message: 'Solution revealed and verified.',
+    });
+    setSolvedStages((prev) => ({ ...prev, [currentStage.stageId]: true }));
+  };
+
   const sampledFrame = sampleFreeStage(currentStage, progress);
   const selectedAtom = selection ? sampledFrame.atoms[selection] : null;
   const uniqueElements = [
@@ -675,10 +777,12 @@ export const FreeStageScreen: React.FC = () => {
   }
 
   const phaseHintText =
-    progress < 0.35
-      ? 'Reactants approaching…'
-      : progress < 0.68
-      ? 'Bonds breaking & reforming…'
+    progress < 0.28
+      ? 'Reactants approaching collision zone…'
+      : progress < 0.52
+      ? 'Old covalent bonds cleaving (Cleavage)…'
+      : progress < 0.76
+      ? 'Fragments recombining & new bonds forming…'
       : progress < 1
       ? 'Products separating…'
       : 'Stage complete';
@@ -893,24 +997,90 @@ export const FreeStageScreen: React.FC = () => {
                 />
               </div>
 
-              {/* 2. Broken & Formed Covalent Bonds */}
-              <div className="free-bond-stats-grid">
-                <div className="free-bond-stat-box broken">
-                  <span className="stat-title">Broken Covalent Bonds</span>
-                  <strong>
-                    {currentStage.brokenBondLabels.length > 0
-                      ? currentStage.brokenBondLabels.join(', ')
-                      : 'None'}
-                  </strong>
+              {/* 2. Mechanism Deduction: Broken & Formed Covalent Bonds */}
+              <div className="free-deduction-interactive-card">
+                <div className="free-deduction-header-row">
+                  <span className="free-summary-label">Mechanism Deduction</span>
+                  {solvedStages[currentStage.stageId] && (
+                    <span className="deduction-solved-pill">Verified ✓</span>
+                  )}
                 </div>
-                <div className="free-bond-stat-box formed">
-                  <span className="stat-title">Formed Covalent Bonds</span>
-                  <strong>
-                    {currentStage.formedBondLabels.length > 0
-                      ? currentStage.formedBondLabels.join(', ')
-                      : 'None'}
-                  </strong>
+
+                {/* Broken Covalent Bonds selection */}
+                <div className="free-deduction-field">
+                  <span className="free-field-title">
+                    Broken Covalent Bonds:
+                  </span>
+                  <div className="bond-chip-selector">
+                    {availableBondOptions.map((opt) => {
+                      const isSelected =
+                        userBrokenBonds.includes(opt) ||
+                        (opt === 'None' && userBrokenBonds.length === 0);
+                      return (
+                        <button
+                          key={`broken-${opt}`}
+                          type="button"
+                          className={`bond-pick-chip ${isSelected ? 'active broken' : ''}`}
+                          onClick={() => toggleBondSelection('broken', opt)}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
+
+                {/* Formed Covalent Bonds selection */}
+                <div className="free-deduction-field">
+                  <span className="free-field-title">
+                    Formed Covalent Bonds:
+                  </span>
+                  <div className="bond-chip-selector">
+                    {availableBondOptions.map((opt) => {
+                      const isSelected =
+                        userFormedBonds.includes(opt) ||
+                        (opt === 'None' && userFormedBonds.length === 0);
+                      return (
+                        <button
+                          key={`formed-${opt}`}
+                          type="button"
+                          className={`bond-pick-chip ${isSelected ? 'active formed' : ''}`}
+                          onClick={() => toggleBondSelection('formed', opt)}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Verify & Solution Action Buttons */}
+                <div className="free-deduction-actions">
+                  <button
+                    type="button"
+                    className="primary-button free-verify-btn"
+                    onClick={handleVerifyDeduction}
+                  >
+                    Verify Deduction
+                  </button>
+                  <button
+                    type="button"
+                    className="toolbar-btn-outline free-reveal-btn"
+                    onClick={handleShowAnswer}
+                  >
+                    Show Solution
+                  </button>
+                </div>
+
+                {deductionFeedback && (
+                  <div
+                    className={`free-deduction-feedback ${
+                      deductionFeedback.ok ? 'success' : 'error'
+                    }`}
+                  >
+                    <span>{deductionFeedback.message}</span>
+                  </div>
+                )}
               </div>
 
               {/* 3. Reactants List */}

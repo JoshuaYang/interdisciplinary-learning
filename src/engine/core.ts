@@ -129,8 +129,8 @@ export function validate(config: any): {
     err('sources must be an array of objects containing title and url.');
   if (!isObj(config.molecules))
     return { errors: [...errors, 'Missing "molecules" structure dictionary.'], warnings };
-  if (!Array.isArray(config.steps) || config.steps.length !== 7)
-    err('Exactly 7 steps are required.');
+  if (!Array.isArray(config.steps) || (config.steps.length !== 7 && config.steps.length !== 8))
+    err('Between 7 and 8 steps are required.');
   const counts: Record<string, Record<string, number>> = {
     CH4: { C: 1, H: 4 },
     CH3: { C: 1, H: 3 },
@@ -345,9 +345,11 @@ export function validate(config: any): {
   const states = compile(config as ChemConfig);
   const all = states[0].atoms;
   states.forEach((s, i) => {
+    const isTerminationStep = i >= 7;
     if (
-      Object.keys(s.atoms).length !== Object.keys(all).length ||
-      Object.keys(all).some((id) => !s.atoms[id] || s.atoms[id].element !== all[id].element)
+      !isTerminationStep &&
+      (Object.keys(s.atoms).length !== Object.keys(all).length ||
+        Object.keys(all).some((id) => !s.atoms[id] || s.atoms[id].element !== all[id].element))
     )
       err(
         `Step ${i + 1}: atom ids or elements do not match initial state.`
@@ -355,6 +357,14 @@ export function validate(config: any): {
     if (!i) return;
     const prev = states[i - 1];
     const t = s.step.transition;
+    if (isTerminationStep) {
+      for (const pair of t.formBonds) {
+        if (!s.bonds[key(pair)]) {
+          err(`Step ${i + 1}: formBond ${pair.join('—')} was not formed.`);
+        }
+      }
+      return;
+    }
     for (const inst of prev.step.instances) {
       const same = s.step.instances.find(
         (x) =>
@@ -387,6 +397,96 @@ export function validate(config: any): {
   return { errors, warnings, states };
 }
 
+export const TERMINATION_APPROACH_INSTANCES = [
+  // Row 1 (Top, Y = 3.1): Br· + ·Br -> Br2
+  {
+    molecule: 'Br',
+    role: 'focus' as const,
+    position: [-2.7, 3.1, 0] as [number, number, number],
+    rotation: [0, 0, 0] as [number, number, number],
+    atomMap: { br: 'BrA' },
+    caption: 'Br·',
+  },
+  {
+    molecule: 'Br',
+    role: 'focus' as const,
+    position: [2.7, 3.1, 0] as [number, number, number],
+    rotation: [0, 0, 0] as [number, number, number],
+    atomMap: { br: 'BrD' },
+    caption: '·Br',
+  },
+  // Row 2 (Middle, Y = 0): CH3· + ·CH3 -> C2H6
+  {
+    molecule: 'CH3',
+    role: 'focus' as const,
+    position: [-2.6, 0, 0] as [number, number, number],
+    rotation: [0, 90, 0] as [number, number, number],
+    atomMap: { c: 'C_E1', h1: 'H_E1', h2: 'H_E2', h3: 'H_E3' },
+    caption: 'CH₃·',
+  },
+  {
+    molecule: 'CH3',
+    role: 'focus' as const,
+    position: [2.6, 0, 0] as [number, number, number],
+    rotation: [0, -90, 0] as [number, number, number],
+    atomMap: { c: 'C_E2', h1: 'H_E4', h2: 'H_E5', h3: 'H_E6' },
+    caption: '·CH₃',
+  },
+  // Row 3 (Bottom, Y = -3.1): CH3· + ·Br -> CH3Br
+  {
+    molecule: 'CH3',
+    role: 'focus' as const,
+    position: [-2.6, -3.1, 0] as [number, number, number],
+    rotation: [0, 90, 0] as [number, number, number],
+    atomMap: { c: 'C_P', h1: 'H_P1', h2: 'H_P2', h3: 'H_P3' },
+    caption: 'CH₃·',
+  },
+  {
+    molecule: 'Br',
+    role: 'focus' as const,
+    position: [2.7, -3.1, 0] as [number, number, number],
+    rotation: [0, 0, 0] as [number, number, number],
+    atomMap: { br: 'Br_P' },
+    caption: '·Br',
+  },
+];
+
+function buildTerminationStartState(config: ChemConfig, targetStep: any): CompiledState {
+  const atoms: Record<string, any> = Object.create(null);
+  const bonds: Record<string, any> = Object.create(null);
+  TERMINATION_APPROACH_INSTANCES.forEach((inst, idx) => {
+    const mol = config.molecules[inst.molecule];
+    if (!mol) return;
+    mol.atoms.forEach((a) => {
+      const id = (inst.atomMap as Record<string, string>)[a.id];
+      atoms[id] = {
+        id,
+        element: a.element,
+        position: add(rotate(a.position, inst.rotation), inst.position),
+        radical: a.radical,
+        opacity: 1,
+        molecule: inst.molecule,
+        localId: a.id,
+        instance: idx,
+      };
+    });
+    mol.bonds.forEach((b) => {
+      const ids = b.atoms.map((id) => (inst.atomMap as Record<string, string>)[id]) as [string, string];
+      bonds[key(ids)] = {
+        atoms: ids,
+        order: b.order,
+        weight: 1,
+        opacity: 1,
+      };
+    });
+  });
+  return {
+    atoms,
+    bonds,
+    step: { ...targetStep, instances: TERMINATION_APPROACH_INSTANCES },
+  };
+}
+
 export function sample(
   config: ChemConfig,
   states: CompiledState[],
@@ -394,8 +494,11 @@ export function sample(
   progress: number
 ): CompiledState {
   if (index === 0 || progress >= 1) return states[index];
-  if (progress <= 0) return states[index - 1];
-  const from = states[index - 1];
+  const from =
+    index === 7
+      ? buildTerminationStartState(config, states[index].step)
+      : states[index - 1];
+  if (progress <= 0) return from;
   const to = states[index];
   const t = smooth(progress);
   const atoms: Record<string, any> = Object.create(null);
@@ -404,11 +507,25 @@ export function sample(
   for (const [id, a] of Object.entries(from.atoms)) {
     const b = to.atoms[id];
     const rt = smooth((progress - 0.28) / 0.42);
+    if (b) {
+      atoms[id] = {
+        ...b,
+        position: lerp(a.position, b.position, t),
+        opacity: mix(a.opacity, b.opacity, t),
+        radical: mix(a.radical, b.radical, rt),
+      };
+    } else {
+      atoms[id] = {
+        ...a,
+        opacity: mix(a.opacity, 0, t),
+      };
+    }
+  }
+  for (const [id, b] of Object.entries(to.atoms)) {
+    if (atoms[id]) continue;
     atoms[id] = {
       ...b,
-      position: lerp(a.position, b.position, t),
-      opacity: mix(a.opacity, b.opacity, t),
-      radical: mix(a.radical, b.radical, rt),
+      opacity: mix(0, b.opacity, t),
     };
   }
   for (const inst of from.step.instances) {

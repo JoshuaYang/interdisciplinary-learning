@@ -11,11 +11,11 @@ const fullBundle = () => structuredClone(CHEM_DEFAULT_FILES);
 const assembleDefault = () => files.assemble(fullBundle());
 
 describe('Chem Engine & Deduction Suite', () => {
-  it('validates and compiles the assembled default 7-step config', () => {
+  it('validates and compiles the assembled default curriculum config', () => {
     const config = assembleDefault();
     const res = core.validate(config);
     expect(res.errors).toEqual([]);
-    expect(res.states?.length).toBe(7);
+    expect(res.states?.length).toBe(8);
   });
 
   it('rejects Br2 or HBr if geometry is tetrahedral instead of diatomic', () => {
@@ -161,6 +161,59 @@ describe('Chem Engine & Deduction Suite', () => {
         { id: 'b7', from: 'c2', to: 'h6', order: 1, length: 1.09 },
       ],
     };
+    // Test Ethylene C2H4 with C-C-H angle set to 119 deg
+    const ethyleneDoc119 = {
+      name: 'Ethylene',
+      formula: 'C2H4',
+      geometry: 'Atomic (Single Atom)',
+      hybridization: 'none',
+      bondLengths: { 'C-C': 1.54, 'C-H': 1.09 },
+      bondAngles: { 'C-C-H': 121, 'H-C-H': 120 },
+      nodes: [
+        { id: 'c1', element: 'C' },
+        { id: 'c2', element: 'C' },
+        { id: 'h1', element: 'H' },
+        { id: 'h2', element: 'H' },
+        { id: 'h3', element: 'H' },
+        { id: 'h4', element: 'H' },
+      ],
+      bonds: [
+        { id: 'b_cc', from: 'c1', to: 'c2', order: 2, length: 1.54 },
+        { id: 'b_ch1', from: 'c1', to: 'h1', order: 1, length: 1.09 },
+        { id: 'b_ch2', from: 'c1', to: 'h2', order: 1, length: 1.09 },
+        { id: 'b_ch3', from: 'c2', to: 'h3', order: 1, length: 1.09 },
+        { id: 'b_ch4', from: 'c2', to: 'h4', order: 1, length: 1.09 },
+      ],
+    };
+    const c2h4Mol = freeEngine.buildUniversalMolecule(ethyleneDoc119);
+    expect(c2h4Mol.atoms.length).toBe(6);
+    // Measure C-C-H angles (exact analytical placement = 121.00 deg)
+    const ang1 = core.measure(c2h4Mol, ['c2', 'c1', 'h1']);
+    const ang2 = core.measure(c2h4Mol, ['c2', 'c1', 'h2']);
+    expect(Math.abs(ang1 - 121)).toBeLessThan(0.05);
+    expect(Math.abs(ang2 - 121)).toBeLessThan(0.05);
+
+    // Test extreme angle 170 deg on Ethylene
+    const c2h4Mol170 = freeEngine.buildUniversalMolecule({
+      ...ethyleneDoc119,
+      bondAngles: { 'C-C-H': 170, 'H-C-H': 20 },
+    });
+    expect(Math.abs(core.measure(c2h4Mol170, ['c2', 'c1', 'h1']) - 170)).toBeLessThan(0.05);
+    expect(Math.abs(core.measure(c2h4Mol170, ['h1', 'c1', 'h2']) - 20)).toBeLessThan(0.05);
+    // Check all atoms are planar (Z coordinate absolute value close to 0)
+    for (const a of c2h4Mol.atoms) {
+      expect(Math.abs(a.position[2])).toBeLessThan(0.05);
+    }
+    // Check that H1 and H2 are separated and symmetric, NOT collapsed
+    const h1 = c2h4Mol.atoms.find((a) => a.id === 'h1')!;
+    const h2 = c2h4Mol.atoms.find((a) => a.id === 'h2')!;
+    const hDist = Math.hypot(
+      h1.position[0] - h2.position[0],
+      h1.position[1] - h2.position[1],
+      h1.position[2] - h2.position[2]
+    );
+    expect(hDist).toBeGreaterThan(1.5); // Should be around 1.88 A, never 0!
+
     const ethaneMol = freeEngine.buildUniversalMolecule(ethaneDoc);
     expect(ethaneMol.atoms.length).toBe(8);
     expect(ethaneMol.bonds.length).toBe(7);

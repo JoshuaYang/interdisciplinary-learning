@@ -5,6 +5,7 @@ export interface AtomDef {
   element: ElementSymbol;
   position: [number, number, number];
   radical: 0 | 1;
+  charge?: number;
 }
 
 export interface BondDef {

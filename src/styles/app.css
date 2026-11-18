@@ -4135,6 +4135,20 @@ kbd {
   color: #c2410c;
 }
 
+.canvas-mini-btn.is-cation {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.canvas-mini-btn.is-anion {
+  background: #f0f9ff;
+  border-color: #7dd3fc;
+  color: #0284c7;
+  font-weight: 700;
+}
+
 .canvas-mini-btn.danger {
   border-color: var(--danger-border);
   color: var(--danger);
@@ -5039,4 +5053,221 @@ kbd {
   .builder-main-columns {
     grid-template-columns: 1fr;
   }
+}
+
+/* Free-Form Step 3 Interactive Deduction */
+.free-deduction-interactive-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+}
+
+.free-deduction-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.deduction-solved-pill {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.free-deduction-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.free-field-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-secondary);
+}
+
+.bond-chip-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bond-pick-chip {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-soft);
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.bond-pick-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+.bond-pick-chip.active.broken {
+  background: #fff7ed;
+  border-color: #f97316;
+  color: #c2410c;
+  box-shadow: 0 0 0 1px #f97316;
+}
+
+.bond-pick-chip.active.formed {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #047857;
+  box-shadow: 0 0 0 1px #10b981;
+}
+
+.free-deduction-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.free-verify-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+  height: 32px;
+}
+
+.free-reveal-btn {
+  font-size: 12px;
+  padding: 6px 12px;
+  height: 32px;
+}
+
+.free-deduction-feedback {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.free-deduction-feedback.success {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+}
+
+.free-deduction-feedback.error {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+}
+
+/* Ion Charge Stepper */
+.node-charge-stepper-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+}
+
+.stepper-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  margin-right: 2px;
+}
+
+.stepper-mini-btn {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border: 1px solid var(--border-soft);
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.12s ease;
+  padding: 0;
+}
+
+.stepper-mini-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+.stepper-val-btn {
+  min-width: 26px;
+  height: 22px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.stepper-val-btn.is-cation {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+.stepper-val-btn.is-anion {
+  background: #f0f9ff;
+  border-color: #7dd3fc;
+  color: #0284c7;
+}
+
+/* Termination Pathway Tabs */
+.termination-pathway-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.termination-pathway-btn {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 20px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-soft);
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.termination-pathway-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+  color: var(--ink);
+}
+
+.termination-pathway-btn.active {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.15);
 }

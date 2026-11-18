@@ -559,6 +559,82 @@ export const MoleculeBuilderModal: React.FC = () => {
     return [...keys];
   }, [nodes, bonds]);
 
+  // Auto-coupled geometric angle handler: keeps dependent bond angles around the same center mathematically consistent
+  const handleAngleChange = useCallback(
+    (changedKey: string, rawVal: string) => {
+      setBondAnglesInput((prev) => {
+        const next = { ...prev, [changedKey]: rawVal };
+        const parts = changedKey.split('-');
+        if (parts.length === 3) {
+          next[`${parts[2]}-${parts[1]}-${parts[0]}`] = rawVal;
+        }
+
+        const num = Number(rawVal);
+        if (!Number.isFinite(num) || num <= 0 || activeAngleKeys.length !== 2) {
+          return next;
+        }
+
+        const otherKey = activeAngleKeys.find((k) => k !== changedKey);
+        if (!otherKey) return next;
+
+        // Determine max coordination number of the central atom
+        const centerSymbol = parts[1];
+        const adjCount = new Map<string, number>();
+        bonds.forEach((b) => {
+          adjCount.set(b.from, (adjCount.get(b.from) || 0) + 1);
+          adjCount.set(b.to, (adjCount.get(b.to) || 0) + 1);
+        });
+        let maxDeg = 0;
+        nodes.forEach((n) => {
+          if (n.element === centerSymbol) {
+            maxDeg = Math.max(maxDeg, adjCount.get(n.id) || 0);
+          }
+        });
+
+        const isChangedSymmetric = parts[0] === parts[2]; // e.g. H-C-H vs C-C-H
+        const otherParts = otherKey.split('-');
+        const otherRev =
+          otherParts.length === 3
+            ? `${otherParts[2]}-${otherParts[1]}-${otherParts[0]}`
+            : otherKey;
+
+        if (maxDeg === 3) {
+          // Planar 3-coordinate closure: 2 * theta_axial + phi_basal = 360°
+          const derived = isChangedSymmetric ? (360 - num) / 2 : 360 - 2 * num;
+          if (derived >= 10 && derived <= 300) {
+            const formatted = String(Number(derived.toFixed(2)));
+            next[otherKey] = formatted;
+            next[otherRev] = formatted;
+          }
+        } else if (maxDeg === 4) {
+          // Tetrahedral C3v closure: cos(beta) = 1.5 * cos^2(alpha) - 0.5
+          if (!isChangedSymmetric && num > 60 && num < 175) {
+            const cosAlpha = Math.cos((num * Math.PI) / 180);
+            const cosBeta = 1.5 * cosAlpha * cosAlpha - 0.5;
+            if (cosBeta > -0.999 && cosBeta < 0.999) {
+              const beta = (Math.acos(cosBeta) * 180) / Math.PI;
+              const formatted = String(Number(beta.toFixed(2)));
+              next[otherKey] = formatted;
+              next[otherRev] = formatted;
+            }
+          } else if (isChangedSymmetric && num > 60 && num < 120) {
+            const cosBeta = Math.cos((num * Math.PI) / 180);
+            const cosAlphaSq = (cosBeta + 0.5) / 1.5;
+            if (cosAlphaSq > 0 && cosAlphaSq < 1) {
+              const alpha = (Math.acos(-Math.sqrt(cosAlphaSq)) * 180) / Math.PI;
+              const formatted = String(Number(alpha.toFixed(2)));
+              next[otherKey] = formatted;
+              next[otherRev] = formatted;
+            }
+          }
+        }
+
+        return next;
+      });
+    },
+    [activeAngleKeys, bonds, nodes]
+  );
+
   // Add an atom of `symbol` to the 2D topology canvas
   const addAtomNode = (symbol: string, customPos?: { x: number; y: number }) => {
     setActiveElement(symbol);
@@ -755,6 +831,26 @@ export const MoleculeBuilderModal: React.FC = () => {
     setHybridization(autoParams.hybridization);
   };
 
+  // Step ion charge on selected node
+  const stepSelectedNodeCharge = (delta: number) => {
+    if (!selectedNodeId) return;
+    setNodes((prev) =>
+      prev.map((n) => {
+        if (n.id !== selectedNodeId) return n;
+        const cur = n.charge || 0;
+        const next = Math.max(-6, Math.min(8, cur + delta));
+        return { ...n, charge: next };
+      })
+    );
+  };
+
+  const setSelectedNodeCharge = (charge: number) => {
+    if (!selectedNodeId) return;
+    setNodes((prev) =>
+      prev.map((n) => (n.id === selectedNodeId ? { ...n, charge } : n))
+    );
+  };
+
   // Delete selected node (and any terminal H atoms exclusively attached to it)
   const deleteSelectedNode = () => {
     if (!selectedNodeId) return;
@@ -909,6 +1005,7 @@ export const MoleculeBuilderModal: React.FC = () => {
         id: n.id,
         element: n.element,
         radical: n.radical,
+        charge: typeof n.charge === 'number' ? n.charge : 0,
         x: n.x,
         y: n.y,
       })),
@@ -1251,7 +1348,7 @@ export const MoleculeBuilderModal: React.FC = () => {
 
       const label = new THREE.Sprite(
         new THREE.SpriteMaterial({
-          map: getElementSpriteTexture(a.element),
+          map: getElementSpriteTexture(a.element, a.charge || 0),
           transparent: true,
           depthTest: true,
           depthWrite: false,
@@ -1575,6 +1672,44 @@ export const MoleculeBuilderModal: React.FC = () => {
                         >
                           <span>· {selectedNode.radical ? 'Radical' : 'No Radical'}</span>
                         </button>
+                        {/* Multi-value Ion Charge Stepper */}
+                        <div className="node-charge-stepper-wrap">
+                          <span className="stepper-title">Charge:</span>
+                          <button
+                            type="button"
+                            className="stepper-mini-btn"
+                            onClick={() => stepSelectedNodeCharge(-1)}
+                            title="Decrease charge by 1"
+                          >
+                            −
+                          </button>
+                          <button
+                            type="button"
+                            className={`stepper-val-btn ${
+                              selectedNode.charge
+                                ? selectedNode.charge > 0
+                                  ? 'is-cation'
+                                  : 'is-anion'
+                                : ''
+                            }`}
+                            onClick={() => setSelectedNodeCharge(0)}
+                            title="Click to reset charge to Neutral (0)"
+                          >
+                            {selectedNode.charge
+                              ? selectedNode.charge > 0
+                                ? `+${selectedNode.charge}`
+                                : `${selectedNode.charge}`
+                              : '0'}
+                          </button>
+                          <button
+                            type="button"
+                            className="stepper-mini-btn"
+                            onClick={() => stepSelectedNodeCharge(1)}
+                            title="Increase charge by 1"
+                          >
+                            +
+                          </button>
+                        </div>
                         <button
                           type="button"
                           className="canvas-mini-btn danger"
@@ -1962,6 +2097,32 @@ export const MoleculeBuilderModal: React.FC = () => {
                                 strokeWidth="1.6"
                               />
                             )}
+                            {typeof n.charge === 'number' && n.charge !== 0 && (
+                              <g transform={`translate(${r * 0.72}, ${-r * 0.72})`}>
+                                <circle
+                                  r="8.5"
+                                  fill={n.charge > 0 ? '#ef4444' : '#0284c7'}
+                                  stroke="#ffffff"
+                                  strokeWidth="1.6"
+                                />
+                                <text
+                                  y="3.5"
+                                  textAnchor="middle"
+                                  fontSize="10"
+                                  fontWeight="800"
+                                  fill="#ffffff"
+                                  style={{ pointerEvents: 'none', userSelect: 'none' }}
+                                >
+                                  {n.charge > 0
+                                    ? n.charge === 1
+                                      ? '+'
+                                      : `${n.charge}+`
+                                    : n.charge === -1
+                                    ? '−'
+                                    : `${Math.abs(n.charge)}−`}
+                                </text>
+                              </g>
+                            )}
                             {showHandle && (
                               <g
                                 className="topo-connect-handle"
@@ -2332,41 +2493,109 @@ export const MoleculeBuilderModal: React.FC = () => {
 
                   {/* Bond Angles (°) */}
                   <div className="param-group-card param-group-angles">
-                    <div className="param-group-title">
+                    <div className="param-group-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div className="param-title-left">
                         <Compass size={16} className="param-icon compass-icon" />
                         <span>Bond Angles (bondAngles · in °)</span>
                       </div>
+                      {activeAngleKeys.length >= 2 && (
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            color: '#d97706',
+                            background: 'rgba(245, 158, 11, 0.12)',
+                            padding: '2px 8px',
+                            borderRadius: '999px',
+                            border: '1px solid rgba(245, 158, 11, 0.25)',
+                          }}
+                          title="Changing one angle automatically updates geometrically coupled angles around the same center"
+                        >
+                          ⚡ Auto-Coupled 3D Sync
+                        </span>
+                      )}
                     </div>
                     {activeAngleKeys.length === 0 ? (
                       <div className="param-empty-hint">
                         Monatomic or diatomic species do not require bond angle parameters.
                       </div>
                     ) : (
-                      <div className="param-grid-2">
-                        {activeAngleKeys.map((k) => (
-                          <label key={k} className="param-field">
-                            <span className="mono">{k} Bond Angle (°)</span>
-                            <div className="input-unit-wrap">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="30"
-                                max="180"
-                                placeholder="e.g. 109.5 or 120"
-                                value={bondAnglesInput[k] || ''}
-                                onChange={(e) =>
-                                  setBondAnglesInput((prev) => ({
-                                    ...prev,
-                                    [k]: e.target.value,
-                                  }))
-                                }
-                              />
-                              <span className="input-unit-tag">°</span>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
+                      <>
+                        <div className="param-grid-2">
+                          {activeAngleKeys.map((k) => {
+                            const numVal = Number(bondAnglesInput[k]);
+                            const sliderVal = Number.isFinite(numVal) && numVal >= 30 && numVal <= 180 ? numVal : 120;
+                            return (
+                              <div key={k} className="param-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <span className="mono">{k} Bond Angle (°)</span>
+                                <div className="input-unit-wrap">
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    min="20"
+                                    max="180"
+                                    placeholder="e.g. 109.5 or 120"
+                                    value={bondAnglesInput[k] || ''}
+                                    onChange={(e) => handleAngleChange(k, e.target.value)}
+                                  />
+                                  <span className="input-unit-tag">°</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="60"
+                                  max="175"
+                                  step="0.5"
+                                  value={Math.max(60, Math.min(175, sliderVal))}
+                                  onChange={(e) => handleAngleChange(k, e.target.value)}
+                                  style={{
+                                    width: '100%',
+                                    accentColor: '#f59e0b',
+                                    cursor: 'pointer',
+                                    height: '5px',
+                                  }}
+                                />
+                                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                  {[
+                                    { label: '60°', val: '60' },
+                                    { label: '104.5°', val: '104.5' },
+                                    { label: '107.5°', val: '107.5' },
+                                    { label: '109.5°', val: '109.471' },
+                                    { label: '120°', val: '120' },
+                                    { label: '180°', val: '180' },
+                                  ].map((preset) => (
+                                    <button
+                                      key={preset.label}
+                                      type="button"
+                                      onClick={() => handleAngleChange(k, preset.val)}
+                                      style={{
+                                        fontSize: '10.5px',
+                                        padding: '2px 6px',
+                                        borderRadius: '4px',
+                                        border:
+                                          Math.abs(numVal - Number(preset.val)) < 0.2
+                                            ? '1px solid #f59e0b'
+                                            : '1px solid #e2e8f0',
+                                        background:
+                                          Math.abs(numVal - Number(preset.val)) < 0.2
+                                            ? 'rgba(245, 158, 11, 0.15)'
+                                            : '#f8fafc',
+                                        color:
+                                          Math.abs(numVal - Number(preset.val)) < 0.2
+                                            ? '#b45309'
+                                            : '#475569',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                      }}
+                                    >
+                                      {preset.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>

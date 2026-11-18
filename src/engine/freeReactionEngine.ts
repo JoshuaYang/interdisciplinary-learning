@@ -6,6 +6,7 @@ export interface TopologyNode {
   id: string;
   element: string;
   radical: 0 | 1;
+  charge?: number;
   /** 2D canvas coordinates for interactive builder */
   x?: number;
   y?: number;
@@ -347,9 +348,11 @@ export function inferFormulaAndName(
   }
   const counts: Record<string, number> = {};
   let totalRadicals = 0;
+  let netCharge = 0;
   for (const n of nodes) {
     counts[n.element] = (counts[n.element] || 0) + 1;
     if (n.radical) totalRadicals += n.radical;
+    if (typeof n.charge === 'number') netCharge += n.charge;
   }
 
   // Special structural formula for ethane CH3CH3
@@ -378,6 +381,21 @@ export function inferFormulaAndName(
   }
   if (totalRadicals > 0) {
     formula += '·';
+  }
+  if (netCharge !== 0) {
+    const sign = netCharge > 0 ? '+' : '-';
+    const magnitude = Math.abs(netCharge) > 1 ? String(Math.abs(netCharge)) : '';
+    formula = nodes.length > 1 ? `[${formula}]${magnitude}${sign}` : `${formula}${magnitude}${sign}`;
+  }
+
+  if (netCharge !== 0) {
+    const ionType = netCharge > 0 ? 'Cation' : 'Anion';
+    const baseName = nodes.length === 1 ? (ELEMENT_MAP[nodes[0].element]?.name || nodes[0].element) : formula;
+    return {
+      formula,
+      name: `${baseName} ${ionType}`,
+      description: `Ionic chemical species with a net charge of ${netCharge > 0 ? `+${netCharge}` : netCharge}.`,
+    };
   }
 
   const known = COMMON_MOLECULE_NAMES[formula];
@@ -444,14 +462,30 @@ function computeLocalDirections(
   }
 
   if (neighborCount === 3) {
+    const isPyramidal = geometry === 'trigonalPyramidal';
+    if (!isPyramidal) {
+      const angle =
+        Number.isFinite(axialAngleDeg) && axialAngleDeg > 30 && axialAngleDeg < 180
+          ? axialAngleDeg
+          : 120;
+      if (Math.abs(angle - 120) < 0.01) {
+        return [
+          [1, 0, 0],
+          [-0.5, Math.sqrt(3) / 2, 0],
+          [-0.5, -Math.sqrt(3) / 2, 0],
+        ];
+      }
+      const rad = (angle * Math.PI) / 180;
+      return [
+        [1, 0, 0],
+        [Math.cos(rad), Math.sin(rad), 0],
+        [Math.cos(rad), -Math.sin(rad), 0],
+      ];
+    }
     const angle =
-      geometry === 'trigonalPlanar'
-        ? 120
-        : Number.isFinite(axialAngleDeg) && axialAngleDeg > 60 && axialAngleDeg <= 120
+      Number.isFinite(axialAngleDeg) && axialAngleDeg > 60 && axialAngleDeg < 150
         ? axialAngleDeg
-        : geometry === 'trigonalPyramidal'
-        ? 107
-        : 120;
+        : 107;
     // Cone half-angle beta: sin(beta) = (2 / sqrt(3)) * sin(angle / 2)
     const sinBeta = Math.min(1, (2 / Math.sqrt(3)) * Math.sin(((angle / 2) * Math.PI) / 180));
     const cosBeta = Math.sqrt(Math.max(0, 1 - sinBeta * sinBeta));
@@ -774,6 +808,405 @@ export function normalizeDocToTopology(doc: any): {
 }
 
 /**
+ * Fast & accurate distance-geometry and bond-angle relaxation solver.
+ * Enforces:
+ * 1. Target bond lengths (including ring closure bonds that tree BFS ignores)
+ * 2. Target bond angles from doc.bondAngles (or standard geometry angles)
+ * 3. Double-bond planar / dihedral flatness
+ * 4. Steric non-overlap
+ */
+function relaxUniversalGeometry(
+  nodes: TopologyNode[],
+  bonds: TopologyBond[],
+  positions: Map<string, [number, number, number]>,
+  targetBondLengths: Record<string, number>,
+  targetBondAngles: Record<string, number>
+) {
+  if (nodes.length <= 2) return;
+
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  const adj = new Map<string, string[]>();
+  nodes.forEach((n) => adj.set(n.id, []));
+  bonds.forEach((b) => {
+    if (adj.has(b.from) && adj.has(b.to)) {
+      adj.get(b.from)!.push(b.to);
+      adj.get(b.to)!.push(b.from);
+    }
+  });
+
+  // Extract all target bond lengths
+  const bondConstraints = bonds.map((b) => {
+    const n1 = nodeMap.get(b.from)!;
+    const n2 = nodeMap.get(b.to)!;
+    const canon = getCanonicalBondKey(n1.element, n2.element);
+    const alt = `${n2.element}-${n1.element}`;
+    const targetL =
+      b.length ??
+      targetBondLengths[canon] ??
+      targetBondLengths[alt] ??
+      getRecommendedBondLength(n1.element, n2.element, b.order);
+    return { from: b.from, to: b.to, targetL, order: b.order };
+  });
+
+  // Extract all angle constraints (A-C-B)
+  const angleConstraints: {
+    center: string;
+    a: string;
+    b: string;
+    targetAngleRad: number;
+    weight: number;
+  }[] = [];
+
+  for (const center of nodes) {
+    const nbs = adj.get(center.id) || [];
+    if (nbs.length < 2) continue;
+
+    const isPlanarCenter =
+      nbs.length === 3 &&
+      (center.geometry === 'trigonalPlanar' ||
+        center.hybridization === 'sp2' ||
+        bonds.some((b) => (b.from === center.id || b.to === center.id) && b.order === 2));
+
+    // For planar 3-coordinate center (e.g. ethylene carbon):
+    // Ensure the 3 angles around this center sum strictly to 360 degrees to avoid non-planar folding
+    if (isPlanarCenter) {
+      const elCenter = center.element;
+      const el0 = nodeMap.get(nbs[0])!.element;
+      const el1 = nodeMap.get(nbs[1])!.element;
+      const el2 = nodeMap.get(nbs[2])!.element;
+
+      const pairs: [number, number, string, string][] = [
+        [0, 1, nbs[0], nbs[1]],
+        [0, 2, nbs[0], nbs[2]],
+        [1, 2, nbs[1], nbs[2]],
+      ];
+
+      const rawAngles = pairs.map(([i, j]) => {
+        const ea = nodeMap.get(nbs[i])!.element;
+        const eb = nodeMap.get(nbs[j])!.element;
+        const k1 = `${ea}-${elCenter}-${eb}`;
+        const k2 = `${eb}-${elCenter}-${ea}`;
+        return (
+          targetBondAngles[k1] ??
+          targetBondAngles[k2] ??
+          center.bondAngles?.[k1] ??
+          center.bondAngles?.[k2]
+        );
+      });
+
+      // Distinguish heavy substituent (e.g. C=C bond) vs ligand substituents
+      const heavyIdx = nbs.findIndex((id) => nodeMap.get(id)!.element !== 'H');
+      let finalDegs: number[] = [120, 120, 120];
+
+      if (heavyIdx >= 0) {
+        // Ligands are the other two
+        const ligIndices = [0, 1, 2].filter((i) => i !== heavyIdx);
+        // Pair between heavy and lig1:
+        const p1Idx = pairs.findIndex(
+          ([i, j]) => (i === heavyIdx && j === ligIndices[0]) || (j === heavyIdx && i === ligIndices[0])
+        );
+        // Pair between heavy and lig2:
+        const p2Idx = pairs.findIndex(
+          ([i, j]) => (i === heavyIdx && j === ligIndices[1]) || (j === heavyIdx && i === ligIndices[1])
+        );
+        // Pair between lig1 and lig2:
+        const pLigIdx = pairs.findIndex(
+          ([i, j]) => (i === ligIndices[0] && j === ligIndices[1]) || (j === ligIndices[0] && i === ligIndices[1])
+        );
+
+        const heavyAngleInput = rawAngles[p1Idx] ?? rawAngles[p2Idx];
+        const ligAngleInput = rawAngles[pLigIdx];
+
+        if (typeof heavyAngleInput === 'number' && heavyAngleInput > 0) {
+          const theta = heavyAngleInput;
+          const phi =
+            typeof ligAngleInput === 'number' && ligAngleInput > 0
+              ? ligAngleInput
+              : Math.max(30, 360 - 2 * theta);
+          const sum = 2 * theta + phi;
+          const norm = 360 / sum;
+          finalDegs[p1Idx] = theta * norm;
+          finalDegs[p2Idx] = theta * norm;
+          finalDegs[pLigIdx] = phi * norm;
+        } else if (typeof ligAngleInput === 'number' && ligAngleInput > 0) {
+          const phi = ligAngleInput;
+          const theta = (360 - phi) / 2;
+          finalDegs[p1Idx] = theta;
+          finalDegs[p2Idx] = theta;
+          finalDegs[pLigIdx] = phi;
+        }
+      } else {
+        const sum = rawAngles.reduce((s: number, a) => s + (typeof a === 'number' && a > 0 ? a : 120), 0);
+        const norm = 360 / sum;
+        finalDegs = rawAngles.map((a) => (typeof a === 'number' && a > 0 ? a * norm : 120 * norm));
+      }
+
+      pairs.forEach(([i, j, idA, idB], pIdx) => {
+        angleConstraints.push({
+          center: center.id,
+          a: idA,
+          b: idB,
+          targetAngleRad: (finalDegs[pIdx] * Math.PI) / 180,
+          weight: 4.0,
+        });
+      });
+      continue;
+    }
+
+    for (let i = 0; i < nbs.length; i++) {
+      for (let j = i + 1; j < nbs.length; j++) {
+        const idA = nbs[i];
+        const idB = nbs[j];
+        const elA = nodeMap.get(idA)!.element;
+        const elB = nodeMap.get(idB)!.element;
+        const k1 = `${elA}-${center.element}-${elB}`;
+        const k2 = `${elB}-${center.element}-${elA}`;
+        const inputAngle =
+          targetBondAngles[k1] ??
+          targetBondAngles[k2] ??
+          center.bondAngles?.[k1] ??
+          center.bondAngles?.[k2];
+
+        const isAHeavy = elA !== 'H';
+        const isBHeavy = elB !== 'H';
+        const isBothHeavy = isAHeavy && isBHeavy;
+        const isRing3 = bonds.some(
+          (b) => (b.from === idA && b.to === idB) || (b.from === idB && b.to === idA)
+        );
+
+        let targetDeg = inputAngle;
+        if (!targetDeg || !Number.isFinite(targetDeg) || targetDeg <= 0) {
+          if (isRing3) {
+            targetDeg = 60.0;
+          } else if (center.geometry === 'trigonalPlanar' || center.hybridization === 'sp2') {
+            targetDeg = 120.0;
+          } else if (center.geometry === 'regularTetrahedral') {
+            targetDeg = 109.471;
+          } else if (center.geometry === 'bent') {
+            targetDeg = center.element === 'O' ? 104.5 : 109.5;
+          } else if (center.geometry === 'linear') {
+            targetDeg = 180.0;
+          } else {
+            targetDeg = 109.5;
+          }
+        }
+
+        const weight = isRing3
+          ? 8.0
+          : inputAngle
+          ? isBothHeavy
+            ? 6.0
+            : 2.0
+          : isBothHeavy
+          ? 3.0
+          : 0.8;
+
+        angleConstraints.push({
+          center: center.id,
+          a: idA,
+          b: idB,
+          targetAngleRad: (targetDeg * Math.PI) / 180,
+          weight,
+        });
+      }
+    }
+  }
+
+  const doubleBonds = bonds.filter((b) => b.order === 2);
+
+  // Gradient relaxation iterations
+  const steps = 140;
+  for (let it = 0; it < steps; it++) {
+    const decay = 1 - it / steps;
+    const bondAlpha = 0.38 * Math.max(0.18, decay);
+    const angleAlpha = 0.24 * Math.max(0.18, decay);
+
+    // 1. Bond length constraints (Hooke's spring relaxation)
+    for (const bc of bondConstraints) {
+      const p1 = positions.get(bc.from);
+      const p2 = positions.get(bc.to);
+      if (!p1 || !p2) continue;
+
+      const dx = p2[0] - p1[0];
+      const dy = p2[1] - p1[1];
+      const dz = p2[2] - p1[2];
+      const dist = Math.hypot(dx, dy, dz) || 0.0001;
+      const diff = dist - bc.targetL;
+      const factor = (diff / dist) * bondAlpha * 0.5;
+
+      p1[0] += dx * factor;
+      p1[1] += dy * factor;
+      p1[2] += dz * factor;
+      p2[0] -= dx * factor;
+      p2[1] -= dy * factor;
+      p2[2] -= dz * factor;
+    }
+
+    // 2. Bond angle constraints
+    for (const ac of angleConstraints) {
+      const pC = positions.get(ac.center);
+      const pA = positions.get(ac.a);
+      const pB = positions.get(ac.b);
+      if (!pC || !pA || !pB) continue;
+
+      const vAx = pA[0] - pC[0];
+      const vAy = pA[1] - pC[1];
+      const vAz = pA[2] - pC[2];
+      const lenA = Math.hypot(vAx, vAy, vAz) || 0.0001;
+
+      const vBx = pB[0] - pC[0];
+      const vBy = pB[1] - pC[1];
+      const vBz = pB[2] - pC[2];
+      const lenB = Math.hypot(vBx, vBy, vBz) || 0.0001;
+
+      const uAx = vAx / lenA;
+      const uAy = vAy / lenA;
+      const uAz = vAz / lenA;
+
+      const uBx = vBx / lenB;
+      const uBy = vBy / lenB;
+      const uBz = vBz / lenB;
+
+      const dot = Math.max(-1, Math.min(1, uAx * uBx + uAy * uBy + uAz * uBz));
+      const curAngle = Math.acos(dot);
+      const angleDiff = curAngle - ac.targetAngleRad;
+
+      if (Math.abs(angleDiff) > 0.001) {
+        const sinVal = Math.sin(curAngle);
+        if (sinVal > 0.001) {
+          // wA is unit tangent on uA pointing towards uB (closing the angle)
+          const wAx = (uBx - dot * uAx) / sinVal;
+          const wAy = (uBy - dot * uAy) / sinVal;
+          const wAz = (uBz - dot * uAz) / sinVal;
+
+          // wB is unit tangent on uB pointing towards uA (closing the angle)
+          const wBx = (uAx - dot * uBx) / sinVal;
+          const wBy = (uAy - dot * uBy) / sinVal;
+          const wBz = (uAz - dot * uBz) / sinVal;
+
+          const elA = nodeMap.get(ac.a)!.element;
+          const elB = nodeMap.get(ac.b)!.element;
+          const massA = elA === 'H' ? 1.0 : elA === 'C' ? 12.0 : 35.0;
+          const massB = elB === 'H' ? 1.0 : elB === 'C' ? 12.0 : 35.0;
+          const totalMass = massA + massB;
+          const factorA = massB / totalMass; // Ligand moves much more, heavy skeleton stays steady!
+          const factorB = massA / totalMass;
+
+          // When angleDiff > 0 (curAngle > targetAngle), move towards each other (+wA, +wB) to close angle
+          const moveA = angleDiff * angleAlpha * ac.weight * factorA * lenA;
+          const moveB = angleDiff * angleAlpha * ac.weight * factorB * lenB;
+
+          pA[0] += wAx * moveA;
+          pA[1] += wAy * moveA;
+          pA[2] += wAz * moveA;
+
+          pB[0] += wBx * moveB;
+          pB[1] += wBy * moveB;
+          pB[2] += wBz * moveB;
+        }
+      }
+    }
+
+    // 3. Double bond planar torsion constraint (ensures ethylene is strictly flat)
+    for (const db of doubleBonds) {
+      const p1 = positions.get(db.from);
+      const p2 = positions.get(db.to);
+      if (!p1 || !p2) continue;
+
+      const nbs1 = (adj.get(db.from) || []).filter((id) => id !== db.to);
+      const nbs2 = (adj.get(db.to) || []).filter((id) => id !== db.from);
+      if (nbs1.length >= 1 && nbs2.length >= 1) {
+        const ux = p2[0] - p1[0];
+        const uy = p2[1] - p1[1];
+        const uz = p2[2] - p1[2];
+
+        const pA = positions.get(nbs1[0])!;
+        const vAx = pA[0] - p1[0];
+        const vAy = pA[1] - p1[1];
+        const vAz = pA[2] - p1[2];
+
+        let nx = uy * vAz - uz * vAy;
+        let ny = uz * vAx - ux * vAz;
+        let nz = ux * vAy - uy * vAx;
+        const nLen = Math.hypot(nx, ny, nz);
+        if (nLen < 0.001) {
+          nx = 0; ny = 0; nz = 1;
+        } else {
+          nx /= nLen; ny /= nLen; nz /= nLen;
+        }
+
+        [...nbs1, ...nbs2].forEach((id) => {
+          const p = positions.get(id)!;
+          const vx = p[0] - p1[0];
+          const vy = p[1] - p1[1];
+          const vz = p[2] - p1[2];
+          const distToPlane = vx * nx + vy * ny + vz * nz;
+          p[0] -= distToPlane * nx * 0.7;
+          p[1] -= distToPlane * ny * 0.7;
+          p[2] -= distToPlane * nz * 0.7;
+        });
+      }
+    }
+
+    // 4. Steric repulsion (prevent atom overlapping, ignore 1-2 and 1-3 pairs)
+    for (let i = 0; i < nodes.length; i++) {
+      const pA = positions.get(nodes[i].id)!;
+      for (let j = i + 1; j < nodes.length; j++) {
+        const idB = nodes[j].id;
+        const isBonded = bonds.some(
+          (b) =>
+            (b.from === nodes[i].id && b.to === idB) || (b.from === idB && b.to === nodes[i].id)
+        );
+        if (isBonded) continue;
+        const isAnglePair = (adj.get(nodes[i].id) || []).some((common) =>
+          (adj.get(idB) || []).includes(common)
+        );
+        if (isAnglePair) continue;
+
+        const pB = positions.get(idB)!;
+        const dx = pB[0] - pA[0];
+        const dy = pB[1] - pA[1];
+        const dz = pB[2] - pA[2];
+        const d = Math.hypot(dx, dy, dz) || 0.0001;
+        const minDist = 1.35;
+        if (d < minDist) {
+          const push = (minDist - d) * 0.15;
+          pA[0] -= (dx / d) * push;
+          pA[1] -= (dy / d) * push;
+          pA[2] -= (dz / d) * push;
+          pB[0] += (dx / d) * push;
+          pB[1] += (dy / d) * push;
+          pB[2] += (dz / d) * push;
+        }
+      }
+    }
+  }
+
+  // Final exact bond length projection to guarantee measured distances match targetL perfectly
+  for (let it = 0; it < 25; it++) {
+    for (const bc of bondConstraints) {
+      const p1 = positions.get(bc.from);
+      const p2 = positions.get(bc.to);
+      if (!p1 || !p2) continue;
+
+      const dx = p2[0] - p1[0];
+      const dy = p2[1] - p1[1];
+      const dz = p2[2] - p1[2];
+      const dist = Math.hypot(dx, dy, dz) || 0.0001;
+      const diff = dist - bc.targetL;
+      const factor = (diff / dist) * 0.5;
+
+      p1[0] += dx * factor;
+      p1[1] += dy * factor;
+      p1[2] += dz * factor;
+      p2[0] -= dx * factor;
+      p2[1] -= dy * factor;
+      p2[2] -= dz * factor;
+    }
+  }
+}
+
+/**
  * Universal 3D structure generator: converts any valid JSON doc into a 3D MoleculeModel
  * purely from the JSON fields without any hardcoded molecule templates or restrictions.
  */
@@ -795,6 +1228,7 @@ export function buildUniversalMolecule(doc: any): MoleculeModel {
         Number(a.position[2]) || 0,
       ],
       radical: a.radical ? 1 : 0,
+      charge: typeof a.charge === 'number' ? a.charge : 0,
     }));
     const bonds: BondDef[] = Array.isArray(doc.bonds)
       ? doc.bonds.map((b: any) => ({
@@ -862,7 +1296,23 @@ export function buildUniversalMolecule(doc: any): MoleculeModel {
       // Order neighbors so that if there's a parentId or a distinct substituent (like Br in CH3Br),
       // for 4-coordinate tetrahedral, the parent or unique substituent is at index 3 (+Z axis)
       const orderedNeighbors = [...neighbors];
-      if (orderedNeighbors.length === 4) {
+      if (orderedNeighbors.length === 3) {
+        if (parentId) {
+          const pIdx = orderedNeighbors.findIndex((x) => x.neighborId === parentId);
+          if (pIdx > 0) {
+            const [item] = orderedNeighbors.splice(pIdx, 1);
+            orderedNeighbors.unshift(item);
+          }
+        } else {
+          const nonHIdx = orderedNeighbors.findIndex(
+            (x) => nodeMap.get(x.neighborId)!.element !== 'H'
+          );
+          if (nonHIdx > 0) {
+            const [item] = orderedNeighbors.splice(nonHIdx, 1);
+            orderedNeighbors.unshift(item);
+          }
+        }
+      } else if (orderedNeighbors.length === 4) {
         if (parentId) {
           const pIdx = orderedNeighbors.findIndex((x) => x.neighborId === parentId);
           if (pIdx >= 0 && pIdx !== 3) {
@@ -898,7 +1348,25 @@ export function buildUniversalMolecule(doc: any): MoleculeModel {
       // Determine axial/characteristic angle from bondAngles if provided
       const anglesObj = centerNode.bondAngles || doc.bondAngles || {};
       let axialAngle = 109.47122;
-      if (orderedNeighbors.length === 4) {
+      if (orderedNeighbors.length === 3) {
+        const a0 = nodeMap.get(orderedNeighbors[0].neighborId)!.element;
+        const a1 = nodeMap.get(orderedNeighbors[1].neighborId)!.element;
+        const a2 = nodeMap.get(orderedNeighbors[2].neighborId)!.element;
+        const k1 = `${a0}-${centerNode.element}-${a1}`;
+        const k2 = `${a1}-${centerNode.element}-${a0}`;
+        const kLig = `${a1}-${centerNode.element}-${a2}`;
+        if (typeof anglesObj[k1] === 'number' && anglesObj[k1] > 0) {
+          axialAngle = anglesObj[k1];
+        } else if (typeof anglesObj[k2] === 'number' && anglesObj[k2] > 0) {
+          axialAngle = anglesObj[k2];
+        } else if (typeof anglesObj[kLig] === 'number' && anglesObj[kLig] > 0) {
+          axialAngle = (360 - anglesObj[kLig]) / 2;
+        } else {
+          const firstAngle = Object.values(anglesObj).find((v) => typeof v === 'number' && v > 0);
+          if (typeof firstAngle === 'number') axialAngle = firstAngle;
+          else axialAngle = 120;
+        }
+      } else if (orderedNeighbors.length === 4) {
         const axialEl = nodeMap.get(orderedNeighbors[3].neighborId)!.element;
         const basalEl = nodeMap.get(orderedNeighbors[0].neighborId)!.element;
         const k1 = `${basalEl}-${centerNode.element}-${axialEl}`;
@@ -931,7 +1399,14 @@ export function buildUniversalMolecule(doc: any): MoleculeModel {
         ];
         const parentSlotIdx = orderedNeighbors.findIndex((x) => x.neighborId === parentId);
         if (parentSlotIdx >= 0) {
-          dirs = alignDirectionsToVector(dirs, parentSlotIdx, toParent, Math.PI / 3);
+          const parentBond = orderedNeighbors[parentSlotIdx]?.bond;
+          const isDoubleOrTriple = parentBond && parentBond.order >= 2;
+          const isPlanarCenter =
+            geo === 'trigonalPlanar' ||
+            centerNode.hybridization === 'sp2' ||
+            (orderedNeighbors.length === 3 && geo !== 'trigonalPyramidal');
+          const twist = isDoubleOrTriple || isPlanarCenter ? 0 : Math.PI / 3;
+          dirs = alignDirectionsToVector(dirs, parentSlotIdx, toParent, twist);
         }
       } else if (orderedNeighbors.length === 2 && !parentId && (geo === 'diatomic' || geo === 'linear')) {
         // Place 2-atom molecule symmetrically around origin if root
@@ -979,6 +1454,17 @@ export function buildUniversalMolecule(doc: any): MoleculeModel {
     componentOffsetX += 3.2;
   }
 
+  // Apply geometry relaxation when cyclic rings exist (bonds.length >= nodes.length)
+  if (bonds.length >= nodes.length) {
+    relaxUniversalGeometry(
+      nodes,
+      bonds,
+      positions,
+      doc.bondLengths || {},
+      doc.bondAngles || {}
+    );
+  }
+
   // Center the entire molecule at [0, 0, 0]
   let cx = 0,
     cy = 0,
@@ -1005,6 +1491,7 @@ export function buildUniversalMolecule(doc: any): MoleculeModel {
         Number((raw[2] - cz).toFixed(4)),
       ],
       radical: n.radical ? 1 : 0,
+      charge: typeof n.charge === 'number' ? n.charge : 0,
     };
   });
 
@@ -1427,16 +1914,17 @@ export function compileFreeStages(
       formedBondLabels,
       reactantLabels,
       productLabels,
-      duration: 2.8,
+      duration: 4.6,
     };
   });
 }
 
 /**
  * Sample a 3D frame at `progress ∈ [0, 1]` for a compiled custom stage:
- * - [0.00 -> 0.35]: Reactants approach from separated positions to collision zone
- * - [0.35 -> 0.68]: Bonds break & form, radicals transfer, atoms rearrange into product geometry
- * - [0.68 -> 1.00]: Products separate from collision zone to final separated positions
+ * - [0.00 -> 0.28]: Reactants approach from separated positions to collision zone
+ * - [0.28 -> 0.52]: Old covalent bonds stretch, cleave, and break cleanly (Bond Cleavage)
+ * - [0.52 -> 0.76]: Intermediate fragments rotate/align and form new bonds (Bond Formation)
+ * - [0.76 -> 1.00]: Products separate from collision zone to final observation positions
  */
 export function sampleFreeStage(stage: CompiledFreeStage, progress: number): FreeSampledFrame {
   const p = core.clamp(progress, 0, 1);
@@ -1445,18 +1933,31 @@ export function sampleFreeStage(stage: CompiledFreeStage, progress: number): Fre
 
   for (const [id, a] of Object.entries(stage.atoms)) {
     let position: [number, number, number];
-    if (p <= 0.35) {
-      const t = core.smooth(p / 0.35);
+    if (p <= 0.28) {
+      const t = core.smooth(p / 0.28);
       position = core.lerp(a.startPos, a.approachPos, t);
-    } else if (p <= 0.68) {
-      const t = core.smooth((p - 0.35) / 0.33);
-      position = core.lerp(a.approachPos, a.departPos, t);
+    } else if (p <= 0.52) {
+      const t = core.smooth((p - 0.28) / 0.24);
+      const midPos: [number, number, number] = [
+        a.approachPos[0] * 0.7 + a.departPos[0] * 0.3,
+        a.approachPos[1] * 0.7 + a.departPos[1] * 0.3,
+        a.approachPos[2] * 0.7 + a.departPos[2] * 0.3,
+      ];
+      position = core.lerp(a.approachPos, midPos, t);
+    } else if (p <= 0.76) {
+      const t = core.smooth((p - 0.52) / 0.24);
+      const midPos: [number, number, number] = [
+        a.approachPos[0] * 0.7 + a.departPos[0] * 0.3,
+        a.approachPos[1] * 0.7 + a.departPos[1] * 0.3,
+        a.approachPos[2] * 0.7 + a.departPos[2] * 0.3,
+      ];
+      position = core.lerp(midPos, a.departPos, t);
     } else {
-      const t = core.smooth((p - 0.68) / 0.32);
+      const t = core.smooth((p - 0.76) / 0.24);
       position = core.lerp(a.departPos, a.endPos, t);
     }
 
-    const recombT = core.smooth((p - 0.32) / 0.36);
+    const recombT = core.smooth((p - 0.4) / 0.3);
     atoms[id] = {
       id,
       element: a.element,
@@ -1466,9 +1967,20 @@ export function sampleFreeStage(stage: CompiledFreeStage, progress: number): Fre
     };
   }
 
-  const bondT = core.smooth((p - 0.32) / 0.36);
+  // Clear temporal separation: break first [0.28, 0.52], form later [0.52, 0.76]
+  const breakT = p < 0.28 ? 0 : p > 0.52 ? 1 : core.smooth((p - 0.28) / 0.24);
+  const formT = p < 0.52 ? 0 : p > 0.76 ? 1 : core.smooth((p - 0.52) / 0.24);
+
   for (const [k, b] of Object.entries(stage.bonds)) {
-    const weight = b.inReactants && b.inProducts ? 1 : b.inReactants ? 1 - bondT : bondT;
+    let weight = 1;
+    if (b.inReactants && b.inProducts) {
+      weight = 1;
+    } else if (b.inReactants) {
+      weight = 1 - breakT;
+    } else {
+      weight = formT;
+    }
+
     const op1 = atoms[b.atoms[0]]?.opacity ?? 1;
     const op2 = atoms[b.atoms[1]]?.opacity ?? 1;
     bonds[k] = {

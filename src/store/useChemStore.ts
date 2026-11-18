@@ -200,6 +200,7 @@ export interface ChemStoreState {
   selection: string | null;
   unlockedMaxStep: number;
   solvedSteps: number[];
+  presetPreFilled: boolean;
   validationReport: { errors: string[]; warnings: string[]; accepted: boolean } | null;
 
   // Dialogs & Toast
@@ -228,6 +229,7 @@ export interface ChemStoreState {
   processFiles: (fileList: File[], targetSlotId?: string | null) => Promise<void>;
   loadPreset: (silent?: boolean) => void;
   loadDefault: () => Promise<void>;
+  initGuidedMode: (preservePreset: boolean) => void;
 
   // Pipeline Actions
   setSelectedPoolMol: (id: string | null) => void;
@@ -303,6 +305,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
   selection: null,
   unlockedMaxStep: 0,
   solvedSteps: [0],
+  presetPreFilled: false,
   validationReport: null,
 
   configDialogOpen: false,
@@ -506,6 +509,42 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     const bundle = (typeof window !== 'undefined' && (window as any).CHEM_DEFAULT_FILES) || CHEM_DEFAULT_FILES;
     set({ baseData: bundle });
     get().loadPreset(true);
+  },
+
+  initGuidedMode: (preservePreset: boolean) => {
+    const bundle = (typeof window !== 'undefined' && (window as any).CHEM_DEFAULT_FILES) || CHEM_DEFAULT_FILES;
+    set({ baseData: bundle });
+    if (preservePreset) {
+      get().loadPreset(true);
+      set({
+        pipelineData: createInitialPipelineData(),
+        pipelineVerified: true,
+        pipelineFeedback: { ok: true, hint: 'All 4 reaction stages fully verified!' },
+        presetPreFilled: true,
+        unlockedMaxStep: 7,
+        solvedSteps: [0],
+        index: 0,
+        progress: 1,
+      });
+      get().showToast('Developer Mode: Loaded pre-filled deductions (manual verify required)', 'info');
+    } else {
+      const emptySlots: Record<string, SlotStatus> = {};
+      REQUIRED_SLOTS.forEach((s) => {
+        emptySlots[s.id] = { status: 'empty', doc: null, mol: null, error: null, warnings: [] };
+      });
+      set({
+        slotState: emptySlots,
+        pipelineData: createEmptyPipelineData(),
+        pipelineVerified: false,
+        pipelineFeedback: null,
+        presetPreFilled: false,
+        screen: 'gate',
+        unlockedMaxStep: 0,
+        solvedSteps: [0],
+        index: 0,
+        progress: 1,
+      });
+    }
   },
 
   setSelectedPoolMol: (id) => set({ selectedPoolMol: id }),
@@ -726,7 +765,8 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
 
   go: (i: number, animate = false) => {
     const { config, unlockedMaxStep, solvedSteps } = get();
-    if (!config || i < 0 || i > 6) return;
+    const maxIdx = config ? config.steps.length - 1 : 7;
+    if (!config || i < 0 || i > maxIdx) return;
     if (i > unlockedMaxStep + 1) {
       get().showToast(`Step ${i + 1} is locked. Complete previous step deductions first.`);
       return;
@@ -748,7 +788,8 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
   play: () => {
     const { config, solvedSteps, index, playing, progress } = get();
     if (!config) return;
-    const allSolved = solvedSteps.length === 7;
+    const maxIdx = config.steps.length - 1;
+    const allSolved = solvedSteps.length >= config.steps.length;
     const isCurrentSolved = solvedSteps.includes(index);
 
     if (!isCurrentSolved) {
@@ -766,7 +807,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     let nextIndex = index;
     let nextProgress = progress;
     if (progress === 1) {
-      nextIndex = index === 6 ? 1 : index + 1;
+      nextIndex = index >= maxIdx ? 1 : index + 1;
       nextProgress = 0;
     }
     set({
@@ -805,9 +846,11 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
   setSelection: (selection) => set({ selection }),
 
   unlockAllSteps: () => {
+    const maxIdx = (get().config?.steps.length || 8) - 1;
+    const all = Array.from({ length: maxIdx + 1 }, (_, i) => i);
     set({
-      solvedSteps: [0, 1, 2, 3, 4, 5, 6],
-      unlockedMaxStep: 6,
+      solvedSteps: all,
+      unlockedMaxStep: maxIdx,
     });
   },
 

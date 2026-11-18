@@ -38,7 +38,7 @@ export function getStepInstances(
   prog: number
 ): StepInstance[] {
   if (!config) return [];
-  if ([1, 3, 5].includes(stepIdx) && prog < 0.6) {
+  if ([1, 3, 5, 7].includes(stepIdx) && prog < 0.6) {
     if (stepIdx === 1) {
       return [
         {
@@ -66,6 +66,9 @@ export function getStepInstances(
         },
       ];
     }
+    if (stepIdx === 7) {
+      return core.TERMINATION_APPROACH_INSTANCES;
+    }
     return config.steps[stepIdx - 1].instances;
   }
   return config.steps[stepIdx].instances;
@@ -83,6 +86,7 @@ export const StageScreen: React.FC = () => {
   const selection = useChemStore((s) => s.selection);
   const unlockedMaxStep = useChemStore((s) => s.unlockedMaxStep);
   const solvedSteps = useChemStore((s) => s.solvedSteps);
+  const presetPreFilled = useChemStore((s) => s.presetPreFilled);
   const resetCameraTrigger = useChemStore((s) => s.resetCameraTrigger);
 
   const go = useChemStore((s) => s.go);
@@ -114,14 +118,22 @@ export const StageScreen: React.FC = () => {
 
   useEffect(() => {
     const d = deduction.STEPS_DATA[index];
+    const isSolved = solvedSteps.includes(index);
     if (d && !d.isObservation) {
-      setSelPhase(d.phase || '');
-      setSelEq(d.equation || '');
-      setSelBreak(d.breakBond || '');
-      setSelForm(d.formBond || '');
+      if (isSolved || presetPreFilled) {
+        setSelPhase(d.phase || '');
+        setSelEq(d.equation || '');
+        setSelBreak(d.breakBond || '');
+        setSelForm(d.formBond || '');
+      } else {
+        setSelPhase('');
+        setSelEq('');
+        setSelBreak('');
+        setSelForm('');
+      }
     }
     setDeductionFeedback(null);
-  }, [index]);
+  }, [index, solvedSteps, presetPreFilled]);
 
   const [showArrows, setShowArrows] = useState(true);
   const [showVdwShell, setShowVdwShell] = useState(false);
@@ -226,28 +238,38 @@ export const StageScreen: React.FC = () => {
     const mechArrows = new CurvedMechanismArrows();
     root.add(mechArrows.group);
 
-    for (const [id, a] of Object.entries(states[0].atoms)) {
+    const allAtoms = new Map<string, { id: string; element: string }>();
+    states.forEach((s) => {
+      Object.entries(s.atoms).forEach(([id, a]) => {
+        if (!allAtoms.has(id)) {
+          allAtoms.set(id, { id, element: a.element });
+        }
+      });
+    });
+
+    for (const [id, a] of allAtoms) {
+      const el = a.element || 'C';
       const material = new THREE.MeshStandardMaterial({
-        color: new THREE.Color(COLORS[a.element]),
+        color: new THREE.Color(COLORS[el] || '#94a3b8'),
         roughness: 0.36,
         metalness: 0,
         transparent: true,
       });
       const mesh = new THREE.Mesh(sphereGeo, material);
-      mesh.scale.setScalar(RADII[a.element]);
+      mesh.scale.setScalar(RADII[el] || 0.4);
       mesh.castShadow = true;
       mesh.userData.id = id;
 
       const label = new THREE.Sprite(
         new THREE.SpriteMaterial({
-          map: elementTexture(a.element),
+          map: elementTexture(el),
           transparent: true,
           depthTest: true,
           depthWrite: false,
           toneMapped: false,
         })
       );
-      label.scale.setScalar(RADII[a.element] * 1.14);
+      label.scale.setScalar((RADII[el] || 0.4) * 1.14);
 
       const dot = new THREE.Mesh(
         sphereGeo,
@@ -258,18 +280,18 @@ export const StageScreen: React.FC = () => {
       const vdwShell = new THREE.Mesh(
         sphereGeo,
         new THREE.MeshBasicMaterial({
-          color: new THREE.Color(COLORS[a.element]),
+          color: new THREE.Color(COLORS[el] || '#94a3b8'),
           wireframe: true,
           transparent: true,
           opacity: 0.18,
           depthWrite: false,
         })
       );
-      vdwShell.scale.setScalar(RADII[a.element] * 2.18);
+      vdwShell.scale.setScalar((RADII[el] || 0.4) * 2.18);
       vdwShell.visible = false;
 
       root.add(mesh, label, dot, vdwShell);
-      meshes.set(id, { mesh, label, dot, vdwShell, element: a.element });
+      meshes.set(id, { mesh, label, dot, vdwShell, element: el });
     }
 
     // High-fidelity Microscopic Quantum Bond Cleavage & Formation FX
@@ -281,17 +303,17 @@ export const StageScreen: React.FC = () => {
       Object.entries(s.bonds).forEach(([k, b]) => allBonds.set(k, b))
     );
     for (const [k, b] of allBonds) {
-      const pair = b.atoms.map(
-        (id) =>
-          new THREE.Mesh(
-            cylinderGeo,
-            new THREE.MeshStandardMaterial({
-              color: new THREE.Color(COLORS[states[0].atoms[id].element]),
-              roughness: 0.5,
-              transparent: true,
-            })
-          )
-      );
+      const pair = b.atoms.map((id) => {
+        const el = allAtoms.get(id)?.element || 'C';
+        return new THREE.Mesh(
+          cylinderGeo,
+          new THREE.MeshStandardMaterial({
+            color: new THREE.Color(COLORS[el] || '#94a3b8'),
+            roughness: 0.5,
+            transparent: true,
+          })
+        );
+      });
       pair.forEach((m) => {
         m.castShadow = true;
         root.add(m);
@@ -314,7 +336,7 @@ export const StageScreen: React.FC = () => {
     const syncLabels = (stepIdx: number, prog: number) => {
       const labelsContainer = labelsRef.current;
       if (!labelsContainer) return;
-      const isReact = [1, 3, 5].includes(stepIdx);
+      const isReact = [1, 3, 5, 7].includes(stepIdx);
       const phase = isReact && prog < 0.6 ? 'pre' : 'post';
       const key = `${stepIdx}_${phase}`;
       if (key === currentLabelKey) return;
@@ -352,6 +374,10 @@ export const StageScreen: React.FC = () => {
         const atomPos = state.atoms[focusId].position;
         targetPivot.set(atomPos[0], atomPos[1], atomPos[2]);
         targetZoom = 1.85;
+      } else if (st.index === 7) {
+        // Multi-row Termination view: zoom out slightly and shift slightly left to clear the PES HUD
+        targetPivot.set(0.35, 0, 0);
+        targetZoom = 0.65;
       } else {
         targetPivot.set(0, 0, 0);
         targetZoom = 1.0;
@@ -372,11 +398,9 @@ export const StageScreen: React.FC = () => {
       const right = new THREE.Vector3(1, 0, 0).applyQuaternion(inv);
       const up = new THREE.Vector3(0, 1, 0).applyQuaternion(inv);
 
-      for (const [id, a] of Object.entries(state.atoms)) {
-        const obj = meshes.get(id);
-        if (!obj) continue;
-        const isContext = a.opacity < 0.5;
-        if (isContext && !st.showContext) {
+      for (const [id, obj] of meshes) {
+        const a = state.atoms[id];
+        if (!a || a.opacity < 0.01 || (a.opacity < 0.5 && !st.showContext)) {
           obj.mesh.visible = false;
           obj.label.visible = false;
           obj.dot.visible = false;
@@ -385,7 +409,7 @@ export const StageScreen: React.FC = () => {
         }
         obj.mesh.visible = true;
         obj.label.visible = true;
-        const radius = RADII[a.element];
+        const radius = RADII[a.element] || 0.4;
         obj.mesh.position.fromArray(a.position);
         const meshMat = obj.mesh.material as THREE.MeshStandardMaterial;
         meshMat.opacity = a.opacity;
@@ -424,8 +448,7 @@ export const StageScreen: React.FC = () => {
       }
 
       const axis = new THREE.Vector3(0, 1, 0);
-      let activeCleavage: ActiveBondCleavage | null = null;
-      let minTsDelta = Infinity;
+      const activeCleavages: ActiveBondCleavage[] = [];
 
       for (const [k, pair] of bonds) {
         const b = state.bonds[k];
@@ -446,11 +469,7 @@ export const StageScreen: React.FC = () => {
         const stubLen = Math.max(0.04, normalHalf * (1 - gapFactor * 0.72));
 
         if (isTransitionBond) {
-          const delta = Math.abs(b.weight - 0.5);
-          if (delta < minTsDelta) {
-            minTsDelta = delta;
-            activeCleavage = { id: k, posA: a, posB: z, weight: b.weight };
-          }
+          activeCleavages.push({ id: k, posA: a, posB: z, weight: b.weight });
         }
 
         pair.forEach((m, i) => {
@@ -485,7 +504,7 @@ export const StageScreen: React.FC = () => {
       }
 
       // Update localized bond cleavage/formation quantum micro-sparks and plasma ring
-      cleavageFX.update(activeCleavage, Date.now() * 0.0018);
+      cleavageFX.update(activeCleavages, Date.now() * 0.0018);
 
       // 3D Electron-Pushing Mechanism Arrows Update
       const isReactionStep = [1, 3, 5, 7].includes(st.index);
@@ -548,17 +567,38 @@ export const StageScreen: React.FC = () => {
             arrowSpecs.push({ id: 'brbr_to_leaving', start: brMid, end: leavingBr, curveHeight: 0.42, color: 0x38bdf8, pulsePhase: 0.66 });
           }
         } else if (st.index === 7) {
-          // Termination: two radicals combine
-          const activeRadicals = atomList.filter(([_, a]) => a.opacity > 0.8 && a.radical > 0.05);
-          if (activeRadicals.length >= 2) {
-            const r1 = new THREE.Vector3(...activeRadicals[0][1].position);
-            const r2 = new THREE.Vector3(...activeRadicals[1][1].position);
-            const mid = new THREE.Vector3().addVectors(r1, r2).multiplyScalar(0.5);
-            arrowSpecs.push(
-              { id: 'term_1', start: r1, end: mid, curveHeight: 0.38, color: 0x38bdf8 },
-              { id: 'term_2', start: r2, end: mid, curveHeight: 0.38, color: 0x38bdf8, pulsePhase: 0.5 }
-            );
-          }
+          // Termination: all 3 radical pairs combine simultaneously!
+          const pairs: [string, string][] = [
+            ['BrA', 'BrD'],
+            ['C_E1', 'C_E2'],
+            ['C_P', 'Br_P'],
+          ];
+          pairs.forEach(([id1, id2], pairIdx) => {
+            const a1 = state.atoms[id1];
+            const a2 = state.atoms[id2];
+            if (a1 && a2 && a1.opacity > 0.3 && a2.opacity > 0.3) {
+              const r1 = new THREE.Vector3(...a1.position);
+              const r2 = new THREE.Vector3(...a2.position);
+              const mid = new THREE.Vector3().addVectors(r1, r2).multiplyScalar(0.5);
+              arrowSpecs.push(
+                {
+                  id: `term_${pairIdx}_1`,
+                  start: r1,
+                  end: mid,
+                  curveHeight: 0.35,
+                  color: 0x38bdf8,
+                },
+                {
+                  id: `term_${pairIdx}_2`,
+                  start: r2,
+                  end: mid,
+                  curveHeight: 0.35,
+                  color: 0x38bdf8,
+                  pulsePhase: 0.5,
+                }
+              );
+            }
+          });
         }
       }
 
@@ -572,18 +612,36 @@ export const StageScreen: React.FC = () => {
           node.style.display = 'none';
           continue;
         }
+        const atomIds = Object.values(inst.atomMap).filter((id) => Boolean(state.atoms[id]));
+        if (atomIds.length === 0) {
+          node.style.display = 'none';
+          continue;
+        }
         node.style.display = '';
-        const positions = Object.values(inst.atomMap).map((id) =>
+        const positions = atomIds.map((id) =>
           worldToScreen(state.atoms[id].position)
         );
         const x = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+        const yCenter = positions.reduce((s, p) => s + p.y, 0) / positions.length;
         const bottom = Math.max(...positions.map((p) => p.y));
         const maxRadius = Math.max(
-          ...Object.values(inst.atomMap).map((id) => RADII[state.atoms[id].element])
+          ...atomIds.map((id) => RADII[state.atoms[id].element] || 0.4)
         );
         const offset = (maxRadius * height) / (camera.top - camera.bottom) + 9;
-        node.style.left = Math.max(72, Math.min(width - 72, x)) + 'px';
-        node.style.top = Math.min(height - 35, bottom + offset) + 'px';
+        if (st.index === 7) {
+          // Place row labels horizontally beside each molecule to avoid vertical crowding between the 3 rows
+          if (inst.position[0] > 0.5) {
+            const rightX = Math.max(...positions.map((p) => p.x));
+            node.style.left = Math.min(width - 72, rightX + offset + 48) + 'px';
+          } else {
+            const leftX = Math.min(...positions.map((p) => p.x));
+            node.style.left = Math.max(72, leftX - offset - 58) + 'px';
+          }
+          node.style.top = Math.max(24, Math.min(height - 35, yCenter - 14)) + 'px';
+        } else {
+          node.style.left = Math.max(72, Math.min(width - 72, x)) + 'px';
+          node.style.top = Math.min(height - 35, bottom + offset) + 'px';
+        }
         node.style.opacity = '1';
       }
 
@@ -795,7 +853,7 @@ export const StageScreen: React.FC = () => {
 
   const currentStep = config.steps[index];
   const isCurrentSolved = solvedSteps.includes(index);
-  const allSolved = solvedSteps.length === 7;
+  const allSolved = solvedSteps.length >= config.steps.length;
   const sampledState = core.sample(config, states, index, progress);
   const selectedAtom = selection ? sampledState.atoms[selection] : null;
 
@@ -837,7 +895,7 @@ export const StageScreen: React.FC = () => {
     playText = 'Resume';
   } else if (allSolved) {
     playIcon = '▶';
-    playText = index === 6 ? 'Play from Start' : 'Continuous Play';
+    playText = index >= config.steps.length - 1 ? 'Play from Start' : 'Continuous Play';
   }
 
   return (
@@ -882,6 +940,49 @@ export const StageScreen: React.FC = () => {
         <section className="step-heading" aria-live="polite" aria-atomic="true">
           <h2 id="step-title">{currentStep.title}</h2>
           <p id="step-description">{currentStep.description}</p>
+          {index === 7 && (
+            <div className="termination-pathway-tabs" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
+              <div
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#38bdf8',
+                  padding: '4px 10px',
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(56, 189, 248, 0.25)',
+                }}
+              >
+                Row ① (Top): 2 Br· → Br₂
+              </div>
+              <div
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#34d399',
+                  padding: '4px 10px',
+                  background: 'rgba(52, 211, 153, 0.12)',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(52, 211, 153, 0.25)',
+                }}
+              >
+                Row ② (Middle): 2 CH₃· → CH₃CH₃
+              </div>
+              <div
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: '#f59e0b',
+                  padding: '4px 10px',
+                  background: 'rgba(245, 158, 11, 0.12)',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                }}
+              >
+                Row ③ (Bottom): CH₃· + Br· → CH₃Br
+              </div>
+            </div>
+          )}
         </section>
 
         <section
@@ -1145,72 +1246,76 @@ export const StageScreen: React.FC = () => {
                       After observing the initial molecules, click <strong>02</strong> on the left sidebar to begin deducing the reaction mechanism.
                     </div>
                   </div>
-                ) : isCurrentSolved ? (
-                  <div className="deduction-summary-box solved-box">
-                    <div className="summary-box-title">
-                      <CheckCircle2 size={16} />
-                      <span>Step Conclusion</span>
-                    </div>
-                    <p className="summary-box-text">{stepData.summary}</p>
-                  </div>
-                ) : index <= unlockedMaxStep + 1 ? (
-                  <div className="deduction-form-list">
-                    <div className="deduction-field">
-                      <label className="deduction-label" htmlFor="deduce-phase">
-                        <span className="deduction-q-num">01</span>
-                        <span>Which reaction stage does this step belong to?</span>
-                      </label>
-                      <CustomSelect
-                        id="deduce-phase"
-                        value={selPhase}
-                        onChange={(val) => setSelPhase(val)}
-                        options={stepData.phaseOptions || []}
-                        placeholder="Select reaction stage…"
-                      />
+                ) : index <= unlockedMaxStep + 1 || isCurrentSolved ? (
+                  <>
+                    <div className="deduction-form-list">
+                      <div className="deduction-field">
+                        <label className="deduction-label" htmlFor="deduce-phase">
+                          <span className="deduction-q-num">01</span>
+                          <span>Which reaction stage does this step belong to?</span>
+                        </label>
+                        <CustomSelect
+                          id="deduce-phase"
+                          value={selPhase}
+                          onChange={(val) => setSelPhase(val)}
+                          options={stepData.phaseOptions || []}
+                          placeholder="Select reaction stage…"
+                        />
+                      </div>
+
+                      <div className="deduction-field">
+                        <label className="deduction-label" htmlFor="deduce-equation">
+                          <span className="deduction-q-num">02</span>
+                          <span>{stepData.fieldLabel || 'Reaction Equation'}?</span>
+                        </label>
+                        <CustomSelect
+                          id="deduce-equation"
+                          value={selEq}
+                          onChange={(val) => setSelEq(val)}
+                          options={stepData.equationOptions || []}
+                          placeholder="Select species change…"
+                        />
+                      </div>
+
+                      <div className="deduction-field">
+                        <label className="deduction-label" htmlFor="deduce-break">
+                          <span className="deduction-q-num">03</span>
+                          <span>Broken Covalent Bond in this step?</span>
+                        </label>
+                        <CustomSelect
+                          id="deduce-break"
+                          value={selBreak}
+                          onChange={(val) => setSelBreak(val)}
+                          options={stepData.breakBondOptions || []}
+                          placeholder="Select broken bond…"
+                        />
+                      </div>
+
+                      <div className="deduction-field">
+                        <label className="deduction-label" htmlFor="deduce-form">
+                          <span className="deduction-q-num">04</span>
+                          <span>Formed Covalent Bond in this step?</span>
+                        </label>
+                        <CustomSelect
+                          id="deduce-form"
+                          value={selForm}
+                          onChange={(val) => setSelForm(val)}
+                          options={stepData.formBondOptions || []}
+                          placeholder="Select formed bond…"
+                        />
+                      </div>
                     </div>
 
-                    <div className="deduction-field">
-                      <label className="deduction-label" htmlFor="deduce-equation">
-                        <span className="deduction-q-num">02</span>
-                        <span>{stepData.fieldLabel || 'Reaction Equation'}?</span>
-                      </label>
-                      <CustomSelect
-                        id="deduce-equation"
-                        value={selEq}
-                        onChange={(val) => setSelEq(val)}
-                        options={stepData.equationOptions || []}
-                        placeholder="Select species change…"
-                      />
-                    </div>
-
-                    <div className="deduction-field">
-                      <label className="deduction-label" htmlFor="deduce-break">
-                        <span className="deduction-q-num">03</span>
-                        <span>Broken Covalent Bond in this step?</span>
-                      </label>
-                      <CustomSelect
-                        id="deduce-break"
-                        value={selBreak}
-                        onChange={(val) => setSelBreak(val)}
-                        options={stepData.breakBondOptions || []}
-                        placeholder="Select broken bond…"
-                      />
-                    </div>
-
-                    <div className="deduction-field">
-                      <label className="deduction-label" htmlFor="deduce-form">
-                        <span className="deduction-q-num">04</span>
-                        <span>Formed Covalent Bond in this step?</span>
-                      </label>
-                      <CustomSelect
-                        id="deduce-form"
-                        value={selForm}
-                        onChange={(val) => setSelForm(val)}
-                        options={stepData.formBondOptions || []}
-                        placeholder="Select formed bond…"
-                      />
-                    </div>
-                  </div>
+                    {isCurrentSolved && (
+                      <div className="deduction-summary-box solved-box">
+                        <div className="summary-box-title">
+                          <CheckCircle2 size={16} />
+                          <span>Step Conclusion (Verified ✓)</span>
+                        </div>
+                        <p className="summary-box-text">{stepData.summary}</p>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="deduction-summary-box locked-box">
                     <div className="summary-box-title">
@@ -1296,7 +1401,7 @@ export const StageScreen: React.FC = () => {
                 className="icon-button transport-side"
                 aria-label="Next Step"
                 title="Next Step (→)"
-                disabled={index >= 6 || index > unlockedMaxStep}
+                disabled={index >= config.steps.length - 1 || index > unlockedMaxStep}
                 onClick={() => go(index + 1, solvedSteps.includes(index + 1))}
               >
                 <ChevronRight size={18} />

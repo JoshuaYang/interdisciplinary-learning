@@ -272,19 +272,32 @@ export function getElementRadius(element: string): number {
 
 const textureCache = new Map<string, THREE.CanvasTexture>();
 
-export function getElementSpriteTexture(element: string): THREE.CanvasTexture {
-  if (textureCache.has(element)) return textureCache.get(element)!;
+export function getElementSpriteTexture(element: string, charge = 0): THREE.CanvasTexture {
+  const cacheKey = charge ? `${element}:${charge}` : element;
+  if (textureCache.has(cacheKey)) return textureCache.get(cacheKey)!;
   const c = document.createElement('canvas');
   c.width = 128;
   c.height = 128;
   const ctx = c.getContext('2d')!;
-  ctx.font = '600 64px -apple-system, BlinkMacSystemFont, "Inter", Arial, sans-serif';
+  ctx.font = '600 60px -apple-system, BlinkMacSystemFont, "Inter", Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = ['H', 'He', 'Be', 'B', 'Ne'].includes(element) ? '#334155' : '#ffffff';
-  ctx.fillText(element, 64, 66);
+  const isLight = ['H', 'He', 'Be', 'B', 'Ne'].includes(element);
+  ctx.fillStyle = isLight ? '#334155' : '#ffffff';
+  
+  if (charge !== 0) {
+    // Offset slightly left to make room for superscript charge
+    ctx.fillText(element, 54, 66);
+    ctx.font = '700 36px -apple-system, BlinkMacSystemFont, "Inter", Arial, sans-serif';
+    ctx.fillStyle = charge > 0 ? '#ef4444' : '#0284c7';
+    const chargeText = charge > 0 ? (charge === 1 ? '+' : `${charge}+`) : (charge === -1 ? '−' : `${Math.abs(charge)}−`);
+    ctx.fillText(chargeText, 98, 48);
+  } else {
+    ctx.fillText(element, 64, 66);
+  }
+
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
-  textureCache.set(element, tex);
+  textureCache.set(cacheKey, tex);
   return tex;
 }

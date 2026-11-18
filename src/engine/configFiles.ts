@@ -299,6 +299,38 @@ export function assemble(bundle: any): ChemConfig {
       throw new Error(`${id}.json: ${e.message}`);
     }
   }
+  if (!molecules['C2H6']) {
+    molecules['C2H6'] = {
+      name: 'Ethane',
+      formula: 'CH₃CH₃',
+      geometry: 'Tetrahedral (sp³)',
+      description: 'Ethane is formed by the coupling of two methyl radicals in the termination stage.',
+      hybridization: 'sp3',
+      atoms: [
+        { id: 'c1', element: 'C', position: [-0.77, 0, 0], radical: 0 },
+        { id: 'c2', element: 'C', position: [0.77, 0, 0], radical: 0 },
+        { id: 'h1', element: 'H', position: [-1.15, 1.03, 0], radical: 0 },
+        { id: 'h2', element: 'H', position: [-1.15, -0.51, -0.89], radical: 0 },
+        { id: 'h3', element: 'H', position: [-1.15, -0.51, 0.89], radical: 0 },
+        { id: 'h4', element: 'H', position: [1.15, 1.03, 0], radical: 0 },
+        { id: 'h5', element: 'H', position: [1.15, -0.51, 0.89], radical: 0 },
+        { id: 'h6', element: 'H', position: [1.15, -0.51, -0.89], radical: 0 },
+      ],
+      bonds: [
+        { atoms: ['c1', 'c2'], order: 1 },
+        { atoms: ['c1', 'h1'], order: 1 },
+        { atoms: ['c1', 'h2'], order: 1 },
+        { atoms: ['c1', 'h3'], order: 1 },
+        { atoms: ['c2', 'h4'], order: 1 },
+        { atoms: ['c2', 'h5'], order: 1 },
+        { atoms: ['c2', 'h6'], order: 1 },
+      ],
+      radicals: [],
+      measurements: [
+        { label: 'C—C', atoms: ['c1', 'c2'], value: 1.54, tolerance: 0.02 },
+      ],
+    };
+  }
   return { ...clone(project), molecules, steps: clone(bundle.steps) };
 }
 
