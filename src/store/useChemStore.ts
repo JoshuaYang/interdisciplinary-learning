@@ -356,7 +356,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
   previewSlotId: null,
   builderSlotId: null,
 
-  pipelineData: createInitialPipelineData(),
+  pipelineData: createEmptyPipelineData(),
   selectedPoolMol: null,
   activePipelineTab: 0,
   pipelineVerified: false,
@@ -578,7 +578,6 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
   loadDefault: async () => {
     const bundle = (typeof window !== 'undefined' && (window as any).CHEM_DEFAULT_FILES) || CHEM_DEFAULT_FILES;
     set({ baseData: bundle });
-    get().loadPreset(true);
   },
 
   initGuidedMode: (preservePreset: boolean) => {
@@ -821,6 +820,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
 
   reloadDefaultConfig: async () => {
     await get().loadDefault();
+    get().loadPreset(true);
     const { slotState, baseData } = get();
     const students = REQUIRED_SLOTS.map((s) => slotState[s.id].doc);
     const assembled = files.assemble({
