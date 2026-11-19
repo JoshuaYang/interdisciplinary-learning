@@ -395,5 +395,24 @@ describe('Chem Engine & Deduction Suite', () => {
       expect(mol).toBeDefined();
       expect(mol.atoms.length).toBe(builderDoc.nodes.length);
     }
+
+    // Verify files.assemble succeeds with converted builder docs and with raw preset docs
+    const studentDocsFromBuilder = Object.values(builderOutputs).map((d) => buildGuidedStudentDoc(d));
+    const assembledFromBuilder = files.assemble({
+      project: bundle.project,
+      catalog: bundle.catalog,
+      steps: bundle.steps,
+      students: studentDocsFromBuilder,
+    });
+    expect(assembledFromBuilder.molecules.CH4).toBeDefined();
+
+    const studentDocsFromPreset = bundle.students.map((d: any) => buildGuidedStudentDoc(d));
+    const assembledFromPreset = files.assemble({
+      project: bundle.project,
+      catalog: bundle.catalog,
+      steps: bundle.steps,
+      students: studentDocsFromPreset,
+    });
+    expect(assembledFromPreset.molecules.CH4).toBeDefined();
   });
 });

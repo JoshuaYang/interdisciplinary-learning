@@ -97,6 +97,22 @@ export function structure(doc: any, template: any): MoleculeModel {
   fields.push('name', 'formula', 'description');
   if (spec.kind === 'center') fields.push('bondAngles', 'hybridization');
   fields.push('nodes', 'bonds');
+  if (spec.kind === 'atom') {
+    if (doc.bondLengths && typeof doc.bondLengths === 'object' && Object.keys(doc.bondLengths).length === 0) {
+      delete doc.bondLengths;
+    }
+    if (doc.bondAngles && typeof doc.bondAngles === 'object' && Object.keys(doc.bondAngles).length === 0) {
+      delete doc.bondAngles;
+    }
+  }
+  if (spec.kind === 'pair') {
+    if (doc.bondAngles && typeof doc.bondAngles === 'object' && Object.keys(doc.bondAngles).length === 0) {
+      delete doc.bondAngles;
+    }
+    if (doc.unpairedElectrons === 0) {
+      delete doc.unpairedElectrons;
+    }
+  }
   for (const k of Object.keys(doc))
     if (!fields.includes(k))
       throw new Error(`Unrecognized field "${k}". Allowed fields for this structure: ${fields.join(', ')}.`);
@@ -136,6 +152,12 @@ export function structure(doc: any, template: any): MoleculeModel {
   let bonds: [string, string][] = [];
   let radicals: string[] = [];
   if (spec.kind === 'center') {
+    if (!doc['center'] && elements[spec.center]) {
+      doc['center'] = elements[spec.center];
+    }
+    if (!doc['neighbors'] && Array.isArray(spec.neighbors)) {
+      doc['neighbors'] = spec.neighbors.map((n: string) => elements[n]);
+    }
     if (doc['center'] !== elements[spec.center])
       throw new Error(`${id}: incorrect central atom. Please verify the molecular center.`);
     const expected = spec.neighbors.map((n: string) => elements[n]);

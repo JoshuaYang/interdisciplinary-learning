@@ -125,8 +125,48 @@ export function inferToastType(msg: string, explicitType?: ToastType): ToastType
 }
 
 export function buildGuidedStudentDoc(builderDoc: any): any {
-  const nodes = builderDoc.nodes || [];
-  const bonds = builderDoc.bonds || [];
+  if (!builderDoc) return null;
+
+  // Idempotency: if already a complete central molecule doc
+  if (builderDoc.center && Array.isArray(builderDoc.neighbors) && builderDoc.neighbors.length > 0) {
+    const doc: any = {
+      name: builderDoc.name,
+      formula: builderDoc.formula,
+      description: builderDoc.description || '',
+      center: builderDoc.center,
+      neighbors: [...builderDoc.neighbors],
+      geometry: builderDoc.geometry || (builderDoc.unpairedElectrons ? 'trigonalPlanar' : 'regularTetrahedral'),
+      hybridization: builderDoc.hybridization || (builderDoc.unpairedElectrons ? 'sp2' : 'sp3'),
+      bondLengths: builderDoc.bondLengths || {},
+      bondAngles: builderDoc.bondAngles || {},
+    };
+    if (builderDoc.nodes) doc.nodes = builderDoc.nodes;
+    if (builderDoc.bonds) doc.bonds = builderDoc.bonds;
+    if (builderDoc.unpairedElectrons) doc.unpairedElectrons = builderDoc.unpairedElectrons;
+    return doc;
+  }
+
+  // Idempotency: if already a complete diatomic or atomic doc with atoms list
+  if (Array.isArray(builderDoc.atoms) && builderDoc.atoms.length > 0 && !builderDoc.nodes) {
+    const isSingle = builderDoc.atoms.length === 1;
+    const doc: any = {
+      name: builderDoc.name,
+      formula: builderDoc.formula,
+      description: builderDoc.description || '',
+      atoms: [...builderDoc.atoms],
+      geometry: builderDoc.geometry || (isSingle ? 'atomic' : 'diatomic'),
+    };
+    if (!isSingle) {
+      doc.bondLengths = builderDoc.bondLengths || {};
+    }
+    if (builderDoc.unpairedElectrons) {
+      doc.unpairedElectrons = builderDoc.unpairedElectrons;
+    }
+    return doc;
+  }
+
+  const nodes = Array.isArray(builderDoc.nodes) ? builderDoc.nodes : [];
+  const bonds = Array.isArray(builderDoc.bonds) ? builderDoc.bonds : [];
   const radicals = nodes.filter((n: any) => n.radical === 1).length;
 
   const nonHNodes = nodes.filter((n: any) => n.element !== 'H');
@@ -146,28 +186,32 @@ export function buildGuidedStudentDoc(builderDoc: any): any {
       .filter(Boolean);
   }
 
+  const cleanFormula = (builderDoc.formula || '').replace(/[·.]/g, '');
+
   // 1. Single atom (e.g. Br·)
-  if (nodes.length <= 1) {
+  if (cleanFormula === 'Br' || (nodes.length <= 1 && cleanFormula !== 'CH4' && cleanFormula !== 'CH3' && cleanFormula !== 'CH3Br' && cleanFormula !== 'Br2' && cleanFormula !== 'HBr')) {
     const doc: any = {
-      name: builderDoc.name,
-      formula: builderDoc.formula,
+      name: builderDoc.name || 'Bromine Radical',
+      formula: builderDoc.formula || 'Br·',
       description: builderDoc.description || '',
       geometry: builderDoc.geometry || 'atomic',
-      atoms: atoms.length > 0 ? atoms : [builderDoc.formula?.replace(/·/g, '') || 'Br'],
-      nodes: builderDoc.nodes,
-      bonds: builderDoc.bonds,
+      atoms: atoms.length > 0 ? atoms : ['Br'],
+      unpairedElectrons: radicals || builderDoc.unpairedElectrons || 1,
     };
-    if (radicals > 0 || builderDoc.unpairedElectrons) {
-      doc.unpairedElectrons = radicals || builderDoc.unpairedElectrons || 1;
-    }
+    if (builderDoc.nodes) doc.nodes = builderDoc.nodes;
+    if (builderDoc.bonds) doc.bonds = builderDoc.bonds;
     return doc;
   }
 
   // 2. Diatomic pair (e.g. Br2, HBr)
-  if (nodes.length === 2) {
+  if (cleanFormula === 'Br2' || cleanFormula === 'HBr' || nodes.length === 2) {
+    const defaultAtoms = cleanFormula === 'HBr' ? ['H', 'Br'] : ['Br', 'Br'];
+    const resolvedAtoms = atoms.length === 2 ? atoms : defaultAtoms;
     const rawBL = builderDoc.bondLengths || {};
     const bl: Record<string, number> = {};
-    const standardKey = atoms.includes('H') ? `H-${atoms.find((a: string) => a !== 'H')}` : `${atoms[0]}-${atoms[1]}`;
+    const standardKey = resolvedAtoms.includes('H')
+      ? `H-${resolvedAtoms.find((a: string) => a !== 'H')}`
+      : `${resolvedAtoms[0]}-${resolvedAtoms[1]}`;
     const revKey = standardKey.split('-').reverse().join('-');
     const val = rawBL[standardKey] ?? rawBL[revKey];
     if (val !== undefined && Number.isFinite(Number(val))) {
@@ -183,11 +227,11 @@ export function buildGuidedStudentDoc(builderDoc: any): any {
       formula: builderDoc.formula,
       description: builderDoc.description || '',
       geometry: builderDoc.geometry || 'diatomic',
-      atoms,
+      atoms: resolvedAtoms,
       bondLengths: bl,
-      nodes: builderDoc.nodes,
-      bonds: builderDoc.bonds,
     };
+    if (builderDoc.nodes) doc.nodes = builderDoc.nodes;
+    if (builderDoc.bonds) doc.bonds = builderDoc.bonds;
     if (radicals > 0 || builderDoc.unpairedElectrons) {
       doc.unpairedElectrons = radicals || builderDoc.unpairedElectrons;
     }
@@ -195,6 +239,14 @@ export function buildGuidedStudentDoc(builderDoc: any): any {
   }
 
   // 3. Central molecule (e.g. CH4, CH3·, CH3Br)
+  if (!center) center = 'C';
+  if (neighbors.length === 0) {
+    if (cleanFormula === 'CH4') neighbors = ['H', 'H', 'H', 'H'];
+    else if (cleanFormula === 'CH3') neighbors = ['H', 'H', 'H'];
+    else if (cleanFormula === 'CH3Br') neighbors = ['H', 'H', 'H', 'Br'];
+    else neighbors = ['H', 'H', 'H', 'H'];
+  }
+
   const rawBL = builderDoc.bondLengths || {};
   const bl: Record<string, number> = {};
   const expectedBLKeys = Array.from(new Set(neighbors.map((nb) => `${center}-${nb}`)));
@@ -227,17 +279,17 @@ export function buildGuidedStudentDoc(builderDoc: any): any {
     name: builderDoc.name,
     formula: builderDoc.formula,
     description: builderDoc.description || '',
-    geometry: builderDoc.geometry,
-    center: center || 'C',
-    neighbors: neighbors.length > 0 ? neighbors : ['H', 'H', 'H', 'H'],
-    hybridization: builderDoc.hybridization || (radicals > 0 ? 'sp2' : 'sp3'),
+    geometry: builderDoc.geometry || (cleanFormula === 'CH3' ? 'trigonalPlanar' : 'regularTetrahedral'),
+    center,
+    neighbors,
+    hybridization: builderDoc.hybridization || (cleanFormula === 'CH3' || radicals > 0 ? 'sp2' : 'sp3'),
     bondLengths: bl,
     bondAngles: ba,
-    nodes: builderDoc.nodes,
-    bonds: builderDoc.bonds,
   };
-  if (radicals > 0 || builderDoc.unpairedElectrons) {
-    doc.unpairedElectrons = radicals || builderDoc.unpairedElectrons;
+  if (builderDoc.nodes) doc.nodes = builderDoc.nodes;
+  if (builderDoc.bonds) doc.bonds = builderDoc.bonds;
+  if (cleanFormula === 'CH3' || radicals > 0 || builderDoc.unpairedElectrons) {
+    doc.unpairedElectrons = radicals || builderDoc.unpairedElectrons || 1;
   }
   return doc;
 }
@@ -481,7 +533,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
         ...state.slotState,
         [slotId]: {
           status: (verifyRes.success ? 'valid' : 'error') as SlotStatus['status'],
-          doc: builderDoc,
+          doc: guidedDoc,
           mol: verifyRes.mol || null,
           error: verifyRes.success ? null : verifyRes.error || 'Configuration incomplete',
           warnings: verifyRes.warnings || [],
@@ -745,7 +797,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       if (!next[stageId]) next[stageId] = { reactants: [], products: [] };
       next[stageId][role].push(molId);
     }
-    set({ pipelineData: next, selectedPoolMol: null });
+    set({ pipelineData: next, selectedPoolMol: null, pipelineFeedback: null });
   },
 
   removeParticleFromZone: (stageId, role, itemIdx, reactionIndex = null) => {
@@ -755,7 +807,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     } else {
       next[stageId]?.[role]?.splice(itemIdx, 1);
     }
-    set({ pipelineData: next });
+    set({ pipelineData: next, pipelineFeedback: null });
   },
 
   resetPipeline: () => {
@@ -804,8 +856,10 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       return false;
     }
 
+    set({ pipelineFeedback: null });
+
     try {
-      const students = REQUIRED_SLOTS.map((s) => slotState[s.id].doc);
+      const students = REQUIRED_SLOTS.map((s) => buildGuidedStudentDoc(slotState[s.id]?.doc));
       const assembled = files.assemble({
         project: baseData.project,
         catalog: baseData.catalog,
@@ -931,7 +985,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     await get().loadDefault();
     get().loadPreset(true);
     const { slotState, baseData } = get();
-    const students = REQUIRED_SLOTS.map((s) => slotState[s.id].doc);
+    const students = REQUIRED_SLOTS.map((s) => buildGuidedStudentDoc(slotState[s.id]?.doc));
     const assembled = files.assemble({
       project: baseData.project,
       catalog: baseData.catalog,
