@@ -56,8 +56,12 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
     }
   };
 
+  // Generate a reactive key so Radix UI resets its internal selection DOM whenever value resets to empty or options change
+  const rootKey = `${id || 'select'}-${safeValue ?? '__empty__'}-${normalizedOptions.length}`;
+
   return (
     <Select.Root
+      key={rootKey}
       value={safeValue}
       onValueChange={handleValueChange}
       disabled={disabled}

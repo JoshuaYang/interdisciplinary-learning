@@ -1102,6 +1102,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       solvedSteps: nextSolved,
       unlockedMaxStep: nextMax,
     });
+    saveGuidedProgressToStorage({ solvedSteps: nextSolved, unlockedMaxStep: nextMax });
     get().go(stepIdx, true);
     if (nextSolved.length === 7) {
       get().showToast('Congratulations! All 7 reaction mechanism steps completed. Continuous playback unlocked!');

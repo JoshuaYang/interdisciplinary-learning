@@ -1248,13 +1248,14 @@ export const StageScreen: React.FC = () => {
                   </div>
                 ) : index <= unlockedMaxStep + 1 || isCurrentSolved ? (
                   <>
-                    <div className="deduction-form-list">
+                    <div className="deduction-form-list" key={`deduction-step-${index}`}>
                       <div className="deduction-field">
                         <label className="deduction-label" htmlFor="deduce-phase">
                           <span className="deduction-q-num">01</span>
                           <span>Which reaction stage does this step belong to?</span>
                         </label>
                         <CustomSelect
+                          key={`deduce-phase-${index}`}
                           id="deduce-phase"
                           value={selPhase}
                           onChange={(val) => setSelPhase(val)}
@@ -1269,6 +1270,7 @@ export const StageScreen: React.FC = () => {
                           <span>{stepData.fieldLabel || 'Reaction Equation'}?</span>
                         </label>
                         <CustomSelect
+                          key={`deduce-eq-${index}`}
                           id="deduce-equation"
                           value={selEq}
                           onChange={(val) => setSelEq(val)}
@@ -1283,6 +1285,7 @@ export const StageScreen: React.FC = () => {
                           <span>Broken Covalent Bond in this step?</span>
                         </label>
                         <CustomSelect
+                          key={`deduce-break-${index}`}
                           id="deduce-break"
                           value={selBreak}
                           onChange={(val) => setSelBreak(val)}
@@ -1297,6 +1300,7 @@ export const StageScreen: React.FC = () => {
                           <span>Formed Covalent Bond in this step?</span>
                         </label>
                         <CustomSelect
+                          key={`deduce-form-${index}`}
                           id="deduce-form"
                           value={selForm}
                           onChange={(val) => setSelForm(val)}
