@@ -4,6 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import {
   AlertCircle,
   Atom,
+  Check,
   ChevronDown,
   ChevronUp,
   Compass,
@@ -172,7 +173,9 @@ export const MoleculeBuilderModal: React.FC = () => {
     ? REQUIRED_SLOTS.find((s) => s.id === guidedSlotId) || null
     : null;
 
+  const executeAutoSaveRef = useRef<() => boolean>(() => false);
   const handleCloseModal = useCallback(() => {
+    executeAutoSaveRef.current();
     lastTargetRef.current = null;
     if (guidedSlotId) {
       closeGuidedBuilder();
@@ -189,6 +192,8 @@ export const MoleculeBuilderModal: React.FC = () => {
   // Topology graph state
   const [nodes, setNodes] = useState<TopologyNode[]>([]);
   const [bonds, setBonds] = useState<TopologyBond[]>([]);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('saved');
+  const isInitialMountRef = useRef<boolean>(true);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedBondId, setSelectedBondId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
@@ -503,8 +508,11 @@ export const MoleculeBuilderModal: React.FC = () => {
       setBondAnglesInput(autoParams.bondAngles);
       setTopoZoom(1);
       setTopoPan({ x: 0, y: 0 });
+      isInitialMountRef.current = false;
+      setAutoSaveStatus('saved');
     } else {
       resetEmptyBuilder();
+      isInitialMountRef.current = false;
     }
   }, [
     isModalOpen,
@@ -1065,10 +1073,11 @@ export const MoleculeBuilderModal: React.FC = () => {
     hybridization,
   ]);
 
-  // Save the constructed molecule into the Zustand store
-  const handleSaveMolecule = () => {
-    // In Guided Mode: save current configuration immediately without modal popup error blockades
+  // Continuous Auto-save logic
+  const executeAutoSave = useCallback(() => {
+    if (!isModalOpen) return false;
     if (guidedSlotId) {
+      if (nodes.length === 0) return false;
       const docToSave = currentDoc || {
         name,
         formula,
@@ -1081,53 +1090,57 @@ export const MoleculeBuilderModal: React.FC = () => {
         bondAngles: bondAnglesInput,
       };
       saveDocForSlot(guidedSlotId, docToSave);
-      handleCloseModal();
-      return;
+      return true;
     }
+    if (editingMolId && currentDoc) {
+      saveMoleculeDoc(currentDoc, editingMolId);
+      return true;
+    }
+    return false;
+  }, [
+    isModalOpen,
+    guidedSlotId,
+    editingMolId,
+    currentDoc,
+    name,
+    formula,
+    description,
+    nodes,
+    bonds,
+    geometry,
+    hybridization,
+    bondLengthsInput,
+    bondAnglesInput,
+    saveDocForSlot,
+    saveMoleculeDoc,
+  ]);
+  executeAutoSaveRef.current = executeAutoSave;
 
-    if (nodes.length === 0) {
-      const err = 'Please add atoms from the periodic table above before saving.';
-      showToast(err);
-      triggerSaveError(err);
-      return;
-    }
-    if (!connectedGraph) {
-      const err = 'All atoms in the molecule must be connected into a single structure.';
-      showToast(err);
-      triggerSaveError(err);
-      return;
-    }
-    if (!geometry) {
-      const err = 'Please specify the Spatial Geometry (e.g. tetrahedral, linear).';
-      showToast(err);
-      triggerSaveError(err);
-      return;
-    }
-    for (const bk of activeBondKeys) {
-      if (!bondLengthsInput[bk] || Number(bondLengthsInput[bk]) <= 0) {
-        const err = `Please enter a valid bond length for ${bk}.`;
-        showToast(err);
-        triggerSaveError(err);
-        return;
-      }
-    }
-    for (const ak of activeAngleKeys) {
-      if (!bondAnglesInput[ak] || Number(bondAnglesInput[ak]) <= 0) {
-        const err = `Please enter a valid bond angle for ${ak}.`;
-        showToast(err);
-        triggerSaveError(err);
-        return;
-      }
-    }
-    if (!currentDoc) {
-      const err = 'Invalid molecule configuration. Please check the parameter inputs.';
-      showToast(err);
-      triggerSaveError(err);
-      return;
-    }
+  useEffect(() => {
+    if (!isModalOpen || isInitialMountRef.current) return;
+    setAutoSaveStatus('saving');
+    const timer = setTimeout(() => {
+      const saved = executeAutoSave();
+      setAutoSaveStatus(saved ? 'saved' : 'idle');
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [
+    isModalOpen,
+    nodes,
+    bonds,
+    bondLengthsInput,
+    bondAnglesInput,
+    geometry,
+    hybridization,
+    name,
+    formula,
+    description,
+    executeAutoSave,
+  ]);
 
-    saveMoleculeDoc(currentDoc, editingMolId);
-    showToast(`Saved substance ${currentDoc.formula} (${currentDoc.name}) successfully!`);
+  // Save the constructed molecule into the Zustand store
+  const handleSaveMolecule = () => {
+    executeAutoSave();
     handleCloseModal();
   };
 
@@ -1508,12 +1521,16 @@ export const MoleculeBuilderModal: React.FC = () => {
                 </h2>
               </Dialog.Title>
             </div>
-            <div className="mol-builder-header-actions">
+            <div className="mol-builder-header-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span className={`builder-autosave-badge ${autoSaveStatus}`} title="Modifications are auto-saved in real-time">
+                <Check size={12} strokeWidth={2.6} />
+                <span>{autoSaveStatus === 'saving' ? 'Saving…' : 'Auto-saved'}</span>
+              </span>
               <Dialog.Close asChild>
                 <button
                   className="icon-button"
                   aria-label="Close Builder"
-                  title="Close"
+                  title="Close (changes auto-saved)"
                   onClick={handleCloseModal}
                 >
                   <X size={20} />
@@ -2626,13 +2643,16 @@ export const MoleculeBuilderModal: React.FC = () => {
                   </div>
                 )}
               </div>
-              <div className="mol-builder-footer-btns">
+              <div className="mol-builder-footer-btns" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span className="footer-autosave-note">
+                  <Check size={13} style={{ color: '#10b981' }} /> Auto-saves changes
+                </span>
                 <button
                   type="button"
                   className="toolbar-btn-outline"
                   onClick={handleCloseModal}
                 >
-                  Cancel
+                  Close
                 </button>
                 <button
                   type="button"
@@ -2640,7 +2660,7 @@ export const MoleculeBuilderModal: React.FC = () => {
                   className="primary-button"
                   onClick={handleSaveMolecule}
                 >
-                  <span>Save</span>
+                  <span>Done</span>
                 </button>
               </div>
             </div>

@@ -242,6 +242,64 @@ export function buildGuidedStudentDoc(builderDoc: any): any {
   return doc;
 }
 
+const GUIDED_STORAGE_KEY = 'chem_guided_progress_v2';
+
+export function saveGuidedProgressToStorage(state: {
+  slotState?: Record<string, any>;
+  pipelineData?: any;
+  screen?: string;
+  unlockedMaxStep?: number;
+  solvedSteps?: number[];
+  presetPreFilled?: boolean;
+}) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    const cleanSlotState: Record<string, any> = {};
+    if (state.slotState) {
+      for (const [k, v] of Object.entries(state.slotState)) {
+        cleanSlotState[k] = {
+          status: v.status,
+          doc: v.doc,
+          error: v.error,
+          warnings: v.warnings,
+        };
+      }
+    }
+    const existing = getStoredGuidedProgress() || {};
+    const payload = {
+      ...existing,
+      slotState: state.slotState ? cleanSlotState : existing.slotState,
+      pipelineData: state.pipelineData !== undefined ? state.pipelineData : existing.pipelineData,
+      screen: state.screen !== undefined ? state.screen : existing.screen,
+      unlockedMaxStep: state.unlockedMaxStep !== undefined ? state.unlockedMaxStep : existing.unlockedMaxStep,
+      solvedSteps: state.solvedSteps !== undefined ? state.solvedSteps : existing.solvedSteps,
+      presetPreFilled: state.presetPreFilled !== undefined ? state.presetPreFilled : existing.presetPreFilled,
+      updatedAt: Date.now(),
+    };
+    window.localStorage.setItem(GUIDED_STORAGE_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.warn('Auto-save to localStorage failed:', err);
+  }
+}
+
+export function getStoredGuidedProgress(): any {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    const raw = window.localStorage.getItem(GUIDED_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearStoredGuidedProgress() {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(GUIDED_STORAGE_KEY);
+    }
+  } catch {}
+}
+
 export interface ChemStoreState {
   screen: 'gate' | 'pipeline' | 'stage';
   baseData: typeof CHEM_DEFAULT_FILES;
@@ -396,7 +454,10 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     }, 4200);
   },
 
-  setScreen: (screen) => set({ screen }),
+  setScreen: (screen) => {
+    set({ screen });
+    saveGuidedProgressToStorage({ screen });
+  },
   setPreviewSlotId: (id) => set({ previewSlotId: id }),
   openBuilderForSlot: (slotId) => set({ builderSlotId: slotId }),
   closeBuilderForSlot: () => set({ builderSlotId: null }),
@@ -410,19 +471,23 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     }
 
     // Always preserve user's edited document in slotState and let outer card reflect status
-    set((state) => ({
-      slotState: {
+    set((state) => {
+      const nextSlotState = {
         ...state.slotState,
         [slotId]: {
-          status: verifyRes.success ? 'valid' : 'error',
+          status: (verifyRes.success ? 'valid' : 'error') as SlotStatus['status'],
           doc: builderDoc,
           mol: verifyRes.mol || null,
           error: verifyRes.success ? null : verifyRes.error || 'Configuration incomplete',
           warnings: verifyRes.warnings || [],
         },
-      },
-      builderSlotId: null,
-    }));
+      };
+      saveGuidedProgressToStorage({ slotState: nextSlotState });
+      return {
+        slotState: nextSlotState,
+        builderSlotId: null,
+      };
+    });
 
     return { success: true };
   },
@@ -585,6 +650,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     const bundle = (typeof window !== 'undefined' && (window as any).CHEM_DEFAULT_FILES) || CHEM_DEFAULT_FILES;
     set({ baseData: bundle });
     if (preservePreset) {
+      clearStoredGuidedProgress();
       get().loadPreset(true);
       set({
         pipelineData: createInitialPipelineData(),
@@ -597,23 +663,62 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
         progress: 1,
       });
       get().showToast('Developer Mode: Loaded pre-filled deductions (manual verify required)', 'info');
+      saveGuidedProgressToStorage(get());
     } else {
-      const emptySlots: Record<string, SlotStatus> = {};
-      REQUIRED_SLOTS.forEach((s) => {
-        emptySlots[s.id] = { status: 'empty', doc: null, mol: null, error: null, warnings: [] };
-      });
-      set({
-        slotState: emptySlots,
-        pipelineData: createEmptyPipelineData(),
-        pipelineVerified: false,
-        pipelineFeedback: null,
-        presetPreFilled: false,
-        screen: 'gate',
-        unlockedMaxStep: 0,
-        solvedSteps: [0],
-        index: 0,
-        progress: 1,
-      });
+      const stored = getStoredGuidedProgress();
+      if (stored && stored.slotState && Object.keys(stored.slotState).length > 0) {
+        // Restore from auto-saved progress
+        const rehydratedSlotState: Record<string, SlotStatus> = {};
+        for (const [k, v] of Object.entries(stored.slotState as Record<string, any>)) {
+          let mol = null;
+          if (v.doc && v.status === 'valid') {
+            try {
+              const template = (bundle.catalog as any)[k];
+              if (template) {
+                mol = files.structure(v.doc, template);
+              }
+            } catch {
+              mol = null;
+            }
+          }
+          rehydratedSlotState[k] = {
+            status: v.status || 'empty',
+            doc: v.doc || null,
+            mol,
+            error: v.error || null,
+            warnings: v.warnings || [],
+          };
+        }
+        set({
+          slotState: rehydratedSlotState,
+          pipelineData: stored.pipelineData || createEmptyPipelineData(),
+          pipelineVerified: !!stored.pipelineData?.reactions?.length,
+          presetPreFilled: !!stored.presetPreFilled,
+          screen: stored.screen || 'gate',
+          unlockedMaxStep: stored.unlockedMaxStep || 0,
+          solvedSteps: stored.solvedSteps || [0],
+          index: 0,
+          progress: 1,
+        });
+        get().showToast('Auto-restored your previous experimental progress ✓', 'success');
+      } else {
+        const emptySlots: Record<string, SlotStatus> = {};
+        REQUIRED_SLOTS.forEach((s) => {
+          emptySlots[s.id] = { status: 'empty', doc: null, mol: null, error: null, warnings: [] };
+        });
+        set({
+          slotState: emptySlots,
+          pipelineData: createEmptyPipelineData(),
+          pipelineVerified: false,
+          pipelineFeedback: null,
+          presetPreFilled: false,
+          screen: 'gate',
+          unlockedMaxStep: 0,
+          solvedSteps: [0],
+          index: 0,
+          progress: 1,
+        });
+      }
     }
   },
 

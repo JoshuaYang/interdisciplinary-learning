@@ -11,7 +11,7 @@ import {
   Info,
   RotateCcw,
 } from 'lucide-react';
-import { useChemStore, REQUIRED_SLOTS } from '../../store/useChemStore';
+import { useChemStore, REQUIRED_SLOTS, clearStoredGuidedProgress } from '../../store/useChemStore';
 import { MoleculePreviewModal } from './MoleculePreviewModal';
 import { MoleculeBuilderModal } from '../FreeMode/MoleculeBuilderModal';
 import { ConfirmModal } from '../Common/ConfirmModal';
@@ -285,6 +285,7 @@ export const GateScreen: React.FC = () => {
           description="Are you sure you want to reset all molecular configurations back to initial status?"
           confirmLabel="Reset All"
           onConfirm={() => {
+            clearStoredGuidedProgress();
             const emptySlots: Record<string, any> = {};
             REQUIRED_SLOTS.forEach((s) => {
               emptySlots[s.id] = { status: 'empty', doc: null, mol: null, error: null, warnings: [] };
