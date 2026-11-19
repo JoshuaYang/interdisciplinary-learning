@@ -299,9 +299,11 @@ const GUIDED_STORAGE_KEY = 'chem_guided_progress_v2';
 export function saveGuidedProgressToStorage(state: {
   slotState?: Record<string, any>;
   pipelineData?: any;
+  pipelineVerified?: boolean;
   screen?: string;
   unlockedMaxStep?: number;
   solvedSteps?: number[];
+  index?: number;
   presetPreFilled?: boolean;
 }) {
   try {
@@ -327,9 +329,11 @@ export function saveGuidedProgressToStorage(state: {
     const payload = {
       slotState: state.slotState ? cleanSlotState : existing.slotState,
       pipelineData: state.pipelineData !== undefined ? state.pipelineData : existing.pipelineData,
+      pipelineVerified: state.pipelineVerified !== undefined ? state.pipelineVerified : existing.pipelineVerified,
       screen: state.screen !== undefined ? state.screen : existing.screen,
       unlockedMaxStep: state.unlockedMaxStep !== undefined ? state.unlockedMaxStep : existing.unlockedMaxStep,
       solvedSteps: state.solvedSteps !== undefined ? state.solvedSteps : existing.solvedSteps,
+      index: state.index !== undefined ? state.index : existing.index,
       presetPreFilled: false,
       updatedAt: Date.now(),
     };
@@ -455,6 +459,7 @@ export interface ChemStoreState {
   unlockAllSteps: () => void;
   resetDeduction: () => void;
   markStepSolved: (stepIdx: number) => void;
+  manualSaveProgress: () => boolean;
 }
 
 let toastTimer: any = null;
@@ -723,6 +728,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       if (stored && !stored.presetPreFilled && stored.slotState && Object.keys(stored.slotState).length > 0) {
         // Restore from legitimate auto-saved progress
         const rehydratedSlotState: Record<string, SlotStatus> = {};
+        let validMolCount = 0;
         for (const [k, v] of Object.entries(stored.slotState as Record<string, any>)) {
           let mol = null;
           if (v.doc && v.status === 'valid') {
@@ -731,6 +737,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
               if (template) {
                 const guidedDoc = buildGuidedStudentDoc(v.doc);
                 mol = files.structure(guidedDoc, template);
+                validMolCount++;
               }
             } catch {
               mol = null;
@@ -744,15 +751,46 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
             warnings: v.warnings || [],
           };
         }
+
+        const restoredPipelineData = stored.pipelineData || createEmptyPipelineData();
+        const pipelineCheck = deduction.verifyPipeline(restoredPipelineData);
+        const isPipelineVerified = stored.pipelineVerified ?? pipelineCheck.ok;
+
+        let targetScreen = stored.screen || 'gate';
+        if (targetScreen === 'pipeline' && validMolCount < 6) {
+          targetScreen = 'gate';
+        }
+        if (targetScreen === 'stage') {
+          if (validMolCount < 6 || !pipelineCheck.ok) {
+            targetScreen = validMolCount >= 6 ? 'pipeline' : 'gate';
+          } else {
+            try {
+              const students = REQUIRED_SLOTS.map((s) => buildGuidedStudentDoc(rehydratedSlotState[s.id]?.doc));
+              const assembled = files.assemble({
+                project: bundle.project,
+                catalog: bundle.catalog,
+                steps: bundle.steps,
+                students,
+              });
+              get().installConfig(assembled, 'Restored Guided Config');
+            } catch (err) {
+              console.warn('Failed to reassemble 3D config on restore:', err);
+              targetScreen = 'pipeline';
+            }
+          }
+        }
+
+        const restoredIndex = typeof stored.index === 'number' ? stored.index : (stored.unlockedMaxStep || 0);
+
         set({
           slotState: rehydratedSlotState,
-          pipelineData: stored.pipelineData || createEmptyPipelineData(),
-          pipelineVerified: !!stored.pipelineData?.reactions?.length,
-          presetPreFilled: !!stored.presetPreFilled,
-          screen: stored.screen || 'gate',
+          pipelineData: restoredPipelineData,
+          pipelineVerified: isPipelineVerified,
+          presetPreFilled: false,
+          screen: targetScreen,
           unlockedMaxStep: stored.unlockedMaxStep || 0,
           solvedSteps: stored.solvedSteps || [0],
-          index: 0,
+          index: restoredIndex,
           progress: 1,
         });
         get().showToast('Auto-restored your previous experimental progress ✓', 'success');
@@ -798,6 +836,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       next[stageId][role].push(molId);
     }
     set({ pipelineData: next, selectedPoolMol: null, pipelineFeedback: null });
+    saveGuidedProgressToStorage({ pipelineData: next });
   },
 
   removeParticleFromZone: (stageId, role, itemIdx, reactionIndex = null) => {
@@ -808,22 +847,27 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       next[stageId]?.[role]?.splice(itemIdx, 1);
     }
     set({ pipelineData: next, pipelineFeedback: null });
+    saveGuidedProgressToStorage({ pipelineData: next });
   },
 
   resetPipeline: () => {
+    const empty = createEmptyPipelineData();
     set({
-      pipelineData: createEmptyPipelineData(),
+      pipelineData: empty,
       pipelineVerified: false,
       pipelineFeedback: null,
     });
+    saveGuidedProgressToStorage({ pipelineData: empty, pipelineVerified: false });
     get().showToast('Cleared all reaction species.');
   },
 
   autofillPipeline: () => {
+    const initial = createInitialPipelineData();
     set({
-      pipelineData: createInitialPipelineData(),
+      pipelineData: initial,
       pipelineFeedback: null,
     });
+    saveGuidedProgressToStorage({ pipelineData: initial });
     get().showToast('Auto-filled standard reaction pathway!');
   },
 
@@ -834,6 +878,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       return false;
     }
     set({ screen: 'pipeline' });
+    saveGuidedProgressToStorage({ screen: 'pipeline' });
     get().showToast('Loaded molecular building blocks. Assemble the reaction pathway!');
     return true;
   },
@@ -873,6 +918,11 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
         pipelineFeedback: null,
         screen: 'stage',
       });
+      saveGuidedProgressToStorage({
+        screen: 'stage',
+        pipelineVerified: true,
+        pipelineData,
+      });
       get().triggerResetView();
       get().showToast('Reaction pathway verified! Entering 3D Mechanism Workbench.');
       return true;
@@ -884,11 +934,13 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
 
   returnToGateFromPipeline: () => {
     set({ screen: 'gate' });
+    saveGuidedProgressToStorage({ screen: 'gate' });
   },
 
   returnToPipeline: () => {
     get().pause();
     set({ screen: 'pipeline' });
+    saveGuidedProgressToStorage({ screen: 'pipeline' });
   },
 
   installConfig: (data: ChemConfig, name: string) => {
@@ -1014,6 +1066,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       continuous: false,
       selection: null,
     });
+    saveGuidedProgressToStorage({ index: i });
   },
 
   pause: () => set({ playing: false, continuous: false }),
@@ -1108,6 +1161,26 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
       get().showToast('Congratulations! All 7 reaction mechanism steps completed. Continuous playback unlocked!');
     } else {
       get().showToast(`Step ${stepIdx + 1} verified! Next step unlocked.`);
+    }
+  },
+
+  manualSaveProgress: () => {
+    const { slotState, pipelineData, pipelineVerified, screen, unlockedMaxStep, solvedSteps, index } = get();
+    try {
+      saveGuidedProgressToStorage({
+        slotState,
+        pipelineData,
+        pipelineVerified,
+        screen,
+        unlockedMaxStep,
+        solvedSteps,
+        index,
+      });
+      get().showToast('Progress saved successfully to this browser ✓', 'success');
+      return true;
+    } catch (e: any) {
+      get().showToast('Failed to save progress: ' + e.message, 'error');
+      return false;
     }
   },
 }));

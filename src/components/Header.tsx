@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowLeft, Atom, Check, ChevronRight, Lock } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, Atom, Check, ChevronRight, Lock, Save } from 'lucide-react';
 import { useChemStore, REQUIRED_SLOTS } from '../store/useChemStore';
 import { useFreeChemStore } from '../store/useFreeChemStore';
 import * as deduction from '../engine/deduction';
@@ -14,7 +14,18 @@ export const Header: React.FC = () => {
   const enterPipelineFromGate = useChemStore((s) => s.enterPipelineFromGate);
   const submitPipelineAndEnterStage = useChemStore((s) => s.submitPipelineAndEnterStage);
   const showToast = useChemStore((s) => s.showToast);
+  const manualSaveProgress = useChemStore((s) => s.manualSaveProgress);
   const setAppMode = useFreeChemStore((s) => s.setAppMode);
+
+  const [justSaved, setJustSaved] = useState(false);
+
+  const handleManualSave = () => {
+    const ok = manualSaveProgress();
+    if (ok) {
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2200);
+    }
+  };
 
   const validMolCount = REQUIRED_SLOTS.filter((s) => slotState[s.id]?.status === 'valid').length;
   const step1Done = validMolCount === 6;
@@ -84,7 +95,27 @@ export const Header: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button
+          type="button"
+          className={`header-manual-save-btn ${justSaved ? 'saved' : ''}`}
+          onClick={handleManualSave}
+          title="Save your current progress immediately (Ctrl+S / ⌘S)"
+          aria-label="Save Progress"
+        >
+          {justSaved ? (
+            <>
+              <Check size={13} strokeWidth={2.5} />
+              <span>Saved ✓</span>
+            </>
+          ) : (
+            <>
+              <Save size={13} strokeWidth={2.2} />
+              <span>Save</span>
+            </>
+          )}
+        </button>
+
         <div className="header-autosave-pill" title="Experimental progress and molecule structures auto-saved in this browser">
           <span className="autosave-status-dot" />
           <span>Auto-saved</span>

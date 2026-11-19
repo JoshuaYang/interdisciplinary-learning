@@ -136,10 +136,19 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const fs = useFreeChemStore.getState();
+
+      // Global shortcut: Ctrl+S / Cmd+S to save progress
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (fs.appMode === 'guided') {
+          useChemStore.getState().manualSaveProgress();
+        }
+        return;
+      }
+
       const target = e.target as HTMLElement | null;
       if (target && target.matches('input, button, select, textarea, label')) return;
-
-      const fs = useFreeChemStore.getState();
       if (fs.appMode === 'free' && fs.screen === 'stage') {
         if (e.code === 'Space') {
           e.preventDefault();
