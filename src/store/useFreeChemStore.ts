@@ -250,7 +250,7 @@ export interface FreeChemStoreState {
   resetCameraTrigger: number;
 
   // Actions
-  setAppMode: (mode: 'home' | 'guided' | 'free') => void;
+  setAppMode: (mode: 'home' | 'guided' | 'free', isBackdoor?: boolean) => void;
   setScreen: (screen: 'gate' | 'pipeline' | 'stage') => void;
   setPreviewMolId: (id: string | null) => void;
   openBuilder: (molId?: string | null) => void;
@@ -289,10 +289,19 @@ export interface FreeChemStoreState {
   triggerResetView: () => void;
 }
 
+export const resolveInitialAppMode = (): 'home' | 'guided' | 'free' => {
+  if (typeof window === 'undefined') return 'home';
+  const path = window.location.pathname.toLowerCase().replace(/\/+$/, '');
+  const hash = window.location.hash.toLowerCase().replace(/\/+$/, '');
+  if (path.endsWith('/guided') || hash === '#/guided' || hash === '#guided') return 'guided';
+  if (path.endsWith('/free') || hash === '#/free' || hash === '#free') return 'free';
+  return 'home';
+};
+
 const initialSample = buildInitialSampleState();
 
 export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
-  appMode: 'home',
+  appMode: resolveInitialAppMode(),
   screen: 'gate',
 
   molecules: initialSample.molecules,
@@ -313,11 +322,17 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
   selection: null,
   resetCameraTrigger: 0,
 
-  setAppMode: (appMode) => {
+  setAppMode: (appMode, isBackdoor = false) => {
     get().pause();
     useChemStore.getState().pause();
     // Always start from Step 1 ('gate') when entering any workbench
     if (appMode === 'guided') {
+      const isAlreadyPreset = useChemStore.getState().presetPreFilled;
+      if (isBackdoor) {
+        useChemStore.getState().initGuidedMode(true);
+      } else if (!isAlreadyPreset) {
+        useChemStore.getState().initGuidedMode(false);
+      }
       useChemStore.getState().setScreen('gate');
     } else if (appMode === 'free') {
       set({ appMode, screen: 'gate', previewMolId: null, builderOpen: false });

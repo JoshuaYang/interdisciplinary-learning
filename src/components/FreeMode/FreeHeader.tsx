@@ -31,7 +31,13 @@ export const FreeHeader: React.FC = () => {
         </div>
       </div>
 
-      <nav className="header-stepper header-stepper-right" aria-label="Experiment Steps">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div className="header-autosave-pill" title="Molecules and reaction stages are auto-saved in this browser">
+          <span className="autosave-status-dot" />
+          <span>Auto-saved</span>
+        </div>
+
+        <nav className="header-stepper header-stepper-right" aria-label="Experiment Steps">
         <button
           type="button"
           className={`stepper-item ${screen === 'gate' ? 'active' : 'done'}`}
@@ -65,6 +71,7 @@ export const FreeHeader: React.FC = () => {
           <span className="stepper-label">3D Animation</span>
         </button>
       </nav>
+      </div>
     </header>
   );
 };

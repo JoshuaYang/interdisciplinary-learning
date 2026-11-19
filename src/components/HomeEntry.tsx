@@ -9,8 +9,7 @@ export const HomeEntry: React.FC = () => {
 
   const handleEnterGuided = (e: React.MouseEvent) => {
     const isBackdoor = e.metaKey || e.ctrlKey;
-    useChemStore.getState().initGuidedMode(isBackdoor);
-    setAppMode('guided');
+    setAppMode('guided', isBackdoor);
   };
 
   return (

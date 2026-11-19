@@ -29,21 +29,26 @@ export const App: React.FC = () => {
   // HTML5 History & Subpath/Hash Adaptive Routing (supports local, custom domain, and GitHub Pages subpath)
   useEffect(() => {
     const handlePopState = () => {
-      const pathname = window.location.pathname.toLowerCase();
-      const hash = window.location.hash.toLowerCase();
+      const pathname = window.location.pathname.toLowerCase().replace(/\/+$/, '');
+      const hash = window.location.hash.toLowerCase().replace(/\/+$/, '');
 
       if (pathname.endsWith('/guided') || hash === '#/guided' || hash === '#guided') {
-        useFreeChemStore.getState().setAppMode('guided');
+        if (useFreeChemStore.getState().appMode !== 'guided') {
+          useFreeChemStore.getState().setAppMode('guided');
+        }
       } else if (pathname.endsWith('/free') || hash === '#/free' || hash === '#free') {
-        useFreeChemStore.getState().setAppMode('free');
+        if (useFreeChemStore.getState().appMode !== 'free') {
+          useFreeChemStore.getState().setAppMode('free');
+        }
       } else {
-        useFreeChemStore.getState().setAppMode('home');
+        if (useFreeChemStore.getState().appMode !== 'home') {
+          useFreeChemStore.getState().setAppMode('home');
+        }
       }
     };
 
     window.addEventListener('popstate', handlePopState);
     window.addEventListener('hashchange', handlePopState);
-    handlePopState();
 
     return () => {
       window.removeEventListener('popstate', handlePopState);
@@ -62,7 +67,10 @@ export const App: React.FC = () => {
         ? `${baseDir}/free`
         : baseDir ? `${baseDir}/` : '/';
 
-    if (window.location.pathname !== targetPath) {
+    const currentNormalized = currentPath.replace(/\/+$/, '') || '/';
+    const targetNormalized = targetPath.replace(/\/+$/, '') || '/';
+
+    if (currentNormalized !== targetNormalized) {
       window.history.pushState(null, '', targetPath);
     }
   }, [appMode]);
@@ -86,6 +94,10 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     loadDefault();
+    const initialMode = useFreeChemStore.getState().appMode;
+    if (initialMode === 'guided') {
+      useChemStore.getState().initGuidedMode(false);
+    }
 
     // Expose diagnostic & programmatic API on window.chemLab for classroom scripts & tests
     (window as any).chemLab = {
