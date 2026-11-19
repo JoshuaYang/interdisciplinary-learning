@@ -84,13 +84,7 @@ export const Header: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-        <div className="header-autosave-pill" title="Experimental progress and molecule structures auto-saved in this browser">
-          <span className="autosave-status-dot" />
-          <span>Auto-saved</span>
-        </div>
-
-        <nav className="header-stepper header-stepper-right" aria-label="Experiment Steps">
+      <nav className="header-stepper header-stepper-right" aria-label="Experiment Steps">
         <button
           type="button"
           className={`stepper-item ${screen === 'gate' ? 'active' : ''} ${
@@ -148,7 +142,6 @@ export const Header: React.FC = () => {
           <span className="stepper-label">3D Mechanism</span>
         </button>
       </nav>
-      </div>
 
       <span className="local-state" id="workflow-badge" hidden>
         <i></i>
