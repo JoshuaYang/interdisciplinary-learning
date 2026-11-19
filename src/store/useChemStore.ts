@@ -146,30 +146,100 @@ export function buildGuidedStudentDoc(builderDoc: any): any {
       .filter(Boolean);
   }
 
-  const guidedDoc: any = {
+  // 1. Single atom (e.g. Br·)
+  if (nodes.length <= 1) {
+    const doc: any = {
+      name: builderDoc.name,
+      formula: builderDoc.formula,
+      description: builderDoc.description || '',
+      geometry: builderDoc.geometry || 'atomic',
+      atoms: atoms.length > 0 ? atoms : [builderDoc.formula?.replace(/·/g, '') || 'Br'],
+      nodes: builderDoc.nodes,
+      bonds: builderDoc.bonds,
+    };
+    if (radicals > 0 || builderDoc.unpairedElectrons) {
+      doc.unpairedElectrons = radicals || builderDoc.unpairedElectrons || 1;
+    }
+    return doc;
+  }
+
+  // 2. Diatomic pair (e.g. Br2, HBr)
+  if (nodes.length === 2) {
+    const rawBL = builderDoc.bondLengths || {};
+    const bl: Record<string, number> = {};
+    const standardKey = atoms.includes('H') ? `H-${atoms.find((a: string) => a !== 'H')}` : `${atoms[0]}-${atoms[1]}`;
+    const revKey = standardKey.split('-').reverse().join('-');
+    const val = rawBL[standardKey] ?? rawBL[revKey];
+    if (val !== undefined && Number.isFinite(Number(val))) {
+      bl[standardKey] = Number(val);
+    } else {
+      for (const [k, v] of Object.entries(rawBL)) {
+        bl[k] = Number(v);
+      }
+    }
+
+    const doc: any = {
+      name: builderDoc.name,
+      formula: builderDoc.formula,
+      description: builderDoc.description || '',
+      geometry: builderDoc.geometry || 'diatomic',
+      atoms,
+      bondLengths: bl,
+      nodes: builderDoc.nodes,
+      bonds: builderDoc.bonds,
+    };
+    if (radicals > 0 || builderDoc.unpairedElectrons) {
+      doc.unpairedElectrons = radicals || builderDoc.unpairedElectrons;
+    }
+    return doc;
+  }
+
+  // 3. Central molecule (e.g. CH4, CH3·, CH3Br)
+  const rawBL = builderDoc.bondLengths || {};
+  const bl: Record<string, number> = {};
+  const expectedBLKeys = Array.from(new Set(neighbors.map((nb) => `${center}-${nb}`)));
+  for (const k of expectedBLKeys) {
+    const rev = k.split('-').reverse().join('-');
+    const val = rawBL[k] ?? rawBL[rev];
+    if (val !== undefined && Number.isFinite(Number(val))) {
+      bl[k] = Number(val);
+    }
+  }
+  if (Object.keys(bl).length === 0) {
+    for (const [k, v] of Object.entries(rawBL)) bl[k] = Number(v);
+  }
+
+  const rawBA = builderDoc.bondAngles || {};
+  const ba: Record<string, number> = {};
+  const candidateAngleKeys = ['H-C-H', 'H-C-Br'];
+  for (const k of candidateAngleKeys) {
+    const rev = k.split('-').reverse().join('-');
+    const val = rawBA[k] ?? rawBA[rev];
+    if (val !== undefined && Number.isFinite(Number(val))) {
+      ba[k] = Number(val);
+    }
+  }
+  if (Object.keys(ba).length === 0) {
+    for (const [k, v] of Object.entries(rawBA)) ba[k] = Number(v);
+  }
+
+  const doc: any = {
     name: builderDoc.name,
     formula: builderDoc.formula,
-    geometry: builderDoc.geometry,
-    hybridization: builderDoc.hybridization || 'none',
-    bondLengths: builderDoc.bondLengths || {},
-    bondAngles: builderDoc.bondAngles || {},
     description: builderDoc.description || '',
+    geometry: builderDoc.geometry,
+    center: center || 'C',
+    neighbors: neighbors.length > 0 ? neighbors : ['H', 'H', 'H', 'H'],
+    hybridization: builderDoc.hybridization || (radicals > 0 ? 'sp2' : 'sp3'),
+    bondLengths: bl,
+    bondAngles: ba,
     nodes: builderDoc.nodes,
     bonds: builderDoc.bonds,
   };
-
-  if (center && neighbors.length > 0) {
-    guidedDoc.center = center;
-    guidedDoc.neighbors = neighbors;
+  if (radicals > 0 || builderDoc.unpairedElectrons) {
+    doc.unpairedElectrons = radicals || builderDoc.unpairedElectrons;
   }
-  if (atoms.length <= 2) {
-    guidedDoc.atoms = atoms;
-  }
-  if (radicals > 0) {
-    guidedDoc.unpairedElectrons = radicals;
-  }
-
-  return guidedDoc;
+  return doc;
 }
 
 export interface ChemStoreState {

@@ -978,13 +978,21 @@ export const MoleculeBuilderModal: React.FC = () => {
     for (const k of activeBondKeys) {
       const parts = k.split('-');
       const altK = parts.length === 2 ? `${parts[1]}-${parts[0]}` : k;
-      parsedLengths[k] = Number(bondLengthsInput[k] ?? bondLengthsInput[altK]);
+      const val = Number(bondLengthsInput[k] ?? bondLengthsInput[altK]);
+      parsedLengths[k] = val;
+      if (altK !== k) {
+        parsedLengths[altK] = val;
+      }
     }
     const parsedAngles: Record<string, number> = {};
     for (const k of activeAngleKeys) {
       const parts = k.split('-');
       const altK = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : k;
-      parsedAngles[k] = Number(bondAnglesInput[k] ?? bondAnglesInput[altK]);
+      const val = Number(bondAnglesInput[k] ?? bondAnglesInput[altK]);
+      parsedAngles[k] = val;
+      if (altK !== k) {
+        parsedAngles[altK] = val;
+      }
     }
 
     const nodeMap = new Map(nodes.map((n) => [n.id, n]));
@@ -2445,10 +2453,11 @@ export const MoleculeBuilderModal: React.FC = () => {
                       <div className="param-field">
                         <span>Central Hybridization (hybridization)</span>
                         <CustomSelect
-                          value={hybridization}
+                          value={nodes.length <= 2 ? '' : hybridization}
+                          disabled={nodes.length <= 2}
                           onChange={(val) => setHybridization(val)}
                           options={HYBRIDIZATION_OPTIONS}
-                          placeholder="Select Hybridization…"
+                          placeholder={nodes.length <= 2 ? 'Not applicable (no central atom)' : 'Select Hybridization…'}
                         />
                       </div>
                     </div>

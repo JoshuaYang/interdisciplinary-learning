@@ -165,14 +165,21 @@ export function structure(doc: any, template: any): MoleculeModel {
               spec.neighbors.map((n: string) => elements[spec.center] + '-' + elements[n])
             ),
           ];
-    lengths = doc['bondLengths'];
-    if (!object(lengths)) throw new Error('Please provide "bondLengths" in Ångströms (Å).');
-    for (const k of required)
-      if (!own(lengths, k) || !Number.isFinite(lengths[k]) || lengths[k] <= 0 || lengths[k] > 10)
+    const rawLengths = doc['bondLengths'];
+    if (!object(rawLengths)) throw new Error('Please provide "bondLengths" in Ångströms (Å).');
+    lengths = {};
+    for (const k of required) {
+      const rev = k.split('-').reverse().join('-');
+      const val = own(rawLengths, k) ? rawLengths[k] : rawLengths[rev];
+      if (!Number.isFinite(val) || val <= 0 || val > 10)
         throw new Error(`Invalid bond length for "${k}". Please enter a reasonable positive value in Å.`);
-    for (const k of Object.keys(lengths))
-      if (!required.includes(k))
+      lengths[k] = val;
+    }
+    for (const k of Object.keys(rawLengths)) {
+      const rev = k.split('-').reverse().join('-');
+      if (!required.includes(k) && !required.includes(rev))
         throw new Error(`Bond length "${k}" is not a valid bond in this molecule.`);
+    }
   }
   if (spec.kind === 'pair') {
     const half = lengths[spec.bond] / 2;
@@ -182,14 +189,22 @@ export function structure(doc: any, template: any): MoleculeModel {
   }
   if (spec.kind === 'center') {
     positions[spec.center] = [0, 0, 0];
-    const angles = doc.bondAngles;
+    const rawAngles = doc.bondAngles;
+    if (!object(rawAngles)) throw new Error('Please provide bondAngles in degrees (°).');
+    const angles: Record<string, number> = {};
     const required = id === 'CH3Br' ? ['H-C-H', 'H-C-Br'] : ['H-C-H'];
-    if (!object(angles)) throw new Error('Please provide bondAngles in degrees (°).');
-    for (const k of required)
-      if (!Number.isFinite(angles[k]) || angles[k] <= 0 || angles[k] >= 180)
+    for (const k of required) {
+      const rev = k.split('-').reverse().join('-');
+      const val = own(rawAngles, k) ? rawAngles[k] : rawAngles[rev];
+      if (!Number.isFinite(val) || val <= 0 || val >= 180)
         throw new Error(`bondAngles.${k} must be an angle between 0° and 180°.`);
-    if (Object.keys(angles).some((k) => !required.includes(k)))
-      throw new Error('bondAngles contains unsupported angle keys for this structure.');
+      angles[k] = val;
+    }
+    for (const k of Object.keys(rawAngles)) {
+      const rev = k.split('-').reverse().join('-');
+      if (!required.includes(k) && !required.includes(rev))
+        throw new Error('bondAngles contains unsupported angle keys for this structure.');
+    }
     const ideal = (Math.acos(-1 / 3) * 180) / Math.PI;
     let axialCos = 0;
     if (id === 'CH3') {

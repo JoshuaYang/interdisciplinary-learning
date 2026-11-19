@@ -6,6 +6,7 @@ import * as freeEngine from '../freeReactionEngine';
 import { PERIODIC_TABLE } from '../cpkPalette';
 import { CHEM_DEFAULT_FILES } from '../defaultBundle';
 import { createZipBlob } from '../zipExporter';
+import { buildGuidedStudentDoc } from '../../store/useChemStore';
 
 const fullBundle = () => structuredClone(CHEM_DEFAULT_FILES);
 const assembleDefault = () => files.assemble(fullBundle());
@@ -275,5 +276,124 @@ describe('Chem Engine & Deduction Suite', () => {
     expect(blob.size).toBeGreaterThan(100);
     const buf = new DataView(await blob.arrayBuffer());
     expect(buf.getUint32(0, true)).toBe(0x04034b50); // PK\x03\x04 local file header
+  });
+
+  it('guarantees all 6 guided curriculum molecules pass validation when saved from builderDoc', () => {
+    const bundle = fullBundle();
+    // Simulate what the builder modal exports for each of the 6 slots
+    const builderOutputs: Record<string, any> = {
+      CH4: {
+        name: 'Methane',
+        formula: 'CH4',
+        geometry: 'regularTetrahedral',
+        hybridization: 'sp3',
+        bondLengths: { 'C-H': 1.087, 'H-C': 1.087 },
+        bondAngles: { 'H-C-H': 109.471 },
+        description: 'Methane',
+        nodes: [
+          { id: 'c', element: 'C', radical: 0 },
+          { id: 'h1', element: 'H', radical: 0 },
+          { id: 'h2', element: 'H', radical: 0 },
+          { id: 'h3', element: 'H', radical: 0 },
+          { id: 'h4', element: 'H', radical: 0 },
+        ],
+        bonds: [
+          { id: 'b1', from: 'c', to: 'h1', order: 1 },
+          { id: 'b2', from: 'c', to: 'h2', order: 1 },
+          { id: 'b3', from: 'c', to: 'h3', order: 1 },
+          { id: 'b4', from: 'c', to: 'h4', order: 1 },
+        ],
+      },
+      CH3: {
+        name: 'Methyl Radical',
+        formula: 'CH3·',
+        geometry: 'trigonalPlanar',
+        hybridization: 'sp2',
+        bondLengths: { 'C-H': 1.079, 'H-C': 1.079 },
+        bondAngles: { 'H-C-H': 120 },
+        description: 'Methyl Radical',
+        nodes: [
+          { id: 'c', element: 'C', radical: 1 },
+          { id: 'h1', element: 'H', radical: 0 },
+          { id: 'h2', element: 'H', radical: 0 },
+          { id: 'h3', element: 'H', radical: 0 },
+        ],
+        bonds: [
+          { id: 'b1', from: 'c', to: 'h1', order: 1 },
+          { id: 'b2', from: 'c', to: 'h2', order: 1 },
+          { id: 'b3', from: 'c', to: 'h3', order: 1 },
+        ],
+      },
+      CH3Br: {
+        name: 'Bromomethane',
+        formula: 'CH3Br',
+        geometry: 'tetrahedral',
+        hybridization: 'sp3',
+        bondLengths: { 'C-H': 1.09, 'C-Br': 1.939 },
+        bondAngles: { 'H-C-H': 111.37, 'Br-C-H': 107.5, 'H-C-Br': 107.5 },
+        description: 'Bromomethane',
+        nodes: [
+          { id: 'c', element: 'C', radical: 0 },
+          { id: 'h1', element: 'H', radical: 0 },
+          { id: 'h2', element: 'H', radical: 0 },
+          { id: 'h3', element: 'H', radical: 0 },
+          { id: 'br', element: 'Br', radical: 0 },
+        ],
+        bonds: [
+          { id: 'b1', from: 'c', to: 'h1', order: 1 },
+          { id: 'b2', from: 'c', to: 'h2', order: 1 },
+          { id: 'b3', from: 'c', to: 'h3', order: 1 },
+          { id: 'b4', from: 'c', to: 'br', order: 1 },
+        ],
+      },
+      Br2: {
+        name: 'Bromine',
+        formula: 'Br2',
+        geometry: 'diatomic',
+        hybridization: 'none',
+        bondLengths: { 'Br-Br': 2.281 },
+        bondAngles: {},
+        description: 'Bromine',
+        nodes: [
+          { id: 'br1', element: 'Br', radical: 0 },
+          { id: 'br2', element: 'Br', radical: 0 },
+        ],
+        bonds: [{ id: 'b1', from: 'br1', to: 'br2', order: 1 }],
+      },
+      HBr: {
+        name: 'Hydrogen Bromide',
+        formula: 'HBr',
+        geometry: 'diatomic',
+        hybridization: 'none',
+        bondLengths: { 'H-Br': 1.414, 'Br-H': 1.414 },
+        bondAngles: {},
+        description: 'Hydrogen Bromide',
+        nodes: [
+          { id: 'h', element: 'H', radical: 0 },
+          { id: 'br', element: 'Br', radical: 0 },
+        ],
+        bonds: [{ id: 'b1', from: 'h', to: 'br', order: 1 }],
+      },
+      Br: {
+        name: 'Bromine Radical',
+        formula: 'Br·',
+        geometry: 'atomic',
+        hybridization: 'none',
+        bondLengths: {},
+        bondAngles: {},
+        description: 'Bromine Radical',
+        nodes: [{ id: 'br', element: 'Br', radical: 1 }],
+        bonds: [],
+      },
+    };
+
+    for (const [id, builderDoc] of Object.entries(builderOutputs)) {
+      const guidedDoc = buildGuidedStudentDoc(builderDoc);
+      const template = bundle.catalog[id];
+      expect(template).toBeDefined();
+      const mol = files.structure(guidedDoc, template);
+      expect(mol).toBeDefined();
+      expect(mol.atoms.length).toBe(builderDoc.nodes.length);
+    }
   });
 });
