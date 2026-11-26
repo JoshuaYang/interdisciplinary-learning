@@ -4861,15 +4861,81 @@ kbd {
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.14);
 }
 
-.stage-pill-wrapper.drag-over {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  transform: scale(1.03);
-  box-shadow: 0 0 0 2px var(--accent);
+.stage-pill-wrapper.dragging {
+  opacity: 0.35;
+  border-style: dashed;
+  border-color: var(--line-strong);
+  box-shadow: none;
+  filter: grayscale(0.5);
 }
 
-.stage-pill-wrapper.dragging {
-  opacity: 0.45;
+/* Insertion Drop Indicator (Vertical Line with Terminal Dots & Insert Flag) */
+.stage-drop-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 38px;
+  position: relative;
+  margin: 0 -4px;
+  z-index: 30;
+  pointer-events: none;
+  animation: dropIndicatorFadeIn 0.15s ease-out;
+}
+
+.stage-drop-indicator .indicator-line {
+  width: 3px;
+  height: 34px;
+  background: var(--accent);
+  border-radius: 3px;
+  position: relative;
+  box-shadow: 0 0 10px rgba(37, 99, 235, 0.7);
+}
+
+.stage-drop-indicator .indicator-dot {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(37, 99, 235, 0.9);
+}
+
+.stage-drop-indicator .indicator-dot.top {
+  top: -2px;
+}
+
+.stage-drop-indicator .indicator-dot.bottom {
+  bottom: -2px;
+}
+
+.stage-drop-indicator .indicator-label {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  box-shadow: 0 3px 8px rgba(15, 23, 42, 0.25);
+}
+
+@keyframes dropIndicatorFadeIn {
+  from {
+    opacity: 0;
+    transform: scaleY(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
 }
 
 .stage-pill-wrapper .stage-pill-tab {

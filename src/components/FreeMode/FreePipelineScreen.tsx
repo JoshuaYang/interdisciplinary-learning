@@ -206,7 +206,7 @@ export const FreePipelineScreen: React.FC = () => {
 
   const [activeDragMolId, setActiveDragMolId] = useState<string | null>(null);
   const [draggingStageIdx, setDraggingStageIdx] = useState<number | null>(null);
-  const [dragOverStageIdx, setDragOverStageIdx] = useState<number | null>(null);
+  const [dropSlot, setDropSlot] = useState<number | null>(null);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [stageToDelete, setStageToDelete] = useState<{ id: string; name: string } | null>(null);
 
@@ -321,98 +321,150 @@ export const FreePipelineScreen: React.FC = () => {
               <div className="pipeline-track-card">
                 {/* Stage Tabs Bar (Integrated at top of card) */}
                 <div className="stage-bar-header">
-                  <div className="stage-pills-track" role="tablist" aria-label="Reaction Stages">
+                  <div
+                    className="stage-pills-track"
+                    role="tablist"
+                    aria-label="Reaction Stages"
+                    onDragOver={(e) => {
+                      if (e.dataTransfer.types.includes('text/stage-index')) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                      }
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                        setDropSlot(null);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      const raw = e.dataTransfer.getData('text/stage-index');
+                      if (raw !== '') {
+                        e.preventDefault();
+                        const fromIdx = Number(raw);
+                        if (
+                          !isNaN(fromIdx) &&
+                          dropSlot !== null &&
+                          dropSlot !== fromIdx &&
+                          dropSlot !== fromIdx + 1
+                        ) {
+                          const targetIndex = dropSlot < fromIdx ? dropSlot : dropSlot - 1;
+                          reorderStage(fromIdx, targetIndex);
+                        }
+                      }
+                      setDraggingStageIdx(null);
+                      setDropSlot(null);
+                    }}
+                  >
                     {stages.map((st, idx) => {
                       const isActive = idx === activeStageTab;
-                      const isDragOver = dragOverStageIdx === idx;
+                      const isDraggingThis = draggingStageIdx === idx;
+                      const showDropIndicatorBefore =
+                        draggingStageIdx !== null &&
+                        dropSlot === idx &&
+                        dropSlot !== draggingStageIdx &&
+                        dropSlot !== draggingStageIdx + 1;
+
                       return (
-                        <div
-                          key={st.id}
-                          className={`stage-pill-wrapper ${isActive ? 'active' : ''} ${
-                            isDragOver ? 'drag-over' : ''
-                          } ${draggingStageIdx === idx ? 'dragging' : ''}`}
-                          draggable={stages.length > 1}
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData('text/stage-index', String(idx));
-                            e.dataTransfer.effectAllowed = 'move';
-                            setDraggingStageIdx(idx);
-                          }}
-                          onDragEnd={() => {
-                            setDraggingStageIdx(null);
-                            setDragOverStageIdx(null);
-                          }}
-                          onDragOver={(e) => {
-                            if (e.dataTransfer.types.includes('text/stage-index')) {
-                              e.preventDefault();
-                              e.dataTransfer.dropEffect = 'move';
-                              if (dragOverStageIdx !== idx) setDragOverStageIdx(idx);
-                            }
-                          }}
-                          onDragLeave={() => {
-                            if (dragOverStageIdx === idx) setDragOverStageIdx(null);
-                          }}
-                          onDrop={(e) => {
-                            const raw = e.dataTransfer.getData('text/stage-index');
-                            if (raw !== '') {
-                              e.preventDefault();
-                              const fromIdx = Number(raw);
-                              if (!isNaN(fromIdx) && fromIdx !== idx) {
-                                reorderStage(fromIdx, idx);
-                              }
-                              setDraggingStageIdx(null);
-                              setDragOverStageIdx(null);
-                            }
-                          }}
-                        >
-                          <button
-                            type="button"
-                            role="tab"
-                            aria-selected={isActive}
-                            className={`stage-pill-tab ${isActive ? 'active' : ''}`}
-                            onClick={() => setActiveStageTab(idx)}
-                            title={stages.length > 1 ? 'Click to view stage, or drag to reorder sequence' : undefined}
-                          >
-                            {stages.length > 1 && (
-                              <span className="stage-drag-handle" title="Drag to reorder stages">
-                                <GripVertical size={13} />
-                              </span>
-                            )}
-                            <span className="tab-badge">{idx + 1}</span>
-                            <span className="tab-name">{st.name || `Stage ${idx + 1}`}</span>
-                          </button>
-                          {stages.length > 1 && (
-                            <div className="pill-reorder-arrows" aria-label="Stage sequence arrows">
-                              <button
-                                type="button"
-                                className="pill-arrow-btn"
-                                disabled={idx === 0}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  moveStage(idx, -1);
-                                }}
-                                title="Move stage earlier (←)"
-                                aria-label={`Move ${st.name} earlier`}
-                              >
-                                <ChevronLeft size={12} />
-                              </button>
-                              <button
-                                type="button"
-                                className="pill-arrow-btn"
-                                disabled={idx === stages.length - 1}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  moveStage(idx, 1);
-                                }}
-                                title="Move stage later (→)"
-                                aria-label={`Move ${st.name} later`}
-                              >
-                                <ChevronRight size={12} />
-                              </button>
+                        <React.Fragment key={st.id}>
+                          {showDropIndicatorBefore && (
+                            <div className="stage-drop-indicator" aria-hidden="true">
+                              <div className="indicator-line">
+                                <span className="indicator-dot top" />
+                                <span className="indicator-label">Insert</span>
+                                <span className="indicator-dot bottom" />
+                              </div>
                             </div>
                           )}
-                        </div>
+                          <div
+                            className={`stage-pill-wrapper ${isActive ? 'active' : ''} ${
+                              isDraggingThis ? 'dragging' : ''
+                            }`}
+                            draggable={stages.length > 1}
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('text/stage-index', String(idx));
+                              e.dataTransfer.effectAllowed = 'move';
+                              setDraggingStageIdx(idx);
+                            }}
+                            onDragEnd={() => {
+                              setDraggingStageIdx(null);
+                              setDropSlot(null);
+                            }}
+                            onDragOver={(e) => {
+                              if (e.dataTransfer.types.includes('text/stage-index')) {
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = 'move';
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                const isLeft = e.clientX < rect.left + rect.width / 2;
+                                const slot = isLeft ? idx : idx + 1;
+                                if (dropSlot !== slot) {
+                                  setDropSlot(slot);
+                                }
+                              }
+                            }}
+                          >
+                            <button
+                              type="button"
+                              role="tab"
+                              aria-selected={isActive}
+                              className={`stage-pill-tab ${isActive ? 'active' : ''}`}
+                              onClick={() => setActiveStageTab(idx)}
+                              title={stages.length > 1 ? 'Click to view stage, or drag to reorder sequence' : undefined}
+                            >
+                              {stages.length > 1 && (
+                                <span className="stage-drag-handle" title="Drag to reorder stages">
+                                  <GripVertical size={13} />
+                                </span>
+                              )}
+                              <span className="tab-badge">{idx + 1}</span>
+                              <span className="tab-name">{st.name || `Stage ${idx + 1}`}</span>
+                            </button>
+                            {stages.length > 1 && (
+                              <div className="pill-reorder-arrows" aria-label="Stage sequence arrows">
+                                <button
+                                  type="button"
+                                  className="pill-arrow-btn"
+                                  disabled={idx === 0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveStage(idx, -1);
+                                  }}
+                                  title="Move stage earlier (←)"
+                                  aria-label={`Move ${st.name} earlier`}
+                                >
+                                  <ChevronLeft size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="pill-arrow-btn"
+                                  disabled={idx === stages.length - 1}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    moveStage(idx, 1);
+                                  }}
+                                  title="Move stage later (→)"
+                                  aria-label={`Move ${st.name} later`}
+                                >
+                                  <ChevronRight size={12} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </React.Fragment>
                       );
                     })}
+                    {/* Trailing drop indicator if dropping after the last item */}
+                    {draggingStageIdx !== null &&
+                      dropSlot === stages.length &&
+                      dropSlot !== draggingStageIdx &&
+                      dropSlot !== draggingStageIdx + 1 && (
+                        <div className="stage-drop-indicator" aria-hidden="true">
+                          <div className="indicator-line">
+                            <span className="indicator-dot top" />
+                            <span className="indicator-label">Insert</span>
+                            <span className="indicator-dot bottom" />
+                          </div>
+                        </div>
+                      )}
                   </div>
                   <button
                     type="button"
