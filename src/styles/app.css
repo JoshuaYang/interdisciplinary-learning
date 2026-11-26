@@ -4942,7 +4942,7 @@ kbd {
   border: none;
   background: transparent;
   box-shadow: none;
-  padding: 8px 10px 8px 12px;
+  padding: 8px 16px;
 }
 
 .stage-drag-handle {
@@ -4958,38 +4958,6 @@ kbd {
 .stage-pill-wrapper:hover .stage-drag-handle {
   opacity: 1;
   color: var(--accent);
-}
-
-.pill-reorder-arrows {
-  display: inline-flex;
-  flex-direction: column;
-  padding-right: 6px;
-  gap: 1px;
-}
-
-.pill-arrow-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 12px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  border-radius: 3px;
-  transition: all 0.12s ease;
-}
-
-.pill-arrow-btn:hover:not(:disabled) {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.pill-arrow-btn:disabled {
-  opacity: 0.2;
-  cursor: not-allowed;
 }
 
 /* Stage Header Actions & Sequence Controls */

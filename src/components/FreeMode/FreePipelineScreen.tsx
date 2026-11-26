@@ -418,36 +418,6 @@ export const FreePipelineScreen: React.FC = () => {
                               <span className="tab-badge">{idx + 1}</span>
                               <span className="tab-name">{st.name || `Stage ${idx + 1}`}</span>
                             </button>
-                            {stages.length > 1 && (
-                              <div className="pill-reorder-arrows" aria-label="Stage sequence arrows">
-                                <button
-                                  type="button"
-                                  className="pill-arrow-btn"
-                                  disabled={idx === 0}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveStage(idx, -1);
-                                  }}
-                                  title="Move stage earlier (←)"
-                                  aria-label={`Move ${st.name} earlier`}
-                                >
-                                  <ChevronLeft size={12} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="pill-arrow-btn"
-                                  disabled={idx === stages.length - 1}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    moveStage(idx, 1);
-                                  }}
-                                  title="Move stage later (→)"
-                                  aria-label={`Move ${st.name} later`}
-                                >
-                                  <ChevronRight size={12} />
-                                </button>
-                              </div>
-                            )}
                           </div>
                         </React.Fragment>
                       );
