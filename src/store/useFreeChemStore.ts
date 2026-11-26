@@ -6,6 +6,8 @@ import {
   type CompiledFreeStage,
   type FreeMoleculeItem,
   type FreeStageDef,
+  type FreeProcessType,
+  type FreePhysicalCondition,
 } from '../engine/freeReactionEngine';
 import { useChemStore, REQUIRED_SLOTS, POOL_MOLECULES } from './useChemStore';
 
@@ -265,9 +267,11 @@ export interface FreeChemStoreState {
   // Step 2 Actions
   setActiveStageTab: (idx: number) => void;
   setSelectedPoolMolId: (id: string | null) => void;
-  addStage: (name?: string) => void;
+  addStage: (name?: string, processType?: FreeProcessType, condition?: FreePhysicalCondition) => void;
   removeStage: (stageId: string) => void;
   renameStage: (stageId: string, name: string) => void;
+  setStageProcessType: (stageId: string, processType: FreeProcessType) => void;
+  setStageCondition: (stageId: string, condition: FreePhysicalCondition) => void;
   moveStage: (index: number, delta: number) => void;
   reorderStage: (fromIndex: number, toIndex: number) => void;
   addMolToStageZone: (stageId: string, role: 'reactants' | 'products', molId: string) => void;
@@ -540,11 +544,13 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
   },
   setSelectedPoolMolId: (id) => set({ selectedPoolMolId: id }),
 
-  addStage: (name) => {
-    const { stages } = get();
+  addStage: (name, processType = 'reaction', condition = 'none') => {
+    const { stages, molecules } = get();
     const newStage: FreeStageDef = {
       id: `stage_${Date.now()}_${nextStageSeq++}`,
       name: name?.trim() || `Stage ${stages.length + 1}`,
+      processType,
+      condition,
       reactants: [],
       products: [],
     };
@@ -552,13 +558,14 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
     set({
       stages: nextStages,
       activeStageTab: nextStages.length - 1,
+      compiledStages: compileFreeStages(molecules, nextStages),
     });
     saveFreeProgressToStorage({ stages: nextStages, activeStageTab: nextStages.length - 1 });
     useChemStore.getState().showToast(`Added "${newStage.name}"`);
   },
 
   removeStage: (stageId) => {
-    const { stages, activeStageTab } = get();
+    const { stages, activeStageTab, molecules } = get();
     if (stages.length <= 1) {
       useChemStore.getState().showToast('At least 1 reaction stage must be kept.');
       return;
@@ -570,6 +577,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
     set({
       stages: nextStages,
       activeStageTab: nextTab,
+      compiledStages: compileFreeStages(molecules, nextStages),
     });
     saveFreeProgressToStorage({ stages: nextStages, activeStageTab: nextTab });
     if (removed) {
@@ -578,9 +586,53 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
   },
 
   renameStage: (stageId, name) => {
-    const nextStages = get().stages.map((s) => (s.id === stageId ? { ...s, name } : s));
-    set({ stages: nextStages });
+    const { stages, molecules } = get();
+    const nextStages = stages.map((s) => (s.id === stageId ? { ...s, name } : s));
+    set({
+      stages: nextStages,
+      compiledStages: compileFreeStages(molecules, nextStages),
+    });
     saveFreeProgressToStorage({ stages: nextStages });
+  },
+
+  setStageProcessType: (stageId, processType) => {
+    const { stages, molecules } = get();
+    const nextStages = stages.map((s) => (s.id === stageId ? { ...s, processType } : s));
+    set({
+      stages: nextStages,
+      compiledStages: compileFreeStages(molecules, nextStages),
+    });
+    saveFreeProgressToStorage({ stages: nextStages });
+    useChemStore
+      .getState()
+      .showToast(
+        processType === 'approach'
+          ? 'Switched to Physical Spatial Approach'
+          : processType === 'excitation'
+          ? 'Switched to Physical Photoexcitation / Activation'
+          : 'Switched to Chemical Reaction',
+        'info'
+      );
+  },
+
+  setStageCondition: (stageId, condition) => {
+    const { stages, molecules } = get();
+    const nextStages = stages.map((s) => (s.id === stageId ? { ...s, condition } : s));
+    set({
+      stages: nextStages,
+      compiledStages: compileFreeStages(molecules, nextStages),
+    });
+    saveFreeProgressToStorage({ stages: nextStages });
+    useChemStore
+      .getState()
+      .showToast(
+        condition === 'uv'
+          ? 'Set physical condition: hν (UV Light)'
+          : condition === 'heat'
+          ? 'Set physical condition: Δ (Heat)'
+          : 'Set standard physical condition',
+        'info'
+      );
   },
 
   reorderStage: (fromIndex: number, toIndex: number) => {

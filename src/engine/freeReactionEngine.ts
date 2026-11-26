@@ -31,9 +31,14 @@ export interface FreeMoleculeItem {
   formulaHtml: string;
 }
 
+export type FreeProcessType = 'reaction' | 'approach' | 'excitation';
+export type FreePhysicalCondition = 'none' | 'uv' | 'heat';
+
 export interface FreeStageDef {
   id: string;
   name: string;
+  processType?: FreeProcessType;
+  condition?: FreePhysicalCondition;
   reactants: string[]; // array of FreeMoleculeItem.id
   products: string[];  // array of FreeMoleculeItem.id
 }
@@ -72,6 +77,8 @@ export interface FreeStageLabelInstance {
 export interface CompiledFreeStage {
   stageId: string;
   name: string;
+  processType: FreeProcessType;
+  condition: FreePhysicalCondition;
   equationText: string;
   reactantMols: { id: string; name: string; formula: string; geometry: string }[];
   productMols: { id: string; name: string; formula: string; geometry: string }[];
@@ -1601,8 +1608,233 @@ export function compileFreeStages(
   const molMap = new Map<string, FreeMoleculeItem>(molecules.map((m) => [m.id, m]));
 
   return stages.map((stage, sIdx) => {
+    const processType: FreeProcessType = stage.processType || 'reaction';
+    const condition: FreePhysicalCondition =
+      stage.condition || (processType === 'excitation' ? 'uv' : 'none');
+
     const rItems = stage.reactants.map((id) => molMap.get(id)).filter(Boolean) as FreeMoleculeItem[];
     const pItems = stage.products.map((id) => molMap.get(id)).filter(Boolean) as FreeMoleculeItem[];
+
+    // Physical Process 1: Spatial Approach & Alignment (No bond breaking or formation)
+    if (processType === 'approach') {
+      const allItems: { item: FreeMoleculeItem; isTarget: boolean; roleIdx: number }[] = [];
+      rItems.forEach((item, i) => allItems.push({ item, isTarget: false, roleIdx: i }));
+      pItems.forEach((item, i) => allItems.push({ item, isTarget: true, roleIdx: i }));
+
+      const atoms: Record<string, FreeStageAtomState> = {};
+      const bonds: Record<string, FreeStageBondState> = {};
+      const reactantLabels: FreeStageLabelInstance[] = [];
+      const productLabels: FreeStageLabelInstance[] = [];
+
+      let atomCounter = 1;
+
+      allItems.forEach(({ item, isTarget, roleIdx }) => {
+        const startX = isTarget ? 2.4 + roleIdx * 1.5 : -2.6 - roleIdx * 1.5;
+        const endX = isTarget ? 0.85 + roleIdx * 1.0 : -0.85 - roleIdx * 1.0;
+        const yOffset = 0.45;
+
+        const instAtomIds: string[] = [];
+        const localToGlobal = new Map<string, string>();
+
+        item.mol.atoms.forEach((a) => {
+          const uId = `a_${atomCounter++}`;
+          instAtomIds.push(uId);
+          localToGlobal.set(a.id, uId);
+
+          const startPos: [number, number, number] = [
+            a.position[0] + startX,
+            a.position[1] + yOffset,
+            a.position[2],
+          ];
+          const endPos: [number, number, number] = [
+            a.position[0] + endX,
+            a.position[1] + yOffset,
+            a.position[2],
+          ];
+          const midPos: [number, number, number] = [
+            (startPos[0] + endPos[0]) / 2,
+            (startPos[1] + endPos[1]) / 2,
+            (startPos[2] + endPos[2]) / 2,
+          ];
+
+          atoms[uId] = {
+            id: uId,
+            element: a.element,
+            startPos,
+            approachPos: midPos,
+            departPos: endPos,
+            endPos,
+            startRadical: a.radical,
+            endRadical: a.radical,
+            startOpacity: 1,
+            endOpacity: 1,
+            reactantInstanceIdx: roleIdx,
+            productInstanceIdx: roleIdx,
+          };
+        });
+
+        item.mol.bonds.forEach((b) => {
+          const u1 = localToGlobal.get(b.atoms[0]);
+          const u2 = localToGlobal.get(b.atoms[1]);
+          if (!u1 || !u2) return;
+          const k = core.key([u1, u2]);
+          const el1 = atoms[u1].element;
+          const el2 = atoms[u2].element;
+          bonds[k] = {
+            key: k,
+            atoms: [u1, u2],
+            order: b.order || 1,
+            inReactants: true,
+            inProducts: true,
+            label: getCanonicalBondKey(el1, el2).replace('-', '—'),
+          };
+        });
+
+        const labelInstance: FreeStageLabelInstance = {
+          molId: item.id,
+          formula: item.mol.formula,
+          name: item.mol.name,
+          atomIds: instAtomIds,
+        };
+        reactantLabels.push(labelInstance);
+        productLabels.push(labelInstance);
+      });
+
+      const leftFormula = rItems.map((m) => m.mol.formula).join(' + ') || '(Approaching Species)';
+      const rightFormula = pItems.map((m) => m.mol.formula).join(' + ') || '(Target Substrate)';
+      const equationText = pItems.length
+        ? `${leftFormula} ➔ ${rightFormula} (Spatial Approach)`
+        : `${leftFormula} (Particle Approach)`;
+
+      return {
+        stageId: stage.id,
+        name: stage.name || `Stage ${sIdx + 1}`,
+        processType,
+        condition,
+        equationText,
+        reactantMols: rItems.map((m) => ({
+          id: m.id,
+          name: m.mol.name,
+          formula: m.mol.formula,
+          geometry: m.mol.geometry,
+        })),
+        productMols: pItems.map((m) => ({
+          id: m.id,
+          name: m.mol.name,
+          formula: m.mol.formula,
+          geometry: m.mol.geometry,
+        })),
+        atoms,
+        bonds,
+        brokenBondLabels: [],
+        formedBondLabels: [],
+        reactantLabels,
+        productLabels,
+        duration: 3.8,
+      };
+    }
+
+    // Physical Process 2: Photoexcitation / Thermal Activation
+    if (processType === 'excitation') {
+      const activeItems = rItems.length ? rItems : pItems;
+      const atoms: Record<string, FreeStageAtomState> = {};
+      const bonds: Record<string, FreeStageBondState> = {};
+      const reactantLabels: FreeStageLabelInstance[] = [];
+      const productLabels: FreeStageLabelInstance[] = [];
+
+      let atomCounter = 1;
+      const offsets = computeInstanceOffsets(activeItems.length, 'separated');
+
+      activeItems.forEach((item, instIdx) => {
+        const offset = offsets[instIdx];
+        const instAtomIds: string[] = [];
+        const localToGlobal = new Map<string, string>();
+
+        item.mol.atoms.forEach((a) => {
+          const uId = `a_${atomCounter++}`;
+          instAtomIds.push(uId);
+          localToGlobal.set(a.id, uId);
+
+          const basePos: [number, number, number] = [
+            a.position[0] + offset[0],
+            a.position[1] + offset[1],
+            a.position[2] + offset[2],
+          ];
+
+          atoms[uId] = {
+            id: uId,
+            element: a.element,
+            startPos: basePos,
+            approachPos: basePos,
+            departPos: basePos,
+            endPos: basePos,
+            startRadical: a.radical,
+            endRadical: a.radical,
+            startOpacity: 1,
+            endOpacity: 1,
+            reactantInstanceIdx: instIdx,
+            productInstanceIdx: instIdx,
+          };
+        });
+
+        item.mol.bonds.forEach((b) => {
+          const u1 = localToGlobal.get(b.atoms[0]);
+          const u2 = localToGlobal.get(b.atoms[1]);
+          if (!u1 || !u2) return;
+          const k = core.key([u1, u2]);
+          const el1 = atoms[u1].element;
+          const el2 = atoms[u2].element;
+          bonds[k] = {
+            key: k,
+            atoms: [u1, u2],
+            order: b.order || 1,
+            inReactants: true,
+            inProducts: true,
+            label: getCanonicalBondKey(el1, el2).replace('-', '—'),
+          };
+        });
+
+        const labelInstance: FreeStageLabelInstance = {
+          molId: item.id,
+          formula: item.mol.formula,
+          name: item.mol.name,
+          atomIds: instAtomIds,
+        };
+        reactantLabels.push(labelInstance);
+        productLabels.push(labelInstance);
+      });
+
+      const condTag = condition === 'uv' ? 'hν (UV Light)' : condition === 'heat' ? 'Δ (Heat)' : 'Energy Absorption';
+      const formulaNames = activeItems.map((m) => m.mol.formula).join(' + ') || '(Absorbing Molecule)';
+      const equationText = `${formulaNames} + ${condTag} ➔ ${formulaNames}* (Photoexcitation)`;
+
+      return {
+        stageId: stage.id,
+        name: stage.name || `Stage ${sIdx + 1}`,
+        processType,
+        condition,
+        equationText,
+        reactantMols: activeItems.map((m) => ({
+          id: m.id,
+          name: m.mol.name,
+          formula: m.mol.formula,
+          geometry: m.mol.geometry,
+        })),
+        productMols: activeItems.map((m) => ({
+          id: m.id,
+          name: m.mol.name,
+          formula: m.mol.formula,
+          geometry: m.mol.geometry,
+        })),
+        atoms,
+        bonds,
+        brokenBondLabels: [],
+        formedBondLabels: [],
+        reactantLabels,
+        productLabels,
+        duration: 3.5,
+      };
+    }
 
     const rSepOffsets = computeInstanceOffsets(rItems.length, 'separated');
     const rContactOffsets =
@@ -1895,6 +2127,8 @@ export function compileFreeStages(
     return {
       stageId: stage.id,
       name: stage.name || `Stage ${sIdx + 1}`,
+      processType,
+      condition,
       equationText: `${lhs} ➔ ${rhs}`,
       reactantMols: rItems.map((m) => ({
         id: m.id,

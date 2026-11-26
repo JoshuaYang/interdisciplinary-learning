@@ -14,15 +14,20 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   ArrowLeft,
   ArrowRight,
+  Atom,
   ChevronLeft,
   ChevronRight,
   Edit3,
+  Flame,
   GripVertical,
+  Move,
   Package,
   Plus,
   RotateCcw,
+  Sun,
   Trash2,
   X,
+  Zap,
 } from 'lucide-react';
 import { useFreeChemStore } from '../../store/useFreeChemStore';
 import { useChemStore } from '../../store/useChemStore';
@@ -196,6 +201,8 @@ export const FreePipelineScreen: React.FC = () => {
   const addStage = useFreeChemStore((s) => s.addStage);
   const removeStage = useFreeChemStore((s) => s.removeStage);
   const renameStage = useFreeChemStore((s) => s.renameStage);
+  const setStageProcessType = useFreeChemStore((s) => s.setStageProcessType);
+  const setStageCondition = useFreeChemStore((s) => s.setStageCondition);
   const moveStage = useFreeChemStore((s) => s.moveStage);
   const reorderStage = useFreeChemStore((s) => s.reorderStage);
   const addMolToStageZone = useFreeChemStore((s) => s.addMolToStageZone);
@@ -512,25 +519,136 @@ export const FreePipelineScreen: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Stage Nature & Physical Condition Configuration Bar */}
+                <div className="stage-meta-config-bar">
+                  <div className="config-group">
+                    <span className="config-group-label">Process Nature:</span>
+                    <div className="process-type-chips">
+                      <button
+                        type="button"
+                        className={`type-chip-btn ${
+                          !currentStage.processType || currentStage.processType === 'reaction'
+                            ? 'active reaction'
+                            : ''
+                        }`}
+                        onClick={() => setStageProcessType(currentStage.id, 'reaction')}
+                        title="Chemical Reaction: Involves covalent bond breaking and/or formation"
+                      >
+                        <Atom size={13} />
+                        <span>Chemical Reaction</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`type-chip-btn ${
+                          currentStage.processType === 'approach' ? 'active approach' : ''
+                        }`}
+                        onClick={() => setStageProcessType(currentStage.id, 'approach')}
+                        title="Physical Process: Particles translate & align for collision without covalent bond cleavage"
+                      >
+                        <Move size={13} />
+                        <span>Spatial Approach</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`type-chip-btn ${
+                          currentStage.processType === 'excitation' ? 'active excitation' : ''
+                        }`}
+                        onClick={() => setStageProcessType(currentStage.id, 'excitation')}
+                        title="Physical Process: Molecules absorb photon energy (hν) or heat (Δ) into excited state"
+                      >
+                        <Zap size={13} />
+                        <span>Energy Excitation</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="config-group">
+                    <span className="config-group-label">Physical Condition:</span>
+                    <div className="condition-chips">
+                      <button
+                        type="button"
+                        className={`cond-chip-btn ${
+                          !currentStage.condition || currentStage.condition === 'none' ? 'active' : ''
+                        }`}
+                        onClick={() => setStageCondition(currentStage.id, 'none')}
+                        title="Standard condition (ambient room temperature)"
+                      >
+                        <span>Standard</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`cond-chip-btn ${currentStage.condition === 'uv' ? 'active uv' : ''}`}
+                        onClick={() => setStageCondition(currentStage.id, 'uv')}
+                        title="hν UV light photoexcitation"
+                      >
+                        <Sun size={13} />
+                        <span>hν (UV Light)</span>
+                      </button>
+                      <button
+                        type="button"
+                        className={`cond-chip-btn ${currentStage.condition === 'heat' ? 'active heat' : ''}`}
+                        onClick={() => setStageCondition(currentStage.id, 'heat')}
+                        title="Δ Thermal activation"
+                      >
+                        <Flame size={13} />
+                        <span>Δ (Heat)</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Integrated Reaction Chamber Tunnel */}
                 <div className="track-flow">
                   <FreeDropZone
                     stageId={currentStage.id}
                     role="reactants"
-                    titleText="Reactants (Before Reaction)"
+                    titleText={
+                      currentStage.processType === 'approach'
+                        ? 'Approaching Species (逼近物料)'
+                        : currentStage.processType === 'excitation'
+                        ? 'Absorbing Molecule(s) (受激物料)'
+                        : 'Reactants (Before Reaction)'
+                    }
                     particles={currentStage.reactants}
                     moleculesMap={moleculesMap}
                   />
                   <div className="track-arrow-zone">
-                    <span className="track-conduit-pill">Reaction</span>
+                    <span className={`track-conduit-pill ${currentStage.processType || 'reaction'}`}>
+                      {currentStage.processType === 'approach'
+                        ? 'Spatial Approach'
+                        : currentStage.processType === 'excitation'
+                        ? `Activation (${currentStage.condition === 'heat' ? 'Δ' : 'hν'})`
+                        : `Reaction ${
+                            currentStage.condition === 'uv'
+                              ? '(hν)'
+                              : currentStage.condition === 'heat'
+                              ? '(Δ)'
+                              : ''
+                          }`}
+                    </span>
                     <div className="track-arrow-circle" aria-hidden="true">
-                      <ArrowRight size={20} />
+                      {currentStage.processType === 'approach' ? (
+                        <Move size={18} />
+                      ) : currentStage.processType === 'excitation' ? (
+                        <Zap size={18} />
+                      ) : (
+                        <ArrowRight size={20} />
+                      )}
                     </div>
+                    {currentStage.processType && currentStage.processType !== 'reaction' && (
+                      <span className="physical-no-bond-hint">No Bond Cleavage</span>
+                    )}
                   </div>
                   <FreeDropZone
                     stageId={currentStage.id}
                     role="products"
-                    titleText="Products (After Reaction)"
+                    titleText={
+                      currentStage.processType === 'approach'
+                        ? 'Target Substrate / Particles (目标物料)'
+                        : currentStage.processType === 'excitation'
+                        ? 'Excited State System (受激产态)'
+                        : 'Products (After Reaction)'
+                    }
                     particles={currentStage.products}
                     moleculesMap={moleculesMap}
                   />

@@ -504,4 +504,79 @@ describe('Chem Engine & Deduction Suite', () => {
     expect(updated2.stages[2].id).toBe('st_1');
     expect(updated2.activeStageTab).toBe(2);
   });
+
+  it('compiles physical process stages (approach and excitation) with zero bond cleavage', () => {
+    const ch4Doc = {
+      name: 'Methane',
+      formula: 'CH4',
+      geometry: 'regularTetrahedral',
+      nodes: [
+        { id: 'c', element: 'C', radical: 0 },
+        { id: 'h1', element: 'H', radical: 0 },
+        { id: 'h2', element: 'H', radical: 0 },
+      ],
+      bonds: [
+        { id: 'b1', from: 'c', to: 'h1', order: 1 },
+        { id: 'b2', from: 'c', to: 'h2', order: 1 },
+      ],
+    };
+    const brDoc = {
+      name: 'Bromine Radical',
+      formula: 'Br·',
+      geometry: 'atomic',
+      nodes: [{ id: 'br', element: 'Br', radical: 1 }],
+      bonds: [],
+    };
+    const ch4Mol = freeEngine.buildUniversalMolecule(ch4Doc);
+    const brMol = freeEngine.buildUniversalMolecule(brDoc);
+
+    const mols: freeEngine.FreeMoleculeItem[] = [
+      { id: 'm_ch4', doc: ch4Doc, mol: ch4Mol, formulaHtml: 'CH<sub>4</sub>' },
+      { id: 'm_br', doc: brDoc, mol: brMol, formulaHtml: 'Br·' },
+    ];
+
+    const stages: freeEngine.FreeStageDef[] = [
+      {
+        id: 'st_approach',
+        name: 'Radical Approaches Methane',
+        processType: 'approach',
+        condition: 'none',
+        reactants: ['m_br'],
+        products: ['m_ch4'],
+      },
+      {
+        id: 'st_uv',
+        name: 'Bromine Photoexcitation',
+        processType: 'excitation',
+        condition: 'uv',
+        reactants: ['m_ch4'],
+        products: [],
+      },
+    ];
+
+    const compiled = freeEngine.compileFreeStages(mols, stages);
+    expect(compiled.length).toBe(2);
+
+    // Verify Approach stage
+    const s1 = compiled[0];
+    expect(s1.processType).toBe('approach');
+    expect(s1.brokenBondLabels).toEqual([]);
+    expect(s1.formedBondLabels).toEqual([]);
+    expect(s1.equationText).toContain('Spatial Approach');
+    expect(Object.keys(s1.bonds).length).toBe(2); // C-H bonds stay intact!
+
+    // Sample approach stage at progress 0 and 1
+    const frame0 = freeEngine.sampleFreeStage(s1, 0);
+    const frame1 = freeEngine.sampleFreeStage(s1, 1);
+    expect(frame0.atoms.a_1).toBeDefined();
+    expect(frame1.atoms.a_1).toBeDefined();
+
+    // Verify Excitation stage
+    const s2 = compiled[1];
+    expect(s2.processType).toBe('excitation');
+    expect(s2.condition).toBe('uv');
+    expect(s2.brokenBondLabels).toEqual([]);
+    expect(s2.formedBondLabels).toEqual([]);
+    expect(s2.equationText).toContain('Photoexcitation');
+  });
 });

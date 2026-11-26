@@ -5022,6 +5022,180 @@ kbd {
   border: 1px solid var(--line);
 }
 
+/* Free Mode Stage Process & Condition Bar in Step 2 */
+.stage-meta-config-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 14px;
+  background: var(--surface-subtle);
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.config-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.config-group-label {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+.process-type-chips,
+.condition-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.type-chip-btn,
+.cond-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.type-chip-btn:hover,
+.cond-chip-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.type-chip-btn.active.reaction {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: #2563eb;
+  color: #1d4ed8;
+}
+
+.type-chip-btn.active.approach {
+  background: rgba(16, 185, 129, 0.12);
+  border-color: #10b981;
+  color: #047857;
+}
+
+.type-chip-btn.active.excitation {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+.cond-chip-btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.cond-chip-btn.active.uv {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+.cond-chip-btn.active.heat {
+  background: rgba(239, 68, 68, 0.14);
+  border-color: #ef4444;
+  color: #b91c1c;
+}
+
+.track-conduit-pill.approach {
+  background: rgba(16, 185, 129, 0.14);
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.track-conduit-pill.excitation {
+  background: rgba(245, 158, 11, 0.14);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.physical-no-bond-hint {
+  font-size: 11px;
+  font-weight: 600;
+  color: #047857;
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* Step 3 Stage Nature Badges */
+.stage-nature-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.stage-nature-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+}
+
+.stage-nature-badge.reaction {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+}
+
+.stage-nature-badge.approach {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.stage-nature-badge.excitation {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.stage-condition-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.stage-condition-badge.uv {
+  background: rgba(245, 158, 11, 0.15);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.stage-condition-badge.heat {
+  background: rgba(239, 68, 68, 0.15);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+#light-cue.heat-cue {
+  background: rgba(254, 242, 242, 0.92);
+  border-bottom: 1.5px solid rgba(239, 68, 68, 0.5);
+  color: #dc2626;
+}
+
 /* Free Stage Right Sidebar Summary */
 .free-summary-card {
   gap: 14px;

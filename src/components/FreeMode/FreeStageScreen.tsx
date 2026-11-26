@@ -724,11 +724,24 @@ export const FreeStageScreen: React.FC = () => {
       [...chosenFormed].sort().join(',') === [...actualFormed].sort().join(',');
 
     if (brokenMatch && formedMatch) {
+      const successMsg =
+        currentStage.processType === 'approach'
+          ? 'Correct! In a physical approach process, particles translate and align without any covalent bond cleavage or formation.'
+          : currentStage.processType === 'excitation'
+          ? 'Correct! Photoexcitation / energy absorption excites molecular bonding orbitals without covalent bond breaking or forming.'
+          : 'Correct! Covalent bond cleavage and formation mechanism verified.';
       setDeductionFeedback({
         ok: true,
-        message: 'Correct! Covalent bond cleavage and formation mechanism verified.',
+        message: successMsg,
       });
       setSolvedStages((prev) => ({ ...prev, [currentStage.stageId]: true }));
+    } else if (currentStage.processType === 'approach' || currentStage.processType === 'excitation') {
+      setDeductionFeedback({
+        ok: false,
+        message: `In this ${
+          currentStage.processType === 'approach' ? 'physical approach' : 'energy excitation'
+        } process, particles do not break or form covalent bonds. Please select "None" for both.`,
+      });
     } else if (!brokenMatch) {
       setDeductionFeedback({
         ok: false,
@@ -821,6 +834,21 @@ export const FreeStageScreen: React.FC = () => {
         {/* Center 3D Reaction Stage */}
         <main className="workspace">
           <section className="step-heading" aria-live="polite" aria-atomic="true">
+            <div className="stage-nature-badge-wrap">
+              <span className={`stage-nature-badge ${currentStage.processType || 'reaction'}`}>
+                {currentStage.processType === 'approach'
+                  ? '↔️ Physical Process · Spatial Approach & Alignment'
+                  : currentStage.processType === 'excitation'
+                  ? '⚡ Physical Process · Energy Photoexcitation'
+                  : '⚗️ Chemical Reaction · Bond Reorganization'}
+              </span>
+              {currentStage.condition === 'uv' && (
+                <span className="stage-condition-badge uv">hν UV Light</span>
+              )}
+              {currentStage.condition === 'heat' && (
+                <span className="stage-condition-badge heat">Δ Thermal Heat</span>
+              )}
+            </div>
             <h2>{currentStage.name}</h2>
             <p
               dangerouslySetInnerHTML={{
@@ -942,13 +970,39 @@ export const FreeStageScreen: React.FC = () => {
               </div>
             </div>
 
+            {/* Physical Process Cues: UV Light and Thermal Heat */}
+            {(currentStage.condition === 'uv' || currentStage.processType === 'excitation') && (
+              <div id="light-cue" className="active" aria-label="UV Light excitation">
+                <span>hν</span>
+                <small>UV Light</small>
+              </div>
+            )}
+            {currentStage.condition === 'heat' && (
+              <div id="light-cue" className="heat-cue active" aria-label="Thermal activation">
+                <span>Δ</span>
+                <small>Thermal Heat</small>
+              </div>
+            )}
+
             {/* Real-time Interactive Potential Energy Surface (PES) HUD */}
             <ReactionPESHUD
               progress={progress}
               onSeek={(p) => setProgress(p, true)}
               stageName={currentStage.name}
-              eaKj={54 + ((stageIndex * 19) % 45)}
-              deltaHKj={-48 - ((stageIndex * 27) % 60)}
+              eaKj={
+                currentStage.processType === 'approach'
+                  ? 12
+                  : currentStage.processType === 'excitation'
+                  ? 193
+                  : 54 + ((stageIndex * 19) % 45)
+              }
+              deltaHKj={
+                currentStage.processType === 'approach'
+                  ? 0
+                  : currentStage.processType === 'excitation'
+                  ? 193
+                  : -48 - ((stageIndex * 27) % 60)
+              }
             />
 
             {selectedAtom && (
