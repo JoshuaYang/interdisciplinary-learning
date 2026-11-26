@@ -4840,6 +4840,154 @@ kbd {
   box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
 }
 
+/* Stage Pill Wrapper & Drag-and-Drop Reorder */
+.stage-pill-wrapper {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  border-radius: 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: all 0.16s ease;
+}
+
+.stage-pill-wrapper:hover {
+  border-color: var(--accent-border);
+}
+
+.stage-pill-wrapper.active {
+  border-color: var(--accent);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.14);
+}
+
+.stage-pill-wrapper.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: scale(1.03);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.stage-pill-wrapper.dragging {
+  opacity: 0.45;
+}
+
+.stage-pill-wrapper .stage-pill-tab {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 8px 10px 8px 12px;
+}
+
+.stage-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  color: var(--muted);
+  cursor: grab;
+  margin-right: 2px;
+  opacity: 0.6;
+  transition: all 0.15s ease;
+}
+
+.stage-pill-wrapper:hover .stage-drag-handle {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.pill-reorder-arrows {
+  display: inline-flex;
+  flex-direction: column;
+  padding-right: 6px;
+  gap: 1px;
+}
+
+.pill-arrow-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 12px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.12s ease;
+}
+
+.pill-arrow-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.pill-arrow-btn:disabled {
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
+/* Stage Header Actions & Sequence Controls */
+.stage-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.stage-reorder-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-subtle);
+  padding: 3px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+}
+
+.reorder-group-label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--ink-secondary);
+  margin-left: 2px;
+  margin-right: 2px;
+}
+
+.stage-move-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 9px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.stage-move-nav-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.stage-move-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.stage-order-badge {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--paper);
+  padding: 3px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--line);
+}
+
 /* Free Stage Right Sidebar Summary */
 .free-summary-card {
   gap: 14px;

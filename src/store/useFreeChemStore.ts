@@ -268,6 +268,8 @@ export interface FreeChemStoreState {
   addStage: (name?: string) => void;
   removeStage: (stageId: string) => void;
   renameStage: (stageId: string, name: string) => void;
+  moveStage: (index: number, delta: number) => void;
+  reorderStage: (fromIndex: number, toIndex: number) => void;
   addMolToStageZone: (stageId: string, role: 'reactants' | 'products', molId: string) => void;
   removeMolFromStageZone: (
     stageId: string,
@@ -579,6 +581,45 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
     const nextStages = get().stages.map((s) => (s.id === stageId ? { ...s, name } : s));
     set({ stages: nextStages });
     saveFreeProgressToStorage({ stages: nextStages });
+  },
+
+  reorderStage: (fromIndex: number, toIndex: number) => {
+    const { stages, activeStageTab, molecules } = get();
+    if (
+      fromIndex < 0 ||
+      fromIndex >= stages.length ||
+      toIndex < 0 ||
+      toIndex >= stages.length ||
+      fromIndex === toIndex
+    ) {
+      return;
+    }
+    const nextStages = [...stages];
+    const [moved] = nextStages.splice(fromIndex, 1);
+    nextStages.splice(toIndex, 0, moved);
+
+    let nextTab = activeStageTab;
+    if (activeStageTab === fromIndex) {
+      nextTab = toIndex;
+    } else if (fromIndex < activeStageTab && toIndex >= activeStageTab) {
+      nextTab = activeStageTab - 1;
+    } else if (fromIndex > activeStageTab && toIndex <= activeStageTab) {
+      nextTab = activeStageTab + 1;
+    }
+
+    set({
+      stages: nextStages,
+      activeStageTab: nextTab,
+      compiledStages: compileFreeStages(molecules, nextStages),
+    });
+    saveFreeProgressToStorage({ stages: nextStages, activeStageTab: nextTab });
+    useChemStore
+      .getState()
+      .showToast(`Moved "${moved.name || `Stage ${toIndex + 1}`}" to position ${toIndex + 1}.`, 'info');
+  },
+
+  moveStage: (index: number, delta: number) => {
+    get().reorderStage(index, index + delta);
   },
 
   addMolToStageZone: (stageId, role, molId) => {

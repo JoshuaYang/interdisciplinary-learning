@@ -11,7 +11,19 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, ArrowRight, Edit3, Package, Plus, RotateCcw, Trash2, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Edit3,
+  GripVertical,
+  Package,
+  Plus,
+  RotateCcw,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { useFreeChemStore } from '../../store/useFreeChemStore';
 import { useChemStore } from '../../store/useChemStore';
 import type { FreeMoleculeItem } from '../../engine/freeReactionEngine';
@@ -184,6 +196,8 @@ export const FreePipelineScreen: React.FC = () => {
   const addStage = useFreeChemStore((s) => s.addStage);
   const removeStage = useFreeChemStore((s) => s.removeStage);
   const renameStage = useFreeChemStore((s) => s.renameStage);
+  const moveStage = useFreeChemStore((s) => s.moveStage);
+  const reorderStage = useFreeChemStore((s) => s.reorderStage);
   const addMolToStageZone = useFreeChemStore((s) => s.addMolToStageZone);
   const clearCurrentStageZones = useFreeChemStore((s) => s.clearCurrentStageZones);
   const setScreen = useFreeChemStore((s) => s.setScreen);
@@ -191,6 +205,8 @@ export const FreePipelineScreen: React.FC = () => {
   const showToast = useChemStore((s) => s.showToast);
 
   const [activeDragMolId, setActiveDragMolId] = useState<string | null>(null);
+  const [draggingStageIdx, setDraggingStageIdx] = useState<number | null>(null);
+  const [dragOverStageIdx, setDragOverStageIdx] = useState<number | null>(null);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [stageToDelete, setStageToDelete] = useState<{ id: string; name: string } | null>(null);
 
@@ -306,19 +322,97 @@ export const FreePipelineScreen: React.FC = () => {
                 {/* Stage Tabs Bar (Integrated at top of card) */}
                 <div className="stage-bar-header">
                   <div className="stage-pills-track" role="tablist" aria-label="Reaction Stages">
-                    {stages.map((st, idx) => (
-                      <button
-                        key={st.id}
-                        type="button"
-                        role="tab"
-                        aria-selected={idx === activeStageTab}
-                        className={`stage-pill-tab ${idx === activeStageTab ? 'active' : ''}`}
-                        onClick={() => setActiveStageTab(idx)}
-                      >
-                        <span className="tab-badge">{idx + 1}</span>
-                        <span>{st.name || `Stage ${idx + 1}`}</span>
-                      </button>
-                    ))}
+                    {stages.map((st, idx) => {
+                      const isActive = idx === activeStageTab;
+                      const isDragOver = dragOverStageIdx === idx;
+                      return (
+                        <div
+                          key={st.id}
+                          className={`stage-pill-wrapper ${isActive ? 'active' : ''} ${
+                            isDragOver ? 'drag-over' : ''
+                          } ${draggingStageIdx === idx ? 'dragging' : ''}`}
+                          draggable={stages.length > 1}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/stage-index', String(idx));
+                            e.dataTransfer.effectAllowed = 'move';
+                            setDraggingStageIdx(idx);
+                          }}
+                          onDragEnd={() => {
+                            setDraggingStageIdx(null);
+                            setDragOverStageIdx(null);
+                          }}
+                          onDragOver={(e) => {
+                            if (e.dataTransfer.types.includes('text/stage-index')) {
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = 'move';
+                              if (dragOverStageIdx !== idx) setDragOverStageIdx(idx);
+                            }
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverStageIdx === idx) setDragOverStageIdx(null);
+                          }}
+                          onDrop={(e) => {
+                            const raw = e.dataTransfer.getData('text/stage-index');
+                            if (raw !== '') {
+                              e.preventDefault();
+                              const fromIdx = Number(raw);
+                              if (!isNaN(fromIdx) && fromIdx !== idx) {
+                                reorderStage(fromIdx, idx);
+                              }
+                              setDraggingStageIdx(null);
+                              setDragOverStageIdx(null);
+                            }
+                          }}
+                        >
+                          <button
+                            type="button"
+                            role="tab"
+                            aria-selected={isActive}
+                            className={`stage-pill-tab ${isActive ? 'active' : ''}`}
+                            onClick={() => setActiveStageTab(idx)}
+                            title={stages.length > 1 ? 'Click to view stage, or drag to reorder sequence' : undefined}
+                          >
+                            {stages.length > 1 && (
+                              <span className="stage-drag-handle" title="Drag to reorder stages">
+                                <GripVertical size={13} />
+                              </span>
+                            )}
+                            <span className="tab-badge">{idx + 1}</span>
+                            <span className="tab-name">{st.name || `Stage ${idx + 1}`}</span>
+                          </button>
+                          {stages.length > 1 && (
+                            <div className="pill-reorder-arrows" aria-label="Stage sequence arrows">
+                              <button
+                                type="button"
+                                className="pill-arrow-btn"
+                                disabled={idx === 0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  moveStage(idx, -1);
+                                }}
+                                title="Move stage earlier (←)"
+                                aria-label={`Move ${st.name} earlier`}
+                              >
+                                <ChevronLeft size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                className="pill-arrow-btn"
+                                disabled={idx === stages.length - 1}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  moveStage(idx, 1);
+                                }}
+                                title="Move stage later (→)"
+                                aria-label={`Move ${st.name} later`}
+                              >
+                                <ChevronRight size={12} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                   <button
                     type="button"
@@ -346,22 +440,54 @@ export const FreePipelineScreen: React.FC = () => {
                       onChange={(e) => renameStage(currentStage.id, e.target.value)}
                     />
                   </div>
-                  {stages.length > 1 && (
-                    <button
-                      type="button"
-                      className="stage-delete-btn"
-                      title="Delete stage"
-                      aria-label="Delete stage"
-                      onClick={() =>
-                        setStageToDelete({
-                          id: currentStage.id,
-                          name: currentStage.name || 'this reaction stage',
-                        })
-                      }
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
+                  <div className="stage-header-actions">
+                    {stages.length > 1 && (
+                      <div className="stage-reorder-group" title="Adjust reaction stage sequence order">
+                        <span className="reorder-group-label">Sequence:</span>
+                        <button
+                          type="button"
+                          className="stage-move-nav-btn"
+                          disabled={activeStageTab === 0}
+                          onClick={() => moveStage(activeStageTab, -1)}
+                          title="Move current stage earlier (left)"
+                          aria-label="Move current stage earlier"
+                        >
+                          <ChevronLeft size={15} />
+                          <span>Move Left</span>
+                        </button>
+                        <span className="stage-order-badge mono">
+                          {activeStageTab + 1} / {stages.length}
+                        </span>
+                        <button
+                          type="button"
+                          className="stage-move-nav-btn"
+                          disabled={activeStageTab === stages.length - 1}
+                          onClick={() => moveStage(activeStageTab, 1)}
+                          title="Move current stage later (right)"
+                          aria-label="Move current stage later"
+                        >
+                          <span>Move Right</span>
+                          <ChevronRight size={15} />
+                        </button>
+                      </div>
+                    )}
+                    {stages.length > 1 && (
+                      <button
+                        type="button"
+                        className="stage-delete-btn"
+                        title="Delete stage"
+                        aria-label="Delete stage"
+                        onClick={() =>
+                          setStageToDelete({
+                            id: currentStage.id,
+                            name: currentStage.name || 'this reaction stage',
+                          })
+                        }
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Integrated Reaction Chamber Tunnel */}

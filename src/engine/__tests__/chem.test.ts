@@ -7,6 +7,7 @@ import { PERIODIC_TABLE } from '../cpkPalette';
 import { CHEM_DEFAULT_FILES } from '../defaultBundle';
 import { createZipBlob } from '../zipExporter';
 import { buildGuidedStudentDoc } from '../../store/useChemStore';
+import { useFreeChemStore } from '../../store/useFreeChemStore';
 
 const fullBundle = () => structuredClone(CHEM_DEFAULT_FILES);
 const assembleDefault = () => files.assemble(fullBundle());
@@ -474,5 +475,33 @@ describe('Chem Engine & Deduction Suite', () => {
       formBond: 'C—Br',
     });
     expect(resPathway3.ok).toBe(true);
+  });
+
+  it('correctly reorders reaction stages in Free Mode and updates active index', () => {
+    // Prepare 3 test stages
+    useFreeChemStore.setState({
+      stages: [
+        { id: 'st_1', name: 'Stage 1: Initiation', reactants: ['m_br2'], products: ['m_br'] },
+        { id: 'st_2', name: 'Stage 2: Propagation', reactants: ['m_ch4'], products: ['m_ch3'] },
+        { id: 'st_3', name: 'Stage 3: Termination', reactants: ['m_br', 'm_br'], products: ['m_br2'] },
+      ],
+      activeStageTab: 0,
+    });
+
+    // Move Stage 1 to position 2 (after Propagation)
+    useFreeChemStore.getState().moveStage(0, 1);
+    const updated1 = useFreeChemStore.getState();
+    expect(updated1.stages[0].id).toBe('st_2');
+    expect(updated1.stages[1].id).toBe('st_1');
+    expect(updated1.stages[2].id).toBe('st_3');
+    expect(updated1.activeStageTab).toBe(1);
+
+    // Reorder st_3 (index 2) to index 0 (drag-and-drop to front)
+    useFreeChemStore.getState().reorderStage(2, 0);
+    const updated2 = useFreeChemStore.getState();
+    expect(updated2.stages[0].id).toBe('st_3');
+    expect(updated2.stages[1].id).toBe('st_2');
+    expect(updated2.stages[2].id).toBe('st_1');
+    expect(updated2.activeStageTab).toBe(2);
   });
 });
