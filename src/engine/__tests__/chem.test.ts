@@ -440,4 +440,39 @@ describe('Chem Engine & Deduction Suite', () => {
     expect(waterMol.bonds.length).toBe(2);
     expect(waterMol.formula).toBe('H2O');
   });
+
+  it('verifies step 7 termination pathways and supports flexible valid answers', () => {
+    // Step 7 has 3 valid pathways + all 3 pathways
+    const resAll = deduction.verify(7, {
+      phase: 'Termination',
+      equation: 'Radical Coupling (All 3 Pathways)',
+      breakBond: 'None',
+      formBond: 'Br—Br, C—C, C—Br',
+    });
+    expect(resAll.ok).toBe(true);
+
+    const resPathway1 = deduction.verify(7, {
+      phase: 'Termination',
+      equation: '2 Br· → Br₂ (Pathway 1: Bromine Coupling)',
+      breakBond: 'None',
+      formBond: 'Br—Br',
+    });
+    expect(resPathway1.ok).toBe(true);
+
+    const resPathway2 = deduction.verify(7, {
+      phase: 'Termination',
+      equation: '2 CH₃· → CH₃—CH₃ (Pathway 2: Ethane Coupling)',
+      breakBond: 'None',
+      formBond: 'C—C',
+    });
+    expect(resPathway2.ok).toBe(true);
+
+    const resPathway3 = deduction.verify(7, {
+      phase: 'Termination',
+      equation: 'CH₃· + Br· → CH₃Br (Pathway 3: Bromomethane Coupling)',
+      breakBond: 'None',
+      formBond: 'C—Br',
+    });
+    expect(resPathway3.ok).toBe(true);
+  });
 });

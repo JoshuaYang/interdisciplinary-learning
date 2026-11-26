@@ -303,6 +303,7 @@ export function saveGuidedProgressToStorage(state: {
   screen?: string;
   unlockedMaxStep?: number;
   solvedSteps?: number[];
+  deductionAnswers?: Record<number, { phase: string; equation: string; breakBond: string; formBond: string }>;
   index?: number;
   presetPreFilled?: boolean;
 }) {
@@ -333,6 +334,7 @@ export function saveGuidedProgressToStorage(state: {
       screen: state.screen !== undefined ? state.screen : existing.screen,
       unlockedMaxStep: state.unlockedMaxStep !== undefined ? state.unlockedMaxStep : existing.unlockedMaxStep,
       solvedSteps: state.solvedSteps !== undefined ? state.solvedSteps : existing.solvedSteps,
+      deductionAnswers: state.deductionAnswers !== undefined ? state.deductionAnswers : existing.deductionAnswers,
       index: state.index !== undefined ? state.index : existing.index,
       presetPreFilled: false,
       updatedAt: Date.now(),
@@ -389,6 +391,7 @@ export interface ChemStoreState {
   selection: string | null;
   unlockedMaxStep: number;
   solvedSteps: number[];
+  deductionAnswers: Record<number, { phase: string; equation: string; breakBond: string; formBond: string }>;
   presetPreFilled: boolean;
   validationReport: { errors: string[]; warnings: string[]; accepted: boolean } | null;
 
@@ -458,7 +461,13 @@ export interface ChemStoreState {
   setSelection: (atomId: string | null) => void;
   unlockAllSteps: () => void;
   resetDeduction: () => void;
-  markStepSolved: (stepIdx: number) => void;
+  markStepSolved: (stepIdx: number, answer?: { phase: string; equation: string; breakBond: string; formBond: string }) => void;
+  setDeductionAnswer: (
+    stepIdx: number,
+    partialAnswer: Partial<{ phase: string; equation: string; breakBond: string; formBond: string }>
+  ) => void;
+  reopenDeduction: (stepIdx: number) => void;
+  playAllContinuous: () => void;
   manualSaveProgress: () => boolean;
 }
 
@@ -495,6 +504,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
   selection: null,
   unlockedMaxStep: 0,
   solvedSteps: [0],
+  deductionAnswers: {},
   presetPreFilled: false,
   validationReport: null,
 
@@ -790,6 +800,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
           screen: targetScreen,
           unlockedMaxStep: stored.unlockedMaxStep || 0,
           solvedSteps: stored.solvedSteps || [0],
+          deductionAnswers: stored.deductionAnswers || {},
           index: restoredIndex,
           progress: 1,
         });
@@ -808,6 +819,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
           screen: 'gate',
           unlockedMaxStep: 0,
           solvedSteps: [0],
+          deductionAnswers: {},
           index: 0,
           progress: 1,
         });
@@ -1147,25 +1159,62 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
     });
   },
 
-  markStepSolved: (stepIdx: number) => {
-    const { solvedSteps, unlockedMaxStep } = get();
+  markStepSolved: (stepIdx: number, answer?: { phase: string; equation: string; breakBond: string; formBond: string }) => {
+    const { solvedSteps, unlockedMaxStep, deductionAnswers } = get();
     const nextSolved = solvedSteps.includes(stepIdx) ? solvedSteps : [...solvedSteps, stepIdx];
     const nextMax = Math.max(unlockedMaxStep, stepIdx);
+    const nextAnswers = answer ? { ...deductionAnswers, [stepIdx]: answer } : deductionAnswers;
     set({
       solvedSteps: nextSolved,
       unlockedMaxStep: nextMax,
+      deductionAnswers: nextAnswers,
     });
-    saveGuidedProgressToStorage({ solvedSteps: nextSolved, unlockedMaxStep: nextMax });
+    saveGuidedProgressToStorage({
+      solvedSteps: nextSolved,
+      unlockedMaxStep: nextMax,
+      deductionAnswers: nextAnswers,
+    });
     get().go(stepIdx, true);
-    if (nextSolved.length === 7) {
-      get().showToast('Congratulations! All 7 reaction mechanism steps completed. Continuous playback unlocked!');
+    if (nextSolved.length >= 8) {
+      get().showToast('🎉 Congratulations! All 8 reaction mechanism steps completed! Continuous full mechanism playback unlocked!', 'success');
     } else {
-      get().showToast(`Step ${stepIdx + 1} verified! Next step unlocked.`);
+      get().showToast(`Step ${stepIdx + 1} verified! Next step unlocked.`, 'success');
     }
   },
 
+  setDeductionAnswer: (stepIdx, partialAnswer) => {
+    const { deductionAnswers } = get();
+    const existing = deductionAnswers[stepIdx] || { phase: '', equation: '', breakBond: '', formBond: '' };
+    const nextAnswers = {
+      ...deductionAnswers,
+      [stepIdx]: { ...existing, ...partialAnswer },
+    };
+    set({ deductionAnswers: nextAnswers });
+    saveGuidedProgressToStorage({ deductionAnswers: nextAnswers });
+  },
+
+  reopenDeduction: (stepIdx: number) => {
+    const { solvedSteps } = get();
+    const nextSolved = solvedSteps.filter((s) => s !== stepIdx);
+    set({ solvedSteps: nextSolved });
+    saveGuidedProgressToStorage({ solvedSteps: nextSolved });
+    get().showToast(`Step ${stepIdx + 1} deduction reopened for editing.`);
+  },
+
+  playAllContinuous: () => {
+    get().pause();
+    set({
+      continuous: true,
+      playing: true,
+      index: 1,
+      progress: 0,
+      selection: null,
+    });
+    get().showToast('▶ Playing complete reaction mechanism from Step 1 to Step 8 continuous…', 'info');
+  },
+
   manualSaveProgress: () => {
-    const { slotState, pipelineData, pipelineVerified, screen, unlockedMaxStep, solvedSteps, index } = get();
+    const { slotState, pipelineData, pipelineVerified, screen, unlockedMaxStep, solvedSteps, deductionAnswers, index } = get();
     try {
       saveGuidedProgressToStorage({
         slotState,
@@ -1174,6 +1223,7 @@ export const useChemStore = create<ChemStoreState>((set, get) => ({
         screen,
         unlockedMaxStep,
         solvedSteps,
+        deductionAnswers,
         index,
       });
       get().showToast('Progress saved successfully to this browser ✓', 'success');

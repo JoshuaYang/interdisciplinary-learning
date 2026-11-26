@@ -8,8 +8,10 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  Film,
   HelpCircle,
   Lock,
+  Play,
   RotateCcw,
   Shield,
   Sparkles,
@@ -80,12 +82,14 @@ export const StageScreen: React.FC = () => {
   const index = useChemStore((s) => s.index);
   const progress = useChemStore((s) => s.progress);
   const playing = useChemStore((s) => s.playing);
+  const continuous = useChemStore((s) => s.continuous);
   const speed = useChemStore((s) => s.speed);
   const showMeasurements = useChemStore((s) => s.showMeasurements);
   const showContext = useChemStore((s) => s.showContext);
   const selection = useChemStore((s) => s.selection);
   const unlockedMaxStep = useChemStore((s) => s.unlockedMaxStep);
   const solvedSteps = useChemStore((s) => s.solvedSteps);
+  const deductionAnswers = useChemStore((s) => s.deductionAnswers);
   const presetPreFilled = useChemStore((s) => s.presetPreFilled);
   const resetCameraTrigger = useChemStore((s) => s.resetCameraTrigger);
 
@@ -98,6 +102,9 @@ export const StageScreen: React.FC = () => {
   const toggleContext = useChemStore((s) => s.toggleContext);
   const returnToPipeline = useChemStore((s) => s.returnToPipeline);
   const markStepSolved = useChemStore((s) => s.markStepSolved);
+  const setDeductionAnswer = useChemStore((s) => s.setDeductionAnswer);
+  const reopenDeduction = useChemStore((s) => s.reopenDeduction);
+  const playAllContinuous = useChemStore((s) => s.playAllContinuous);
 
   const stageRef = useRef<HTMLElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -116,11 +123,25 @@ export const StageScreen: React.FC = () => {
     text: string;
   } | null>(null);
 
+  const handleAnswerChange = (field: 'phase' | 'equation' | 'breakBond' | 'formBond', val: string) => {
+    if (field === 'phase') setSelPhase(val);
+    else if (field === 'equation') setSelEq(val);
+    else if (field === 'breakBond') setSelBreak(val);
+    else if (field === 'formBond') setSelForm(val);
+    setDeductionAnswer(index, { [field]: val });
+  };
+
   useEffect(() => {
     const d = deduction.STEPS_DATA[index];
     const isSolved = solvedSteps.includes(index);
+    const savedAns = deductionAnswers[index];
     if (d && !d.isObservation) {
-      if (isSolved || presetPreFilled) {
+      if (savedAns) {
+        setSelPhase(savedAns.phase || '');
+        setSelEq(savedAns.equation || '');
+        setSelBreak(savedAns.breakBond || '');
+        setSelForm(savedAns.formBond || '');
+      } else if (isSolved || presetPreFilled) {
         setSelPhase(d.phase || '');
         setSelEq(d.equation || '');
         setSelBreak(d.breakBond || '');
@@ -133,7 +154,7 @@ export const StageScreen: React.FC = () => {
       }
     }
     setDeductionFeedback(null);
-  }, [index, solvedSteps, presetPreFilled]);
+  }, [index, solvedSteps, deductionAnswers, presetPreFilled]);
 
   const [showArrows, setShowArrows] = useState(true);
   const [showVdwShell, setShowVdwShell] = useState(false);
@@ -801,8 +822,10 @@ export const StageScreen: React.FC = () => {
           hold += dt;
           if (hold >= 1.2) {
             hold = 0;
-            if (st.index === 6) {
-              st.pause();
+            const maxIdx = (st.config?.steps.length || 8) - 1;
+            if (st.index >= maxIdx) {
+              useChemStore.setState({ playing: false, continuous: false });
+              useChemStore.getState().showToast('🎉 Full mechanism continuous animation completed!', 'success');
             } else {
               useChemStore.setState({
                 index: st.index + 1,
@@ -882,7 +905,12 @@ export const StageScreen: React.FC = () => {
       type: 'success',
       text: 'Correct! Playing 3D molecular mechanism animation…',
     });
-    markStepSolved(index);
+    markStepSolved(index, {
+      phase: selPhase,
+      equation: selEq,
+      breakBond: selBreak,
+      formBond: selForm,
+    });
   };
 
   let playIcon = '↻';
@@ -933,6 +961,37 @@ export const StageScreen: React.FC = () => {
             );
           })}
         </nav>
+
+        {/* Dedicated Sidebar Continuous Mechanism Playback Button */}
+        <div className="sidebar-full-play-wrap" style={{ padding: '12px 14px', borderTop: '1px solid rgba(226, 232, 240, 0.8)' }}>
+          <button
+            type="button"
+            className="full-continuous-side-btn"
+            disabled={!allSolved}
+            onClick={playAllContinuous}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '9px 12px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              fontWeight: 600,
+              background: allSolved ? 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)' : 'rgba(148, 163, 184, 0.12)',
+              color: allSolved ? '#ffffff' : '#94a3b8',
+              border: 'none',
+              boxShadow: allSolved ? '0 2px 8px rgba(37, 99, 235, 0.25)' : 'none',
+              cursor: allSolved ? 'pointer' : 'not-allowed',
+              transition: 'all 0.2s ease',
+            }}
+            title={allSolved ? 'Play complete mechanism sequentially from Step 1 to Step 8' : 'Complete all steps to unlock full continuous playback'}
+          >
+            <Film size={15} />
+            <span>{continuous ? 'Continuous Playing…' : 'Full Mechanism Play'}</span>
+          </button>
+        </div>
       </aside>
 
       {/* Center 3D Stage & Playback Transport */}
@@ -940,6 +999,47 @@ export const StageScreen: React.FC = () => {
         <section className="step-heading" aria-live="polite" aria-atomic="true">
           <h2 id="step-title">{currentStep.title}</h2>
           <p id="step-description">{currentStep.description}</p>
+          {allSolved && (
+            <div
+              className="all-solved-continuous-banner"
+              style={{
+                marginTop: '10px',
+                padding: '8px 14px',
+                background: 'linear-gradient(90deg, rgba(16, 185, 129, 0.12) 0%, rgba(56, 189, 248, 0.12) 100%)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#047857', fontWeight: 600 }}>
+                <span>🎉 All 8 mechanism steps verified! Full reaction mechanism ready.</span>
+              </div>
+              <button
+                type="button"
+                onClick={playAllContinuous}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '5px 12px',
+                  background: continuous ? '#0284c7' : '#059669',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 6px rgba(5, 150, 105, 0.25)',
+                }}
+              >
+                <Film size={14} />
+                <span>{continuous ? 'Continuous Playing…' : 'Play Complete 1→8'}</span>
+              </button>
+            </div>
+          )}
           {index === 7 && (
             <div className="termination-pathway-tabs" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '6px' }}>
               <div
@@ -1258,7 +1358,7 @@ export const StageScreen: React.FC = () => {
                           key={`deduce-phase-${index}`}
                           id="deduce-phase"
                           value={selPhase}
-                          onChange={(val) => setSelPhase(val)}
+                          onChange={(val) => handleAnswerChange('phase', val)}
                           options={stepData.phaseOptions || []}
                           placeholder="Select reaction stage…"
                         />
@@ -1273,7 +1373,7 @@ export const StageScreen: React.FC = () => {
                           key={`deduce-eq-${index}`}
                           id="deduce-equation"
                           value={selEq}
-                          onChange={(val) => setSelEq(val)}
+                          onChange={(val) => handleAnswerChange('equation', val)}
                           options={stepData.equationOptions || []}
                           placeholder="Select species change…"
                         />
@@ -1288,7 +1388,7 @@ export const StageScreen: React.FC = () => {
                           key={`deduce-break-${index}`}
                           id="deduce-break"
                           value={selBreak}
-                          onChange={(val) => setSelBreak(val)}
+                          onChange={(val) => handleAnswerChange('breakBond', val)}
                           options={stepData.breakBondOptions || []}
                           placeholder="Select broken bond…"
                         />
@@ -1303,7 +1403,7 @@ export const StageScreen: React.FC = () => {
                           key={`deduce-form-${index}`}
                           id="deduce-form"
                           value={selForm}
-                          onChange={(val) => setSelForm(val)}
+                          onChange={(val) => handleAnswerChange('formBond', val)}
                           options={stepData.formBondOptions || []}
                           placeholder="Select formed bond…"
                         />
@@ -1312,9 +1412,29 @@ export const StageScreen: React.FC = () => {
 
                     {isCurrentSolved && (
                       <div className="deduction-summary-box solved-box">
-                        <div className="summary-box-title">
-                          <CheckCircle2 size={16} />
-                          <span>Step Conclusion (Verified ✓)</span>
+                        <div className="summary-box-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <CheckCircle2 size={16} />
+                            <span>Step Conclusion (Verified ✓)</span>
+                          </span>
+                          <button
+                            type="button"
+                            className="reopen-deduction-btn"
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              color: '#2563eb',
+                              background: 'rgba(37, 99, 235, 0.08)',
+                              border: '1px solid rgba(37, 99, 235, 0.25)',
+                              borderRadius: '4px',
+                              padding: '2px 8px',
+                              cursor: 'pointer',
+                            }}
+                            title="Clear verification to modify answers"
+                            onClick={() => reopenDeduction(index)}
+                          >
+                            Re-attempt
+                          </button>
                         </div>
                         <p className="summary-box-text">{stepData.summary}</p>
                       </div>
@@ -1333,7 +1453,7 @@ export const StageScreen: React.FC = () => {
                 )}
               </div>
 
-              {!isCurrentSolved && index > 0 && index <= unlockedMaxStep + 1 ? (
+              {index > 0 && index <= unlockedMaxStep + 1 ? (
                 <div className="deduction-action">
                   <button
                     id="deduction-submit-btn"
@@ -1342,7 +1462,7 @@ export const StageScreen: React.FC = () => {
                     onClick={handleDeductionSubmit}
                   >
                     <Sparkles size={16} />
-                    <span>Verify Deduction</span>
+                    <span>{isCurrentSolved ? 'Update & Re-verify' : 'Verify Deduction'}</span>
                   </button>
                 </div>
               ) : null}
@@ -1400,6 +1520,32 @@ export const StageScreen: React.FC = () => {
                 <span id="play-text">{playText}</span>
               </button>
               <button
+                id="play-continuous-btn"
+                type="button"
+                className={`stage-continuous-btn ${continuous ? 'active-continuous' : ''}`}
+                title={allSolved ? 'Play complete mechanism consecutively from Step 1 to Step 8' : 'Complete and verify all steps to unlock full continuous playback'}
+                disabled={!allSolved}
+                onClick={playAllContinuous}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  padding: '7px 12px',
+                  borderRadius: '6px',
+                  background: continuous ? 'rgba(56, 189, 248, 0.2)' : allSolved ? 'rgba(16, 185, 129, 0.12)' : 'rgba(148, 163, 184, 0.1)',
+                  border: continuous ? '1px solid #38bdf8' : allSolved ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(148, 163, 184, 0.25)',
+                  color: continuous ? '#0284c7' : allSolved ? '#059669' : '#94a3b8',
+                  cursor: allSolved ? 'pointer' : 'not-allowed',
+                  transition: 'all 0.2s ease',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                <Film size={14} />
+                <span>{continuous ? 'Playing 1→8…' : 'Play Full (1→8)'}</span>
+              </button>
+              <button
                 id="next"
                 type="button"
                 className="icon-button transport-side"
@@ -1421,7 +1567,7 @@ export const StageScreen: React.FC = () => {
                       : 'Playing'
                     : progress < 1
                     ? 'Paused'
-                    : index === 6
+                    : index >= config.steps.length - 1
                     ? 'Completed'
                     : 'Ready'}
                 </span>
