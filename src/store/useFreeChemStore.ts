@@ -287,6 +287,73 @@ export interface FreeChemStoreState {
   setSpeed: (s: number) => void;
   setSelection: (atomId: string | null) => void;
   triggerResetView: () => void;
+  manualSaveProgress: () => boolean;
+}
+
+const FREE_STORAGE_KEY = 'chem_free_progress_v2';
+
+export function saveFreeProgressToStorage(state: {
+  molecules?: FreeMoleculeItem[];
+  stages?: FreeStageDef[];
+  screen?: string;
+  activeStageTab?: number;
+}) {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    const existing = getStoredFreeProgress() || {};
+    const payload = {
+      molecules: state.molecules ? state.molecules.map((m) => m.doc) : existing.molecules,
+      stages: state.stages !== undefined ? state.stages : existing.stages,
+      screen: state.screen !== undefined ? state.screen : existing.screen,
+      activeStageTab: state.activeStageTab !== undefined ? state.activeStageTab : existing.activeStageTab,
+      updatedAt: Date.now(),
+    };
+    window.localStorage.setItem(FREE_STORAGE_KEY, JSON.stringify(payload));
+  } catch (err) {
+    console.warn('Auto-save free progress to localStorage failed:', err);
+  }
+}
+
+export function getStoredFreeProgress(): any {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
+    const raw = window.localStorage.getItem(FREE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getInitialFreeState() {
+  const stored = getStoredFreeProgress();
+  if (stored && Array.isArray(stored.molecules) && stored.molecules.length > 0) {
+    try {
+      const molecules: FreeMoleculeItem[] = stored.molecules.map((d: any) => createItemFromDoc(d));
+      const stages: FreeStageDef[] =
+        Array.isArray(stored.stages) && stored.stages.length > 0
+          ? stored.stages
+          : [{ id: `stage_1`, name: 'Stage 1', reactants: [], products: [] }];
+      const screen =
+        stored.screen === 'stage' || stored.screen === 'pipeline' || stored.screen === 'gate'
+          ? stored.screen
+          : 'gate';
+      return {
+        molecules,
+        stages,
+        screen,
+        activeStageTab: typeof stored.activeStageTab === 'number' ? stored.activeStageTab : 0,
+      };
+    } catch (e) {
+      console.warn('Failed to restore free progress:', e);
+    }
+  }
+  const sample = buildInitialSampleState();
+  return {
+    molecules: sample.molecules,
+    stages: sample.stages,
+    screen: 'gate' as const,
+    activeStageTab: 0,
+  };
 }
 
 export const resolveInitialAppMode = (): 'home' | 'guided' | 'free' => {
@@ -298,11 +365,11 @@ export const resolveInitialAppMode = (): 'home' | 'guided' | 'free' => {
   return 'home';
 };
 
-const initialSample = buildInitialSampleState();
+const initialSample = getInitialFreeState();
 
 export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
   appMode: resolveInitialAppMode(),
-  screen: 'gate',
+  screen: initialSample.screen,
 
   molecules: initialSample.molecules,
   previewMolId: null,
@@ -310,7 +377,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
   editingMolId: null,
 
   stages: initialSample.stages,
-  activeStageTab: 0,
+  activeStageTab: initialSample.activeStageTab,
   selectedPoolMolId: null,
 
   compiledStages: compileFreeStages(initialSample.molecules, initialSample.stages),
@@ -352,10 +419,12 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
         playing: false,
         continuous: false,
       });
+      saveFreeProgressToStorage({ screen: 'stage' });
       return;
     }
     get().pause();
     set({ screen });
+    saveFreeProgressToStorage({ screen });
   },
 
   setPreviewMolId: (previewMolId) => set({ previewMolId }),
@@ -376,6 +445,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       molecules: nextMolecules,
       compiledStages: compileFreeStages(nextMolecules, stages),
     });
+    saveFreeProgressToStorage({ molecules: nextMolecules });
     return item;
   },
 
@@ -395,6 +465,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       selectedPoolMolId: selectedPoolMolId === id ? null : selectedPoolMolId,
       compiledStages: compileFreeStages(nextMolecules, nextStages),
     });
+    saveFreeProgressToStorage({ molecules: nextMolecules, stages: nextStages });
     if (removed) {
       useChemStore.getState().showToast(`Deleted "${removed.mol.name} (${removed.mol.formula})"`);
     }
@@ -413,6 +484,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       selectedPoolMolId: null,
       compiledStages: [],
     });
+    saveFreeProgressToStorage({ molecules: [], stages: nextStages });
     useChemStore.getState().showToast('Cleared all chemical substances.');
   },
 
@@ -424,6 +496,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       activeStageTab: 0,
       compiledStages: compileFreeStages(sample.molecules, sample.stages),
     });
+    saveFreeProgressToStorage({ molecules: sample.molecules, stages: sample.stages });
     useChemStore
       .getState()
       .showToast(`Loaded ${sample.molecules.length} sample substances and 4 reaction stages!`);
@@ -459,7 +532,10 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
     }
   },
 
-  setActiveStageTab: (idx) => set({ activeStageTab: idx }),
+  setActiveStageTab: (idx) => {
+    set({ activeStageTab: idx });
+    saveFreeProgressToStorage({ activeStageTab: idx });
+  },
   setSelectedPoolMolId: (id) => set({ selectedPoolMolId: id }),
 
   addStage: (name) => {
@@ -475,6 +551,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       stages: nextStages,
       activeStageTab: nextStages.length - 1,
     });
+    saveFreeProgressToStorage({ stages: nextStages, activeStageTab: nextStages.length - 1 });
     useChemStore.getState().showToast(`Added "${newStage.name}"`);
   },
 
@@ -492,6 +569,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       stages: nextStages,
       activeStageTab: nextTab,
     });
+    saveFreeProgressToStorage({ stages: nextStages, activeStageTab: nextTab });
     if (removed) {
       useChemStore.getState().showToast(`Deleted "${removed.name}"`);
     }
@@ -500,6 +578,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
   renameStage: (stageId, name) => {
     const nextStages = get().stages.map((s) => (s.id === stageId ? { ...s, name } : s));
     set({ stages: nextStages });
+    saveFreeProgressToStorage({ stages: nextStages });
   },
 
   addMolToStageZone: (stageId, role, molId) => {
@@ -507,6 +586,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       s.id === stageId ? { ...s, [role]: [...s[role], molId] } : s
     );
     set({ stages: nextStages, selectedPoolMolId: null });
+    saveFreeProgressToStorage({ stages: nextStages });
   },
 
   removeMolFromStageZone: (stageId, role, itemIdx) => {
@@ -517,6 +597,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       return { ...s, [role]: list };
     });
     set({ stages: nextStages });
+    saveFreeProgressToStorage({ stages: nextStages });
   },
 
   clearCurrentStageZones: () => {
@@ -527,6 +608,7 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
       idx === activeStageTab ? { ...s, reactants: [], products: [] } : s
     );
     set({ stages: nextStages });
+    saveFreeProgressToStorage({ stages: nextStages });
     useChemStore.getState().showToast(`Cleared reactants and products in "${cur.name}".`);
   },
 
@@ -607,4 +689,16 @@ export const useFreeChemStore = create<FreeChemStoreState>((set, get) => ({
   setSpeed: (speed) => set({ speed }),
   setSelection: (selection) => set({ selection }),
   triggerResetView: () => set((s) => ({ resetCameraTrigger: s.resetCameraTrigger + 1 })),
+
+  manualSaveProgress: () => {
+    const { molecules, stages, screen, activeStageTab } = get();
+    try {
+      saveFreeProgressToStorage({ molecules, stages, screen, activeStageTab });
+      useChemStore.getState().showToast('Free workbench progress saved successfully ✓', 'success');
+      return true;
+    } catch (e: any) {
+      useChemStore.getState().showToast('Failed to save: ' + e.message, 'error');
+      return false;
+    }
+  },
 }));

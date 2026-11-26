@@ -143,6 +143,8 @@ export const App: React.FC = () => {
         e.preventDefault();
         if (fs.appMode === 'guided') {
           useChemStore.getState().manualSaveProgress();
+        } else if (fs.appMode === 'free') {
+          useFreeChemStore.getState().manualSaveProgress();
         }
         return;
       }

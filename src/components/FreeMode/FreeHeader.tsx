@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowLeft, Atom, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, Atom, Check, ChevronRight, Save } from 'lucide-react';
 import { useFreeChemStore } from '../../store/useFreeChemStore';
 
 export const FreeHeader: React.FC = () => {
@@ -7,6 +7,17 @@ export const FreeHeader: React.FC = () => {
   const setScreen = useFreeChemStore((s) => s.setScreen);
   const setAppMode = useFreeChemStore((s) => s.setAppMode);
   const enterStage = useFreeChemStore((s) => s.enterStage);
+  const manualSaveProgress = useFreeChemStore((s) => s.manualSaveProgress);
+
+  const [justSaved, setJustSaved] = useState(false);
+
+  const handleManualSave = () => {
+    const ok = manualSaveProgress();
+    if (ok) {
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2200);
+    }
+  };
 
   return (
     <header className="app-header">
@@ -31,7 +42,27 @@ export const FreeHeader: React.FC = () => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button
+          type="button"
+          className={`header-manual-save-btn ${justSaved ? 'saved' : ''}`}
+          onClick={handleManualSave}
+          title="Save your current progress immediately (Ctrl+S / ⌘S)"
+          aria-label="Save Progress"
+        >
+          {justSaved ? (
+            <>
+              <Check size={14} strokeWidth={2.5} />
+              <span>Saved ✓</span>
+            </>
+          ) : (
+            <>
+              <Save size={14} strokeWidth={2.2} />
+              <span>Save</span>
+            </>
+          )}
+        </button>
+
         <div className="header-autosave-pill" title="Molecules and reaction stages are auto-saved in this browser">
           <span className="autosave-status-dot" />
           <span>Auto-saved</span>

@@ -1076,37 +1076,46 @@ export const MoleculeBuilderModal: React.FC = () => {
   // Continuous Auto-save logic
   const executeAutoSave = useCallback(() => {
     if (!isModalOpen) return false;
+    if (nodes.length === 0) return false;
+
+    const inferred = inferFormulaAndName(nodes, bonds);
+    const docToSave = currentDoc || {
+      name: name.trim() || inferred.name,
+      formula: formula.trim() || inferred.formula,
+      description: description.trim() || inferred.description,
+      geometry: geometry || (nodes.length === 2 ? 'diatomic' : nodes.length === 1 ? 'atomic' : 'regularTetrahedral'),
+      hybridization: hybridization || 'none',
+      bondLengths: bondLengthsInput,
+      bondAngles: bondAnglesInput,
+      nodes,
+      bonds,
+    };
+
     if (guidedSlotId) {
-      if (nodes.length === 0) return false;
-      const docToSave = currentDoc || {
-        name,
-        formula,
-        description,
-        nodes,
-        bonds,
-        geometry,
-        hybridization,
-        bondLengths: bondLengthsInput,
-        bondAngles: bondAnglesInput,
-      };
       saveDocForSlot(guidedSlotId, docToSave);
       return true;
     }
-    if (editingMolId && currentDoc) {
-      saveMoleculeDoc(currentDoc, editingMolId);
+
+    try {
+      const item = saveMoleculeDoc(docToSave, editingMolId || undefined);
+      if (!editingMolId && item?.id) {
+        useFreeChemStore.setState({ editingMolId: item.id });
+      }
       return true;
+    } catch (err: any) {
+      console.warn('Auto-save molecule failed:', err);
+      return false;
     }
-    return false;
   }, [
     isModalOpen,
+    nodes,
+    bonds,
     guidedSlotId,
     editingMolId,
     currentDoc,
     name,
     formula,
     description,
-    nodes,
-    bonds,
     geometry,
     hybridization,
     bondLengthsInput,
@@ -1140,7 +1149,17 @@ export const MoleculeBuilderModal: React.FC = () => {
 
   // Save the constructed molecule into the Zustand store
   const handleSaveMolecule = () => {
-    executeAutoSave();
+    if (nodes.length === 0) {
+      triggerSaveError('Please add at least one atom before saving.');
+      return;
+    }
+    const saved = executeAutoSave();
+    if (saved) {
+      const inferred = inferFormulaAndName(nodes, bonds);
+      const molName = name.trim() || inferred.name;
+      const molFormula = formula.trim() || inferred.formula;
+      showToast(`Saved substance "${molName} (${molFormula})" ✓`);
+    }
     handleCloseModal();
   };
 

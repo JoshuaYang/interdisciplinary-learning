@@ -415,4 +415,29 @@ describe('Chem Engine & Deduction Suite', () => {
     });
     expect(assembledFromPreset.molecules.CH4).toBeDefined();
   });
+
+  it('correctly creates, saves, and appends new molecules in Free-Form Builder mode', () => {
+    const newDoc = {
+      name: 'Water',
+      formula: 'H2O',
+      geometry: 'bent',
+      hybridization: 'sp3',
+      bondLengths: { 'O-H': 0.96 },
+      bondAngles: { 'H-O-H': 104.5 },
+      nodes: [
+        { id: 'o1', element: 'O', radical: 0, x: 250, y: 160 },
+        { id: 'h1', element: 'H', radical: 0, x: 180, y: 220 },
+        { id: 'h2', element: 'H', radical: 0, x: 320, y: 220 },
+      ],
+      bonds: [
+        { id: 'b1', from: 'o1', to: 'h1', order: 1, length: 0.96 },
+        { id: 'b2', from: 'o1', to: 'h2', order: 1, length: 0.96 },
+      ],
+    };
+
+    const waterMol = freeEngine.buildUniversalMolecule(newDoc);
+    expect(waterMol.atoms.length).toBe(3);
+    expect(waterMol.bonds.length).toBe(2);
+    expect(waterMol.formula).toBe('H2O');
+  });
 });
