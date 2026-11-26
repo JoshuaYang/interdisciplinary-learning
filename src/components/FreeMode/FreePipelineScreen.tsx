@@ -15,8 +15,6 @@ import {
   ArrowLeft,
   ArrowRight,
   Atom,
-  ChevronLeft,
-  ChevronRight,
   Edit3,
   Flame,
   GripVertical,
@@ -203,7 +201,6 @@ export const FreePipelineScreen: React.FC = () => {
   const renameStage = useFreeChemStore((s) => s.renameStage);
   const setStageProcessType = useFreeChemStore((s) => s.setStageProcessType);
   const setStageCondition = useFreeChemStore((s) => s.setStageCondition);
-  const moveStage = useFreeChemStore((s) => s.moveStage);
   const reorderStage = useFreeChemStore((s) => s.reorderStage);
   const addMolToStageZone = useFreeChemStore((s) => s.addMolToStageZone);
   const clearCurrentStageZones = useFreeChemStore((s) => s.clearCurrentStageZones);
@@ -471,36 +468,6 @@ export const FreePipelineScreen: React.FC = () => {
                   </div>
                   <div className="stage-header-actions">
                     {stages.length > 1 && (
-                      <div className="stage-reorder-group" title="Adjust reaction stage sequence order">
-                        <span className="reorder-group-label">Sequence:</span>
-                        <button
-                          type="button"
-                          className="stage-move-nav-btn"
-                          disabled={activeStageTab === 0}
-                          onClick={() => moveStage(activeStageTab, -1)}
-                          title="Move current stage earlier (left)"
-                          aria-label="Move current stage earlier"
-                        >
-                          <ChevronLeft size={15} />
-                          <span>Move Left</span>
-                        </button>
-                        <span className="stage-order-badge mono">
-                          {activeStageTab + 1} / {stages.length}
-                        </span>
-                        <button
-                          type="button"
-                          className="stage-move-nav-btn"
-                          disabled={activeStageTab === stages.length - 1}
-                          onClick={() => moveStage(activeStageTab, 1)}
-                          title="Move current stage later (right)"
-                          aria-label="Move current stage later"
-                        >
-                          <span>Move Right</span>
-                          <ChevronRight size={15} />
-                        </button>
-                      </div>
-                    )}
-                    {stages.length > 1 && (
                       <button
                         type="button"
                         className="stage-delete-btn"
@@ -604,9 +571,9 @@ export const FreePipelineScreen: React.FC = () => {
                     role="reactants"
                     titleText={
                       currentStage.processType === 'approach'
-                        ? 'Approaching Species (逼近物料)'
+                        ? 'Approaching Species'
                         : currentStage.processType === 'excitation'
-                        ? 'Absorbing Molecule(s) (受激物料)'
+                        ? 'Absorbing Molecule(s)'
                         : 'Reactants (Before Reaction)'
                     }
                     particles={currentStage.reactants}
@@ -644,9 +611,9 @@ export const FreePipelineScreen: React.FC = () => {
                     role="products"
                     titleText={
                       currentStage.processType === 'approach'
-                        ? 'Target Substrate / Particles (目标物料)'
+                        ? 'Target Substrate / Particles'
                         : currentStage.processType === 'excitation'
-                        ? 'Excited State System (受激产态)'
+                        ? 'Excited State System'
                         : 'Products (After Reaction)'
                     }
                     particles={currentStage.products}
